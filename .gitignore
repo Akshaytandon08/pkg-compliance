@@ -1,10 +1,25 @@
-node_modules/
-.next/
-.env
-.env.local
-.env*.local
-*.log
+# dependencies
+/node_modules
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+/build
+*.tsbuildinfo
+next-env.d.ts
+
+# env files
+.env*
+!.env.example
+
+# misc
 .DS_Store
+*.pem
+*.log
+.vercel
+
+# MS Office lock files
 ~$*
-coverage/
-dist/

@@ -3,7 +3,7 @@
 Working codename: `pkg-compliance` (product name TBD — do not invent one).
 Source of truth for product decisions: [docs/BRIEF.md](docs/BRIEF.md). Decisions there are settled; raise deltas to Akshay Tandon (product owner & interim regulatory owner). Every corpus change requires his sign-off — hard gate.
 
-**Status: Sprint 0 — reference artefacts received; next: app scaffold. Last updated: 2026-08-06.**
+**Status: Sprint 0 complete — scaffold up, build green. Next: Sprint 1 corpus seeding. Last updated: 2026-08-06.**
 
 ## Hard constraints (enforce in code, verify in review)
 
@@ -35,7 +35,8 @@ Source of truth for product decisions: [docs/BRIEF.md](docs/BRIEF.md). Decisions
 - [x] Development plan (this file)
 - [x] Git repo initialised, initial commit
 - [x] Three reference artefacts received into `/reference` (2026-08-06; sheet structure verified against brief §8)
-- [ ] Scaffold Next.js + PostgreSQL app matching Fitsol conventions
+- [x] Scaffold: Next.js 16 (App Router, TS, Tailwind) + Postgres 16 (Docker) + Drizzle ORM with SQL migrations. Checkpoint + corpus_versions schema implemented per brief §5 (migration `0000_corpus-schema`). Forbidden-language guardrail in `scripts/check-language.mjs`, wired into `npm run check`.
+  - Convention delta to confirm against Fitsol Asset Classification Directory: ORM choice (Drizzle) — swap only if Fitsol standard differs.
 
 ## Sprint 1 — Corpus + schema
 
