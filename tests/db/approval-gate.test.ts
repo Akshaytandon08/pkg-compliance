@@ -3,6 +3,9 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import postgres from "postgres";
+import { drizzle } from "drizzle-orm/postgres-js";
+import * as schema from "../../src/db/schema.ts";
+import { promoteCheckpointToInForce } from "../../src/db/corpus.ts";
 
 try {
   process.loadEnvFile(".env");
@@ -12,6 +15,7 @@ try {
 
 const url = process.env.DATABASE_URL;
 let sql: ReturnType<typeof postgres> | undefined;
+let orm: ReturnType<typeof drizzle<typeof schema>> | undefined;
 let reachable = false;
 
 if (url) {
@@ -19,6 +23,7 @@ if (url) {
   try {
     await sql`select 1`;
     reachable = true;
+    orm = drizzle(sql, { schema });
   } catch {
     await sql.end({ timeout: 1 }).catch(() => {});
     sql = undefined;
@@ -30,6 +35,7 @@ const dbRequired = {
 };
 
 const ID = "TEST-approval-gate";
+const ID_HELPER = "TEST-approval-helper";
 
 // Deliberately weak citation: proves the NOT NULL column alone is no gate.
 const insertDraft = (db: NonNullable<typeof sql>, id: string, status = "draft") =>
@@ -40,18 +46,23 @@ const insertDraft = (db: NonNullable<typeof sql>, id: string, status = "draft") 
       ${status}, 'Test requirement.', '{supplier_declaration}', 'plausible-looking string')
   `;
 
+// Deletes must run approvals → checkpoints → corpus_versions: the FK from
+// approvals to checkpoints is ON DELETE RESTRICT, and approvals reference
+// corpus_versions, so parents cannot go first.
+async function cleanup(db: NonNullable<typeof sql>) {
+  await db`delete from checkpoint_approvals where checkpoint_id like 'TEST-%'`;
+  await db`delete from checkpoints where id like 'TEST-%'`;
+  await db`delete from corpus_versions where label like 'TEST-%'`;
+}
+
 before(async () => {
   if (!reachable || !sql) return;
-  await sql`delete from checkpoints where id like 'TEST-%'`;
-  await sql`delete from corpus_versions where label like 'TEST-%'`;
+  await cleanup(sql);
 });
 
 after(async () => {
   if (!sql) return;
-  if (reachable) {
-    await sql`delete from checkpoints where id like 'TEST-%'`;
-    await sql`delete from corpus_versions where label like 'TEST-%'`;
-  }
+  if (reachable) await cleanup(sql);
   await sql.end({ timeout: 5 });
 });
 
@@ -114,9 +125,51 @@ test("status may still move to contested or superseded", dbRequired, async () =>
   assert.equal(row.status, "contested");
 });
 
-test("deleting a checkpoint version cascades its approval away", dbRequired, async () => {
+test("deleting an approved checkpoint is blocked (approval history is undeletable)", dbRequired, async () => {
   const db = sql!;
-  await db`delete from checkpoints where id = ${ID}`;
-  const rows = await db`select 1 from checkpoint_approvals where checkpoint_id = ${ID}`;
-  assert.equal(rows.length, 0, "stale approval survived its checkpoint version");
+  // ID still has its approval row from the test above.
+  await assert.rejects(
+    () => db`delete from checkpoints where id = ${ID}`,
+    /violates foreign key constraint|still referenced/,
+    "an approved checkpoint must not be deletable",
+  );
+  const [row] = await db`select 1 from checkpoints where id = ${ID}`;
+  assert.ok(row, "checkpoint survived the blocked delete");
+});
+
+test("guarded helper is the single legal path: draft → approval + in_force atomically", dbRequired, async () => {
+  const db = sql!;
+  const database = orm!;
+  await insertDraft(db, ID_HELPER);
+  const [corpus] = await db`
+    insert into corpus_versions (label, approved_by)
+    values ('TEST-helper-batch', 'Test Owner') returning id
+  `;
+
+  await promoteCheckpointToInForce(database, {
+    checkpointId: ID_HELPER,
+    checkpointVersion: 1,
+    corpusVersionId: Number(corpus.id),
+    approvedBy: "Test Owner",
+    primarySourceUrl: "https://eur-lex.europa.eu/eli/reg/2025/40/oj",
+  });
+
+  const [row] = await db`select status from checkpoints where id = ${ID_HELPER}`;
+  assert.equal(row.status, "in_force");
+  const [approval] =
+    await db`select 1 from checkpoint_approvals where checkpoint_id = ${ID_HELPER}`;
+  assert.ok(approval, "approval row recorded");
+
+  // Re-promoting a non-draft is a mistake worth surfacing.
+  await assert.rejects(
+    () =>
+      promoteCheckpointToInForce(database, {
+        checkpointId: ID_HELPER,
+        checkpointVersion: 1,
+        corpusVersionId: Number(corpus.id),
+        approvedBy: "Test Owner",
+        primarySourceUrl: "https://eur-lex.europa.eu/eli/reg/2025/40/oj",
+      }),
+    /not 'draft'/,
+  );
 });

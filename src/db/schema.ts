@@ -113,6 +113,12 @@ export const corpusVersions = pgTable("corpus_versions", {
 // `in_force` without a row here (trigger-enforced), and an `in_force`
 // checkpoint's substantive fields are immutable — any change to requirement
 // text, threshold or citation requires a new version, hence a new approval.
+//
+// Approval history is an audit record: it must be undeletable. The FK is
+// ON DELETE RESTRICT, so an approved checkpoint physically cannot be deleted.
+// Checkpoints are NEVER deleted — a rule that stops applying transitions to
+// status 'superseded' (optionally with a successor version). This keeps every
+// report reproducible: the checkpoint and the approval it cited both survive.
 export const checkpointApprovals = pgTable(
   "checkpoint_approvals",
   {
@@ -132,12 +138,10 @@ export const checkpointApprovals = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.checkpointId, t.checkpointVersion] }),
-    // Cascade: an approval must not outlive the checkpoint version it
-    // approves, so a re-inserted version cannot inherit stale sign-off.
     foreignKey({
       name: "checkpoint_approvals_checkpoint_version_fk",
       columns: [t.checkpointId, t.checkpointVersion],
       foreignColumns: [checkpoints.id, checkpoints.version],
-    }).onDelete("cascade"),
+    }).onDelete("restrict"),
   ],
 );
