@@ -51,7 +51,7 @@ Source of truth for product decisions: [docs/BRIEF.md](docs/BRIEF.md). Decisions
 
 Sequenced by certainty, not checklist order. Batches of 10–15 checkpoints, **one commit each**, commit body carrying the checkpoint diff plus the primary-source link per checkpoint — so the approval trail lives in git history alongside the data it approves. Checkpoints land as `draft`; approval rows (with `primary_source_url`) are what promote them to `in_force`.
 
-- [ ] **Batch 1 — EU Stack A / PPWR articles.** Highest confidence; primary sources already verified. Review is link-clicking to EUR-Lex.
+- [~] **Batch 1 — EU Stack A / PPWR articles.** 10 checkpoints seeded as `draft` (migration `0003_seed-batch1-eu-ppwr.sql`). **Awaiting Akshay's approval** — the seed commit body is the review queue. `citation_verified_date` is NULL on every row: article/paragraph pinpoints were cross-checked against discovery sources but not yet confirmed against the primary enacting text (the EUR-Lex fetch returned only recitals), so each needs a link-click to confirm before promotion. Two deltas were worked around, not resolved: pack/consignment `subject` lives in `notes` (delta #2), and PFAS's three limits are in `requirement_text` with `threshold` NULL (delta #8) — both still need decisions.
 - [ ] **Batch 2 — EU Stack B/C.** EPR calendar, labelling, claims.
 - [ ] **Batch 3 — India.** Slowest review: every value comes off the §6 re-verify list. Each checkpoint attaches the CPCB notification / gazette PDF link — never a consultancy summary.
 - [ ] Seed to ~60–80 EU+India checkpoints total from the two reference artefacts
