@@ -2,7 +2,7 @@
 
 Raised for product-owner decision before Batch 1 seeds. Writing expected verdicts for the Exide seven against brief §5 surfaced eight gaps. **None are implemented** beyond the three approved corrections — seeding on top of an unresolved answer is what we are trying to avoid.
 
-Source of the findings: [tests/fixtures/exide-traction-cell.json](../tests/fixtures/exide-traction-cell.json), validated by [tests/golden-fixtures.test.ts](../tests/golden-fixtures.test.ts).
+Source of the findings: [eval/fixtures/client-a-traction-cell.json](../eval/fixtures/client-a-traction-cell.json) (the anonymised golden run), validated by [eval/golden-fixtures.test.ts](../eval/golden-fixtures.test.ts).
 
 ---
 

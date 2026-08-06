@@ -63,7 +63,7 @@ Sequenced by certainty, not checklist order. Batches of 10–15 checkpoints, **o
   - Italy plastic tax status
   - CN 7317 (nails) CBAM status
   - PPWR 2030 numbers: 70% recyclability floor, grade dates, Art. 29 40% transport reuse target (EUR-Lex direct)
-- [x] Golden dataset: Exide traction-cell BOM (7 components + 2 photo-gap) with known verdicts — `tests/fixtures/exide-traction-cell.json`
+- [x] Golden dataset: traction-cell BOM (7 components + 2 photo-gap) with known verdicts — `eval/fixtures/client-a-traction-cell.json` (anonymised); eval harness in `eval/` (`golden-fixtures.test.ts` active, `engine-verdicts.test.ts` skipped until the engine lands)
 - [ ] Golden dataset: 2 more real packs (needs client packs from Akshay)
 
 ## Sprint 2 — Engine
