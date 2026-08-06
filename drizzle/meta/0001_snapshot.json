@@ -1,6 +1,6 @@
 {
-  "id": "ca387606-6064-4192-a541-e2943677c714",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "95d65c46-a736-4f61-b0b4-a29181ffe6a4",
+  "prevId": "ca387606-6064-4192-a541-e2943677c714",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -57,30 +57,30 @@
         "checkpoint_approvals_corpus_version_id_corpus_versions_id_fk": {
           "name": "checkpoint_approvals_corpus_version_id_corpus_versions_id_fk",
           "tableFrom": "checkpoint_approvals",
-          "tableTo": "corpus_versions",
           "columnsFrom": [
             "corpus_version_id"
           ],
+          "tableTo": "corpus_versions",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "checkpoint_approvals_checkpoint_version_fk": {
           "name": "checkpoint_approvals_checkpoint_version_fk",
           "tableFrom": "checkpoint_approvals",
-          "tableTo": "checkpoints",
           "columnsFrom": [
             "checkpoint_id",
             "checkpoint_version"
           ],
+          "tableTo": "checkpoints",
           "columnsTo": [
             "id",
             "version"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {
@@ -285,10 +285,10 @@
       "uniqueConstraints": {
         "corpus_versions_label_unique": {
           "name": "corpus_versions_label_unique",
-          "nullsNotDistinct": false,
           "columns": [
             "label"
-          ]
+          ],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -330,10 +330,10 @@
     }
   },
   "schemas": {},
+  "views": {},
   "sequences": {},
   "roles": {},
   "policies": {},
-  "views": {},
   "_meta": {
     "columns": {},
     "schemas": {},

@@ -5,8 +5,9 @@ services:
       POSTGRES_USER: pkg_compliance
       POSTGRES_PASSWORD: pkg_compliance
       POSTGRES_DB: pkg_compliance
+    # 5433 on the host: 5432 is taken by asset-directory-db locally.
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
 

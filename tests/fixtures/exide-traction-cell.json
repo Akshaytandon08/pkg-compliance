@@ -1,0 +1,321 @@
+{
+  "fixtureFormatVersion": 1,
+  "pack": {
+    "id": "exide-traction-cell",
+    "description": "Exide traction-cell export packaging, pallet/transport, industrial B2B",
+    "source": "reference/PPWR_Assessment_Exide_Traction_Cell_Packaging.xlsx",
+    "screeningDate": "2026-07-28"
+  },
+  "asOf": "2026-07-28",
+  "scope": {
+    "geography": "EU",
+    "foodContact": false,
+    "packagingLevel": ["transport", "pallet"],
+    "reusable": false,
+    "scopingNotes": [
+      "Non-food-contact industrial B2B packaging: PFAS limits not applicable. The scoping decision itself is a recorded evidence obligation, not an omission."
+    ]
+  },
+  "legalRole": {
+    "persona": "2a",
+    "derived": ["manufacturer"],
+    "counterpartyRoles": ["importer", "epr_producer"],
+    "ambiguous": true,
+    "ambiguityReason": "Exide is the non-EU manufacturer; the EU importer carries importer obligations. Which party is 'manufacturer' (brand/spec owner) and which is EPR producer in each Member State of first placing must be contractually confirmed — engine flags for legal confirmation, does not assign.",
+    "expectedFlag": "legal_confirmation_required"
+  },
+  "components": [
+    {
+      "line": "1",
+      "name": "Pine wood pallet / crate (heat treated)",
+      "material": "wood",
+      "claims": {
+        "composition": "Pine, heat treated",
+        "ispm15Mark": "IN-747 HT",
+        "chemicalPreservative": null
+      },
+      "expected": [
+        {
+          "checkpointId": "EU-PPWR-heavy-metals",
+          "verdict": "conditional",
+          "designAssessment": "no_inherent_risk",
+          "evidenceState": "absent",
+          "risk": "low",
+          "blockingEvidence": ["supplier_declaration"],
+          "basis": "Heat treatment is thermal, not chemical; no inherent substance of concern."
+        },
+        {
+          "checkpointId": "EU-PPWR-no-chemical-preservative",
+          "verdict": "conditional",
+          "designAssessment": "no_inherent_risk",
+          "evidenceState": "absent",
+          "risk": "low",
+          "blockingEvidence": ["supplier_declaration"],
+          "basis": "Risk only if a chemical preservative (e.g. CCA, which contains Cr(VI)) was used; declaration of heat-treatment-only closes it."
+        },
+        {
+          "checkpointId": "INTL-ISPM15-heat-treatment",
+          "verdict": "qualified",
+          "designAssessment": "no_inherent_risk",
+          "evidenceState": "complete",
+          "risk": "low",
+          "blockingEvidence": [],
+          "basis": "HT stamp IN-747 visible on component; treatment provider certificate on file."
+        }
+      ]
+    },
+    {
+      "line": "2",
+      "name": "Nails (2\")",
+      "material": "metal",
+      "claims": { "composition": "Steel fastener", "coating": null },
+      "expected": [
+        {
+          "checkpointId": "EU-PPWR-heavy-metals",
+          "verdict": "conditional",
+          "designAssessment": "no_inherent_risk",
+          "evidenceState": "absent",
+          "risk": "low",
+          "blockingEvidence": ["supplier_declaration"],
+          "basis": "Plain or trivalent-passivated steel complies; legacy Cr(VI) zinc passivation would breach the 100 mg/kg sum."
+        }
+      ]
+    },
+    {
+      "line": "3",
+      "name": "Corrugated sheet",
+      "material": "corrugated",
+      "claims": { "composition": "Paper / cardboard", "printed": "unknown" },
+      "expected": [
+        {
+          "checkpointId": "EU-PPWR-heavy-metals",
+          "verdict": "conditional",
+          "designAssessment": "no_inherent_risk",
+          "evidenceState": "absent",
+          "risk": "low",
+          "blockingEvidence": ["supplier_declaration"],
+          "basis": "Kraft/corrugated inherently low risk; residual risk sits in inks and recycled furnish."
+        },
+        {
+          "checkpointId": "EU-PPWR-soc-minimisation",
+          "verdict": "conditional",
+          "designAssessment": "no_inherent_risk",
+          "evidenceState": "absent",
+          "risk": "low",
+          "blockingEvidence": ["supplier_declaration"],
+          "basis": "Ink specification required where printed."
+        }
+      ]
+    },
+    {
+      "line": "4",
+      "name": "Honeycomb buffer",
+      "material": "corrugated",
+      "claims": { "composition": "Kraft paper 100%, virgin/recycled" },
+      "expected": [
+        {
+          "checkpointId": "EU-PPWR-heavy-metals",
+          "verdict": "conditional",
+          "designAssessment": "no_inherent_risk",
+          "evidenceState": "absent",
+          "risk": "low",
+          "blockingEvidence": ["supplier_declaration"],
+          "basis": "As line 3."
+        }
+      ]
+    },
+    {
+      "line": "5",
+      "name": "Edge board",
+      "material": "corrugated",
+      "claims": {
+        "composition": "Kraft layers + water-based adhesive (0-5%)",
+        "containsPlastic": true
+      },
+      "expected": [
+        {
+          "checkpointId": "EU-PPWR-heavy-metals",
+          "verdict": "conditional",
+          "designAssessment": "no_inherent_risk",
+          "evidenceState": "absent",
+          "risk": "low",
+          "blockingEvidence": ["supplier_declaration"],
+          "basis": "Composition is paper-based; water-based adhesive is not plastic content."
+        },
+        {
+          "checkpointId": "EU-PPWR-soc-minimisation",
+          "verdict": "conditional",
+          "designAssessment": "no_inherent_risk",
+          "evidenceState": "absent",
+          "risk": "low",
+          "blockingEvidence": ["supplier_declaration"],
+          "basis": "Adhesive substance-of-concern statement required."
+        }
+      ]
+    },
+    {
+      "line": "6",
+      "name": "Poly packet (LDPE bag)",
+      "material": "plastic",
+      "claims": {
+        "composition": "LDPE mono-material",
+        "plasticWeightGrams": null
+      },
+      "expected": [
+        {
+          "checkpointId": "EU-PPWR-heavy-metals",
+          "verdict": "conditional",
+          "designAssessment": "no_inherent_risk",
+          "evidenceState": "absent",
+          "risk": "low",
+          "blockingEvidence": ["supplier_declaration"],
+          "basis": "Mono-material and recyclable; risk limited to pigments and additives."
+        }
+      ]
+    },
+    {
+      "line": "7",
+      "name": "Green polyester strap (PET)",
+      "material": "plastic",
+      "claims": {
+        "composition": "PET with green pigment",
+        "materialClassAsRecorded": "composite"
+      },
+      "expected": [
+        {
+          "checkpointId": "EU-PPWR-heavy-metals",
+          "verdict": "conditional",
+          "designAssessment": "at_risk",
+          "evidenceState": "absent",
+          "risk": "medium",
+          "blockingEvidence": ["lab_test", "test_report", "supplier_declaration"],
+          "basis": "Only genuine chemistry risk in the BOM: green/yellow pigment families historically include lead chromate, which fails Pb and Cr(VI) simultaneously. Modern organic pigments comply but must be evidenced.",
+          "note": "Recorded in the manual run as 'CONDITIONAL — test recommended'. Same verdict as lines 1-6, distinguished only by risk and by pigment specification or XRF/lab test being the closing evidence rather than a routine declaration."
+        }
+      ]
+    }
+  ],
+  "bomCompletenessGaps": [
+    {
+      "ref": "P1",
+      "name": "Steel corner plates / clips",
+      "material": "metal",
+      "detectedIn": "consignment_photo",
+      "verdict": "gap",
+      "reason": "Visible on stacked crates but absent from the BOM. Conformity assessment must cover every packaging component.",
+      "requiredAction": "bom_addition",
+      "blockingEvidence": ["supplier_declaration"]
+    },
+    {
+      "ref": "P2",
+      "name": "Plywood battery box system (veneer + phenolic adhesive, steel closure strips, clips, corrugated layer pad, liner)",
+      "material": "wood",
+      "detectedIn": "consignment_photo",
+      "verdict": "gap",
+      "reason": "Distinct packaging system absent from the BOM. Plywood is a wood-plus-adhesive composite requiring a different declaration to solid pine; steel hardware unlisted; liner material unidentified.",
+      "requiredAction": "bom_addition",
+      "blockingEvidence": ["supplier_declaration", "technical_file"]
+    }
+  ],
+  "dataCorrections": [
+    {
+      "line": "5",
+      "field": "containsPlastic",
+      "recorded": true,
+      "issue": "Contradicts stated composition (kraft + water-based adhesive).",
+      "resolution": "Correct the flag or obtain the adhesive specification.",
+      "forwardRisk": "If any polymer film is present at 5% or more by weight, composite treatment applies."
+    },
+    {
+      "line": "7",
+      "field": "materialClass",
+      "recorded": "composite",
+      "issue": "Pigment does not make a material a composite; PET strap is mono-material.",
+      "resolution": "Reclassify as mono-material."
+    },
+    {
+      "line": "6",
+      "field": "plasticWeightGrams",
+      "recorded": null,
+      "issue": "Mandatory field blank; recycled-content assessment cannot be computed without it.",
+      "resolution": "Populate plastic weight."
+    }
+  ],
+  "notApplicable": [
+    {
+      "checkpointId": "EU-PPWR-pfas-food-contact",
+      "reason": "Packaging is not food-contact.",
+      "recordedScopingNote": true,
+      "note": "N/A is itself an evidence obligation — the scoping reasoning must be recorded in the technical file, not merely omitted."
+    }
+  ],
+  "forwardFlags": [
+    {
+      "checkpointId": "EU-PPWR-recycled-content-plastic",
+      "appliesFrom": "2030-01-01",
+      "affectedLines": ["6", "7"],
+      "note": "Non-contact-sensitive plastic packaging target from 2030; rPET strap and rLDPE film are the substitution route. Exact percentage is on the re-verify list and must come from EUR-Lex before this checkpoint ships."
+    },
+    {
+      "checkpointId": "EU-PPWR-recyclability-grade",
+      "appliesFrom": "2030-01-01",
+      "affectedLines": ["1", "3", "4", "5", "6", "7"],
+      "note": "Grades set by delegated acts. Manual run recorded 'Assessment pending', NOT 'Not applicable' — the report must not render an unassessed forward requirement as inapplicable."
+    }
+  ],
+  "packLevelExpected": [
+    {
+      "checkpointId": "EU-PPWR-technical-documentation",
+      "subject": "pack",
+      "verdict": "conditional",
+      "evidenceState": "absent",
+      "risk": "low",
+      "blockingEvidence": ["technical_file"],
+      "basis": "Annex VII Module A self-assessment file to be compiled covering every packaging spec."
+    },
+    {
+      "checkpointId": "EU-PPWR-declaration-of-conformity",
+      "subject": "pack",
+      "verdict": "conditional",
+      "evidenceState": "absent",
+      "risk": "low",
+      "blockingEvidence": ["technical_file"],
+      "basis": "The obligated operator must issue a Declaration of Conformity per Annex VIII and retain it 5 years for single-use packaging. This is the user's obligation; the screening only reports whether the prerequisites are assembled.",
+      "note": "Deliberate fixture case: the report must instruct the user about their DoC obligation while never presenting itself as issuing one."
+    },
+    {
+      "checkpointId": "EU-PPWR-operator-identification",
+      "subject": "pack",
+      "verdict": "conditional",
+      "evidenceState": "absent",
+      "risk": "low",
+      "blockingEvidence": ["marking"],
+      "basis": "Name/trademark and postal address of manufacturer and importer to be marked on packaging."
+    },
+    {
+      "checkpointId": "EU-EPR-producer-registration",
+      "subject": "consignment",
+      "verdict": "conditional",
+      "evidenceState": "absent",
+      "risk": "low",
+      "blockingEvidence": ["registration"],
+      "basis": "Producer registration in each Member State of first placing; authorised representative where required. A branch office does not qualify as importer.",
+      "note": "Subject is the consignment/market, not the pack — obligation depends on destination Member States, which the BOM does not carry."
+    }
+  ],
+  "expectedOverall": {
+    "verdict": "conditional",
+    "summary": "No material is a design failure for the August 2026 tests; qualification is blocked by missing evidence, not chemistry.",
+    "hardBlockers": [
+      "Zero heavy-metal declarations on file for any of the 7 components.",
+      "PET strap green pigment unverified — the only genuine lab-test candidate.",
+      "Components visible in consignment photos are absent from the BOM."
+    ],
+    "counts": {
+      "qualified": 1,
+      "conditional": 14,
+      "gap": 2,
+      "notApplicable": 1
+    }
+  }
+}

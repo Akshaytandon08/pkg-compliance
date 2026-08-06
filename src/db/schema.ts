@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  foreignKey,
   integer,
   jsonb,
   pgEnum,
@@ -23,7 +24,11 @@ export const jurisdictionLevelEnum = pgEnum("jurisdiction_level", [
 
 export const stackEnum = pgEnum("stack", ["A", "B", "C", "D"]);
 
+// `draft` is the insert state. The ONLY path to `in_force` is an approval
+// record by the regulatory owner (enforced by DB trigger, see migration 0002).
+// The evaluator refuses to produce verdicts from anything not `in_force`.
 export const checkpointStatusEnum = pgEnum("checkpoint_status", [
+  "draft",
   "in_force",
   "upcoming",
   "contested",
@@ -77,7 +82,7 @@ export const checkpoints = pgTable(
     packagingLevel: text("packaging_level").array().notNull(),
     triggerDate: date("trigger_date"),
     sunsetDate: date("sunset_date"),
-    status: checkpointStatusEnum("status").notNull(),
+    status: checkpointStatusEnum("status").notNull().default("draft"),
     requirementText: text("requirement_text").notNull(),
     threshold: jsonb("threshold").$type<Threshold | null>(),
     evidenceType: text("evidence_type").array().notNull(),
@@ -103,3 +108,36 @@ export const corpusVersions = pgTable("corpus_versions", {
     .defaultNow(),
   notes: text("notes"),
 });
+
+// The citation gate, made structural. A checkpoint version cannot reach
+// `in_force` without a row here (trigger-enforced), and an `in_force`
+// checkpoint's substantive fields are immutable — any change to requirement
+// text, threshold or citation requires a new version, hence a new approval.
+export const checkpointApprovals = pgTable(
+  "checkpoint_approvals",
+  {
+    checkpointId: text("checkpoint_id").notNull(),
+    checkpointVersion: integer("checkpoint_version").notNull(),
+    corpusVersionId: integer("corpus_version_id")
+      .notNull()
+      .references(() => corpusVersions.id),
+    // Named regulatory owner who signed off (brief: hard gate, not a review).
+    approvedBy: text("approved_by").notNull(),
+    approvedAt: timestamp("approved_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    // Confirms the approver opened the primary source, not a summary of it.
+    primarySourceUrl: text("primary_source_url").notNull(),
+    notes: text("notes"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.checkpointId, t.checkpointVersion] }),
+    // Cascade: an approval must not outlive the checkpoint version it
+    // approves, so a re-inserted version cannot inherit stale sign-off.
+    foreignKey({
+      name: "checkpoint_approvals_checkpoint_version_fk",
+      columns: [t.checkpointId, t.checkpointVersion],
+      foreignColumns: [checkpoints.id, checkpoints.version],
+    }).onDelete("cascade"),
+  ],
+);

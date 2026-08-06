@@ -22,6 +22,10 @@ npm run db:migrate        # apply corpus migrations
 npm run dev
 ```
 
-- `npm run check` — lint + forbidden-language guardrail + typecheck (run before committing)
+Postgres runs on host port **5433** (5432 is taken by `asset-directory-db` locally).
+
+- `npm run check` — lint + language tripwire + typecheck + tests (run before committing)
+- `npm test` — golden fixtures, verdict rule table, output-language guardrail; database tests skip when no DB is reachable
 - `npm run db:generate` — generate a migration after editing `src/db/schema.ts`
-- Corpus (checkpoint) changes require regulatory-owner sign-off — see [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md)
+
+Corpus (checkpoint) changes require regulatory-owner sign-off. This is enforced, not requested: checkpoints insert as `draft`, and only an approval record in `checkpoint_approvals` permits `in_force` — the evaluator refuses to produce a verdict from anything else. See [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) and [docs/SCHEMA_DELTAS.md](docs/SCHEMA_DELTAS.md).
