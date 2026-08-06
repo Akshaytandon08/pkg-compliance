@@ -1,6 +1,6 @@
 # Reference artefacts
 
-Place these three files here (see [docs/BRIEF.md](../docs/BRIEF.md) §8) — not yet received:
+The three artefacts from [docs/BRIEF.md](../docs/BRIEF.md) §8:
 
 - `PPWR_Assessment_Exide_Traction_Cell_Packaging.xlsx` — manual golden-run: verdict logic, evidence tracker, report format to reproduce.
 - `EU_Export_Packaging_Compliance_Checklist_Automotive.xlsx` — 34-checkpoint seed corpus with applicability, deadlines, evidence types.

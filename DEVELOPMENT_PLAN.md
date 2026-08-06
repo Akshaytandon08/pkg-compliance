@@ -3,7 +3,7 @@
 Working codename: `pkg-compliance` (product name TBD — do not invent one).
 Source of truth for product decisions: [docs/BRIEF.md](docs/BRIEF.md). Decisions there are settled; raise deltas to Akshay Tandon (product owner & interim regulatory owner). Every corpus change requires his sign-off — hard gate.
 
-**Status: Sprint 0 (repo setup). Last updated: 2026-08-06.**
+**Status: Sprint 0 — reference artefacts received; next: app scaffold. Last updated: 2026-08-06.**
 
 ## Hard constraints (enforce in code, verify in review)
 
@@ -34,10 +34,7 @@ Source of truth for product decisions: [docs/BRIEF.md](docs/BRIEF.md). Decisions
 - [x] Ingest brief → `docs/BRIEF.md`
 - [x] Development plan (this file)
 - [x] Git repo initialised, initial commit
-- [ ] **BLOCKED — need from Akshay:** the three reference artefacts for `/reference`:
-  - `PPWR_Assessment_Exide_Traction_Cell_Packaging.xlsx` (golden run)
-  - `EU_Export_Packaging_Compliance_Checklist_Automotive.xlsx` (34-checkpoint seed)
-  - `PPWR_Packaging_Data_Request_Template__1_.xlsx` (Persona 2a auto-fill target)
+- [x] Three reference artefacts received into `/reference` (2026-08-06; sheet structure verified against brief §8)
 - [ ] Scaffold Next.js + PostgreSQL app matching Fitsol conventions
 
 ## Sprint 1 — Corpus + schema
@@ -77,7 +74,6 @@ Source of truth for product decisions: [docs/BRIEF.md](docs/BRIEF.md). Decisions
 
 | Item | Owner | Status |
 |---|---|---|
-| Three reference `.xlsx` artefacts into `/reference` | Akshay | Pending |
 | Fitsol Asset Classification Directory conventions (repo access / doc) | Akshay | Pending |
 | Kyoto EF access + GreenAlign evidence-flow interface details | Akshay | Pending |
 | Product name | Akshay | TBD — use `pkg-compliance` |
