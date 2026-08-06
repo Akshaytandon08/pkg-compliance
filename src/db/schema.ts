@@ -25,7 +25,7 @@ export const jurisdictionLevelEnum = pgEnum("jurisdiction_level", [
 export const stackEnum = pgEnum("stack", ["A", "B", "C", "D"]);
 
 // `draft` is the insert state. The ONLY path to `in_force` is an approval
-// record by the regulatory owner (enforced by DB trigger, see migration 0002).
+// record by the regulatory owner (enforced by DB trigger, see migration 0001).
 // The evaluator refuses to produce verdicts from anything not `in_force`.
 export const checkpointStatusEnum = pgEnum("checkpoint_status", [
   "draft",
