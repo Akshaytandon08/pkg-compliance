@@ -21,7 +21,10 @@ The manual run recorded lines 1–6 as **"QUALIFIED — conditional"** and line 
 
 **Decision needed:** confirm the `designAssessment` vocabulary (`no_inherent_risk` / `at_risk` / `non_compliant`) and that `risk` is *derived*, never authored — otherwise two seeders will disagree on what "medium" means.
 
-## 2. Checkpoints do not all attach to a component
+## 2. Checkpoints do not all attach to a component — RESOLVED
+
+**Ruling:** `subject` enum column `component | packaging_unit | organisation`, NOT NULL (migration `0004`). Note the vocabulary is `packaging_unit`/`organisation`, not the originally-proposed `pack`/`consignment`. The consignment/destination-market second-order concern (below) stands: `organisation`-subject checkpoints still need a destination-market input the BOM lacks.
+
 
 Brief §1 specifies a report "per component per checkpoint", but four of the checkpoints the Exide run adjudicated have no component subject:
 
@@ -68,7 +71,9 @@ Brief §5 requires reports to record the corpus version for reproducibility. Tha
 
 **Proposal:** reports record **corpus version + as-of date**, and the evaluator takes `asOf` as an explicit parameter. Already threaded through `evaluability(checkpoint, asOf)`.
 
-## 8. Threshold must be a list
+## 8. Threshold must be a list — RESOLVED
+
+**Ruling:** `threshold` object replaced by `thresholds` JSONB array, implicit AND across elements, each `{parameter, operator, value, unit, applies_when?}` (migration `0004`). PFAS now carries its three limits structurally.
 
 Brief §5 defines `threshold` as one structured object. PFAS (§6 facts ledger) has three simultaneous limits: 25 ppb single substance, 250 ppb sum of non-polymeric, 50 ppm total organic fluorine. Heavy metals is a single summed parameter and fits, but PFAS does not.
 

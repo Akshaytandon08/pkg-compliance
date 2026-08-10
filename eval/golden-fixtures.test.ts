@@ -7,6 +7,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { decideVerdict } from "../src/lib/engine/verdict.ts";
+import { EVIDENCE_TYPES } from "../src/db/schema.ts";
+
+const EVIDENCE_TYPE_SET = new Set<string>(EVIDENCE_TYPES);
+
+type EvidenceRequirement = { allOf: { anyOf: string[] }[] };
 
 type Expectation = {
   checkpointId: string;
@@ -16,7 +21,8 @@ type Expectation = {
   evidenceState: string;
   risk: string;
   reasonCode: string;
-  blockingEvidence: string[];
+  evidenceRequirements: EvidenceRequirement;
+  scopeMismatch?: { documentId: string; coversComponent: boolean; reason: string };
   basis?: string;
 };
 
@@ -25,7 +31,13 @@ type Fixture = {
   asOf: string;
   legalRole: { ambiguous: boolean; expectedFlag?: string };
   components: { line: string; name: string; evidenceDocuments: unknown[]; expected: Expectation[] }[];
-  bomCompletenessGaps: { ref: string; verdict: string; reasonCode: string; requiredAction: string }[];
+  bomCompletenessGaps: {
+    ref: string;
+    verdict: string;
+    reasonCode: string;
+    requiredAction: string;
+    evidenceRequirements: EvidenceRequirement;
+  }[];
   dataCorrections: { line: string; field: string }[];
   notApplicable: { checkpointId: string; reasonCode: string; recordedScopingNote: boolean }[];
   forwardFlags: { checkpointId: string; reasonCode: string; appliesFrom: string }[];
@@ -47,6 +59,24 @@ const REASON_TO_VERDICT: Record<string, string> = {
   FORWARD_NOT_YET_IN_FORCE: "flag",
 };
 
+const VERDICT_SEVERITY: Record<string, number> = { qualified: 1, conditional: 2, gap: 3 };
+
+// Asserts a value is well-formed CNF: allOf of anyOf, exactly one nesting level,
+// every leaf a known evidence type. Resolves eval-format gap #1.
+function assertCnf(where: string, req: EvidenceRequirement) {
+  assert.ok(req && Array.isArray(req.allOf), `${where}: evidenceRequirements.allOf must be an array`);
+  for (const clause of req.allOf) {
+    assert.ok(
+      clause && Array.isArray(clause.anyOf) && clause.anyOf.length > 0,
+      `${where}: every allOf clause needs a non-empty anyOf`,
+    );
+    for (const leaf of clause.anyOf) {
+      assert.equal(typeof leaf, "string", `${where}: CNF leaf must be a string (one nesting level only)`);
+      assert.ok(EVIDENCE_TYPE_SET.has(leaf), `${where}: unknown evidence type "${leaf}"`);
+    }
+  }
+}
+
 const FIXTURES = ["client-a-traction-cell.json"];
 
 for (const file of FIXTURES) {
@@ -64,7 +94,7 @@ for (const file of FIXTURES) {
   const allExpected = [...componentExpected, ...packExpected];
 
   test(`${file}: fixture format version is current`, () => {
-    assert.equal(fixture.fixtureFormatVersion, 1);
+    assert.equal(fixture.fixtureFormatVersion, 2);
   });
 
   test(`${file}: every expectation matches the deterministic rule table`, () => {
@@ -89,12 +119,7 @@ for (const file of FIXTURES) {
   });
 
   test(`${file}: reason codes are in the vocabulary and agree with the verdict`, () => {
-    const check = (
-      where: string,
-      id: string,
-      reasonCode: string,
-      verdict: string,
-    ) => {
+    const check = (where: string, id: string, reasonCode: string, verdict: string) => {
       const expectedVerdict = REASON_TO_VERDICT[reasonCode];
       assert.ok(expectedVerdict, `${where} / ${id}: unknown reasonCode ${reasonCode}`);
       assert.equal(
@@ -112,22 +137,24 @@ for (const file of FIXTURES) {
       check("forward", f.checkpointId, f.reasonCode, "flag");
   });
 
-  test(`${file}: conditional names its blocking evidence; qualified has none`, () => {
+  test(`${file}: evidence requirements are well-formed CNF`, () => {
     for (const e of allExpected) {
+      assertCnf(`${e.where} / ${e.checkpointId}`, e.evidenceRequirements);
       if (e.verdict === "conditional") {
         assert.ok(
-          e.blockingEvidence.length > 0,
-          `${e.where} / ${e.checkpointId}: conditional with no blocking evidence`,
+          e.evidenceRequirements.allOf.length > 0,
+          `${e.where} / ${e.checkpointId}: conditional needs at least one requirement clause`,
         );
       }
       if (e.verdict === "qualified") {
         assert.equal(
-          e.blockingEvidence.length,
-          0,
-          `${e.where} / ${e.checkpointId}: qualified must have no outstanding evidence`,
+          e.evidenceState,
+          "complete",
+          `${e.where} / ${e.checkpointId}: qualified must have complete evidence`,
         );
       }
     }
+    for (const g of fixture.bomCompletenessGaps) assertCnf(`gap:${g.ref}`, g.evidenceRequirements);
   });
 
   test(`${file}: overall counts reconcile with the individual expectations`, () => {
@@ -138,21 +165,26 @@ for (const file of FIXTURES) {
     assert.deepEqual(tally, fixture.expectedOverall.counts);
   });
 
-  test(`${file}: overall verdict is the worst individual verdict`, () => {
-    // Gaps exist (photo-gap components), but the golden run's overall verdict is
-    // CONDITIONAL because the gaps are BOM-completeness findings, not design
-    // failures. Pinned so the aggregation rule cannot silently flip.
-    assert.equal(fixture.expectedOverall.verdict, "conditional");
-    assert.ok(fixture.bomCompletenessGaps.length > 0);
-    assert.ok(
-      fixture.bomCompletenessGaps.every((g) => g.requiredAction === "bom_addition"),
-      "a gap from a design failure would have to raise the overall verdict",
-    );
+  test(`${file}: overall verdict is the worst checkpoint verdict (BOM gaps do not escalate)`, () => {
+    // Worst is computed over checkpoint expectations only. BOM-completeness gaps
+    // are declaration gaps, not design failures, so they must not raise the
+    // overall verdict — the golden run stayed CONDITIONAL despite two gaps.
+    const worst = allExpected
+      .map((e) => e.verdict)
+      .filter((v) => v in VERDICT_SEVERITY)
+      .reduce((a, b) => (VERDICT_SEVERITY[b] > VERDICT_SEVERITY[a] ? b : a), "qualified");
+    assert.equal(fixture.expectedOverall.verdict, worst);
+    for (const g of fixture.bomCompletenessGaps) {
+      assert.equal(g.requiredAction, "bom_addition", `gap:${g.ref} must resolve via bom_addition`);
+    }
   });
 
-  test(`${file}: ambiguous legal role is flagged, never silently assigned`, () => {
-    assert.equal(fixture.legalRole.ambiguous, true);
-    assert.equal(fixture.legalRole.expectedFlag, "legal_confirmation_required");
+  test(`${file}: legal role — ambiguity is flagged, never silently assigned`, () => {
+    if (fixture.legalRole.ambiguous) {
+      assert.equal(fixture.legalRole.expectedFlag, "legal_confirmation_required");
+    } else {
+      assert.notEqual(fixture.legalRole.expectedFlag, "legal_confirmation_required");
+    }
   });
 
   test(`${file}: not-applicable checkpoints carry a recorded scoping note`, () => {

@@ -24,6 +24,15 @@ export const jurisdictionLevelEnum = pgEnum("jurisdiction_level", [
 
 export const stackEnum = pgEnum("stack", ["A", "B", "C", "D"]);
 
+// What a verdict attaches to. Not every obligation is per-component: technical
+// documentation and operator marking attach to the packaging unit; producer
+// registration attaches to the organisation/market. Resolves SCHEMA_DELTAS #2.
+export const checkpointSubjectEnum = pgEnum("checkpoint_subject", [
+  "component",
+  "packaging_unit",
+  "organisation",
+]);
+
 // `draft` is the insert state. The ONLY path to `in_force` is an approval
 // record by the regulatory owner (enforced by DB trigger, see migration 0001).
 // The evaluator refuses to produce verdicts from anything not `in_force`.
@@ -59,6 +68,7 @@ export const EVIDENCE_TYPES = [
   "marking",
   "technical_file",
   "test_report",
+  "pigment_spec",
 ] as const;
 
 export type Threshold = {
@@ -66,6 +76,17 @@ export type Threshold = {
   operator: "<" | "<=" | "=" | ">=" | ">";
   value: number;
   unit: string;
+  // Optional guard: the limit applies only under this condition (e.g. a test
+  // method or material qualifier). Multiple thresholds on a checkpoint are ANDed.
+  applies_when?: string;
+};
+
+// Evidence requirements in conjunctive normal form: an outer AND of inner ORs.
+// Exactly one nesting level; every leaf is an EVIDENCE_TYPES value. If a real
+// requirement cannot be expressed in one level of CNF, split the checkpoint.
+// Resolves SCHEMA_DELTAS eval-format gap #1 (AND/OR evidence semantics).
+export type EvidenceRequirement = {
+  allOf: { anyOf: string[] }[];
 };
 
 export const checkpoints = pgTable(
@@ -76,6 +97,7 @@ export const checkpoints = pgTable(
     geography: text("geography").notNull(),
     jurisdictionLevel: jurisdictionLevelEnum("jurisdiction_level").notNull(),
     stack: stackEnum("stack").notNull(),
+    subject: checkpointSubjectEnum("subject").notNull(),
     material: text("material").array().notNull(),
     legalRole: text("legal_role").array().notNull(),
     personaRelevance: text("persona_relevance").array().notNull(),
@@ -84,8 +106,12 @@ export const checkpoints = pgTable(
     sunsetDate: date("sunset_date"),
     status: checkpointStatusEnum("status").notNull().default("draft"),
     requirementText: text("requirement_text").notNull(),
-    threshold: jsonb("threshold").$type<Threshold | null>(),
-    evidenceType: text("evidence_type").array().notNull(),
+    // Multiple limits are ANDed (e.g. PFAS: single / sum / total organic
+    // fluorine). Resolves SCHEMA_DELTAS #8 (threshold-as-list).
+    thresholds: jsonb("thresholds").$type<Threshold[] | null>(),
+    evidenceRequirements: jsonb("evidence_requirements")
+      .$type<EvidenceRequirement>()
+      .notNull(),
     testMethod: text("test_method"),
     // Primary legal source at article level — MANDATORY. A checkpoint without
     // a primary citation cannot ship.

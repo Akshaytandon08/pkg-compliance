@@ -8,21 +8,23 @@ The eval harness is the contract between the corpus and the engine. Fixtures her
 
 Both are picked up by `npm test` / `npm run check`.
 
-## Fixture format (version 1) — the contract
+## Fixture format (version 2) — the contract
 
 If encoding a real pack cannot be expressed in this format without distortion, that is a **schema/format gap to report, not a fixture to bend**. Gaps found so far live in [docs/SCHEMA_DELTAS.md](../docs/SCHEMA_DELTAS.md) and in the "Known format gaps" section below.
+
+Version 2 (from the schema-deltas rulings) resolves SCHEMA_DELTAS **#2** (checkpoint `subject`) and **#8** (thresholds as a list), and the eval-format AND/OR gap via CNF evidence requirements.
 
 ### Top level
 
 | Field | Meaning |
 |---|---|
-| `fixtureFormatVersion` | `1`. Bumped when this contract changes. |
+| `fixtureFormatVersion` | `2`. Bumped when this contract changes. |
 | `pack` | `{ id, description, source, screeningDate }`. Client identity is **anonymised** (`Client A`, …); no personal contact data. |
 | `asOf` | Screening date the expected verdicts are evaluated as-of. Forward-dated requirements are flags, not verdicts, relative to this. |
 | `scope` | `{ geography, foodContact, packagingLevel[], reusable, scopingNotes[] }`. |
 | `legalRole` | Derived role + whether it was ambiguous. Ambiguous → `expectedFlag: "legal_confirmation_required"`, never a silent assignment. |
 | `components[]` | One per BOM line: `claims`, `evidenceDocuments[]`, and `expected[]` (one per checkpoint). |
-| `packLevelExpected[]` | Checkpoints whose subject is the pack or consignment, not a component (`subject` field). |
+| `packLevelExpected[]` | Checkpoints whose `subject` is `packaging_unit` or `organisation`, not `component`. |
 | `bomCompletenessGaps[]` | Components in the physical pack but absent from the BOM. Pre-evaluation findings, not checkpoint verdicts. |
 | `dataCorrections[]` | BOM-internal contradictions (no law evaluated). |
 | `notApplicable[]` | Out-of-scope checkpoints, each with a recorded scoping note. |
@@ -37,17 +39,27 @@ Each entry in `components[].expected[]` and `packLevelExpected[]`:
 {
   "checkpointId": "EU-PPWR-heavy-metals",  // matches a corpus checkpoint id
   "checkpointVersion": 1,                   // the corpus version this verdict is pinned to
+  "subject": "component",                   // component | packaging_unit | organisation (packLevelExpected only)
   "verdict": "qualified | conditional | gap | not_applicable",
   "designAssessment": "no_inherent_risk | at_risk | non_compliant",
   "evidenceState": "complete | insufficient | absent | expired",
   "risk": "low | medium | high",
   "reasonCode": "EVIDENCE_ABSENT",          // from the vocabulary below
-  "blockingEvidence": ["supplier_declaration"], // evidence that would close it
+  "evidenceRequirements": { "allOf": [{ "anyOf": ["supplier_declaration"] }] }, // CNF, see below
+  "scopeMismatch": {                        // optional: present when a document is on file but out of scope
+    "documentId": "…", "coversComponent": false, "reason": "…"
+  },
   "basis": "free-text explanation"
 }
 ```
 
 `verdict` and `risk` are **derived** from (`designAssessment` × `evidenceState`) by the rule table — never authored independently. The test asserts they agree.
+
+### Evidence requirements (CNF)
+
+`evidenceRequirements` is conjunctive normal form: an outer `allOf` (AND) of inner `anyOf` (OR) clauses, **exactly one nesting level**, every leaf an evidence type. The PET strap closes on a pigment specification **or** an XRF/lab test — `{ "allOf": [{ "anyOf": ["pigment_spec", "lab_test"] }] }`. Two independent things both required would be two `allOf` clauses.
+
+**The CNF rule: if a requirement cannot be expressed in one level of CNF, split the checkpoint.** No nesting beyond allOf→anyOf; no anyOf-of-allOf. This keeps evaluation and delta-action generation mechanical.
 
 ### Reason-code vocabulary
 
@@ -70,7 +82,7 @@ Each entry in `components[].expected[]` and `packLevelExpected[]`:
 ```jsonc
 {
   "docId": "…",
-  "type": "supplier_declaration | lab_test | registration | marking | technical_file | test_report",
+  "type": "supplier_declaration | lab_test | registration | marking | technical_file | test_report | pigment_spec",
   "issuer": "…",              // organisation only; no personal contact data
   "issuedDate": "YYYY-MM-DD | null",
   "expiryDate": "YYYY-MM-DD | null",
@@ -83,8 +95,8 @@ Each entry in `components[].expected[]` and `packLevelExpected[]`:
 }
 ```
 
-## Known format gaps (found encoding the first golden pack — reported, not bent)
+## Known format gaps
 
-1. **`blockingEvidence` has no AND/OR semantics.** The PET strap closes on *pigment specification OR XRF/lab test* — an alternative, not a conjunction. The array cannot express that. Needs grouping (`allOf` / `anyOf`) before the engine consumes it for delta actions.
-2. **Cert-scope mismatch is unexercised.** The format carries `evidenceDocuments[].scope` so the engine can check a certificate actually covers a component. The golden pack has zero evidence on file, so this dimension has no positive test. A second fixture is needed where a document exists but does **not** cover the component (expected: still `conditional`, `EVIDENCE_INCOMPLETE`).
-3. Pack- and consignment-level checkpoints have no component subject; carried in `packLevelExpected[]` with an explicit `subject`. This is delta #2 in [docs/SCHEMA_DELTAS.md](../docs/SCHEMA_DELTAS.md) (checkpoint `subject` column) — still pending a decision.
+1. ~~`blockingEvidence` has no AND/OR semantics.~~ **Resolved** — replaced by CNF `evidenceRequirements` (`allOf` of `anyOf`), with the split rule above.
+2. ~~Cert-scope mismatch is unexercised.~~ **Resolved** — `eval/fixtures/client-b-strap-cert-scope.json` exercises a document on file whose scope does not cover the component (expected `conditional`, `EVIDENCE_INCOMPLETE`, with a `scopeMismatch` detail).
+3. ~~Pack/organisation-level checkpoints have no component subject.~~ **Resolved** — SCHEMA_DELTAS #2: `subject` enum (`component | packaging_unit | organisation`) is now a NOT NULL column.

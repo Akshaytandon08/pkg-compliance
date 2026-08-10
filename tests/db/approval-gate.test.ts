@@ -40,10 +40,10 @@ const ID_HELPER = "TEST-approval-helper";
 // Deliberately weak citation: proves the NOT NULL column alone is no gate.
 const insertDraft = (db: NonNullable<typeof sql>, id: string, status = "draft") =>
   db`
-    insert into checkpoints (id, version, geography, jurisdiction_level, stack, material,
-      legal_role, persona_relevance, packaging_level, status, requirement_text, evidence_type, citation)
-    values (${id}, 1, 'EU', 'EU', 'A', '{all}', '{manufacturer}', '{2a}', '{transport}',
-      ${status}, 'Test requirement.', '{supplier_declaration}', 'plausible-looking string')
+    insert into checkpoints (id, version, geography, jurisdiction_level, stack, subject, material,
+      legal_role, persona_relevance, packaging_level, status, requirement_text, evidence_requirements, citation)
+    values (${id}, 1, 'EU', 'EU', 'A', 'component', '{all}', '{manufacturer}', '{2a}', '{transport}',
+      ${status}, 'Test requirement.', '{"allOf":[{"anyOf":["supplier_declaration"]}]}'::jsonb, 'plausible-looking string')
   `;
 
 // Deletes must run approvals → checkpoints → corpus_versions: the FK from

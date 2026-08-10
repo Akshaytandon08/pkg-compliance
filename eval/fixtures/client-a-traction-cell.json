@@ -1,5 +1,5 @@
 {
-  "fixtureFormatVersion": 1,
+  "fixtureFormatVersion": 2,
   "pack": {
     "id": "client-a-traction-cell",
     "description": "Traction-cell export packaging, pallet/transport, industrial B2B",
@@ -44,7 +44,7 @@
           "evidenceState": "absent",
           "risk": "low",
           "reasonCode": "EVIDENCE_ABSENT",
-          "blockingEvidence": ["supplier_declaration"],
+          "evidenceRequirements": { "allOf": [{ "anyOf": ["supplier_declaration"] }] },
           "basis": "Heat treatment is thermal, not chemical; no inherent substance of concern."
         },
         {
@@ -55,7 +55,7 @@
           "evidenceState": "absent",
           "risk": "low",
           "reasonCode": "EVIDENCE_ABSENT",
-          "blockingEvidence": ["supplier_declaration"],
+          "evidenceRequirements": { "allOf": [{ "anyOf": ["supplier_declaration"] }] },
           "basis": "Risk only if a chemical preservative (e.g. CCA, which contains Cr(VI)) was used; declaration of heat-treatment-only closes it."
         },
         {
@@ -66,7 +66,7 @@
           "evidenceState": "complete",
           "risk": "low",
           "reasonCode": "EVIDENCE_COMPLETE",
-          "blockingEvidence": [],
+          "evidenceRequirements": { "allOf": [{ "anyOf": ["technical_file", "test_report"] }] },
           "basis": "HT stamp IN-747 visible on component; treatment provider certificate on file."
         }
       ]
@@ -86,7 +86,7 @@
           "evidenceState": "absent",
           "risk": "low",
           "reasonCode": "EVIDENCE_ABSENT",
-          "blockingEvidence": ["supplier_declaration"],
+          "evidenceRequirements": { "allOf": [{ "anyOf": ["supplier_declaration"] }] },
           "basis": "Plain or trivalent-passivated steel complies; legacy Cr(VI) zinc passivation would breach the 100 mg/kg sum."
         }
       ]
@@ -106,7 +106,7 @@
           "evidenceState": "absent",
           "risk": "low",
           "reasonCode": "EVIDENCE_ABSENT",
-          "blockingEvidence": ["supplier_declaration"],
+          "evidenceRequirements": { "allOf": [{ "anyOf": ["supplier_declaration"] }] },
           "basis": "Kraft/corrugated inherently low risk; residual risk sits in inks and recycled furnish."
         },
         {
@@ -117,7 +117,7 @@
           "evidenceState": "absent",
           "risk": "low",
           "reasonCode": "EVIDENCE_ABSENT",
-          "blockingEvidence": ["supplier_declaration"],
+          "evidenceRequirements": { "allOf": [{ "anyOf": ["supplier_declaration"] }] },
           "basis": "Ink specification required where printed."
         }
       ]
@@ -137,7 +137,7 @@
           "evidenceState": "absent",
           "risk": "low",
           "reasonCode": "EVIDENCE_ABSENT",
-          "blockingEvidence": ["supplier_declaration"],
+          "evidenceRequirements": { "allOf": [{ "anyOf": ["supplier_declaration"] }] },
           "basis": "As line 3."
         }
       ]
@@ -160,7 +160,7 @@
           "evidenceState": "absent",
           "risk": "low",
           "reasonCode": "EVIDENCE_ABSENT",
-          "blockingEvidence": ["supplier_declaration"],
+          "evidenceRequirements": { "allOf": [{ "anyOf": ["supplier_declaration"] }] },
           "basis": "Composition is paper-based; water-based adhesive is not plastic content."
         },
         {
@@ -171,7 +171,7 @@
           "evidenceState": "absent",
           "risk": "low",
           "reasonCode": "EVIDENCE_ABSENT",
-          "blockingEvidence": ["supplier_declaration"],
+          "evidenceRequirements": { "allOf": [{ "anyOf": ["supplier_declaration"] }] },
           "basis": "Adhesive substance-of-concern statement required."
         }
       ]
@@ -194,7 +194,7 @@
           "evidenceState": "absent",
           "risk": "low",
           "reasonCode": "EVIDENCE_ABSENT",
-          "blockingEvidence": ["supplier_declaration"],
+          "evidenceRequirements": { "allOf": [{ "anyOf": ["supplier_declaration"] }] },
           "basis": "Mono-material and recyclable; risk limited to pigments and additives."
         }
       ]
@@ -217,9 +217,9 @@
           "evidenceState": "absent",
           "risk": "medium",
           "reasonCode": "TEST_REQUIRED",
-          "blockingEvidence": ["lab_test", "test_report", "supplier_declaration"],
-          "basis": "Only genuine chemistry risk in the BOM: green/yellow pigment families historically include lead chromate, which fails Pb and Cr(VI) simultaneously. Modern organic pigments comply but must be evidenced. Closes on pigment specification OR an XRF/lab test — an alternative, not a conjunction (see format gap 1).",
-          "note": "Recorded in the manual run as 'CONDITIONAL — test recommended'. Same verdict as lines 1-6, distinguished only by risk and by pigment specification or lab test being the closing evidence rather than a routine declaration."
+          "evidenceRequirements": { "allOf": [{ "anyOf": ["pigment_spec", "lab_test"] }] },
+          "basis": "Only genuine chemistry risk in the BOM: green/yellow pigment families historically include lead chromate, which fails Pb and Cr(VI) simultaneously. Modern organic pigments comply but must be evidenced. Closes on a pigment specification OR an XRF/lab test — the CNF anyOf clause expresses that alternative.",
+          "note": "Recorded in the manual run as 'CONDITIONAL — test recommended'. Same verdict as lines 1-6, distinguished only by risk and by a pigment specification or lab test being the closing evidence rather than a routine declaration."
         }
       ]
     }
@@ -228,52 +228,52 @@
     {
       "checkpointId": "EU-PPWR-technical-documentation",
       "checkpointVersion": 1,
-      "subject": "pack",
+      "subject": "packaging_unit",
       "verdict": "conditional",
       "designAssessment": "no_inherent_risk",
       "evidenceState": "absent",
       "risk": "low",
       "reasonCode": "EVIDENCE_ABSENT",
-      "blockingEvidence": ["technical_file"],
+      "evidenceRequirements": { "allOf": [{ "anyOf": ["technical_file"] }] },
       "basis": "Annex VII Module A self-assessment file to be compiled covering every packaging spec."
     },
     {
       "checkpointId": "EU-PPWR-declaration-of-conformity",
       "checkpointVersion": 1,
-      "subject": "pack",
+      "subject": "packaging_unit",
       "verdict": "conditional",
       "designAssessment": "no_inherent_risk",
       "evidenceState": "absent",
       "risk": "low",
       "reasonCode": "EVIDENCE_ABSENT",
-      "blockingEvidence": ["technical_file"],
+      "evidenceRequirements": { "allOf": [{ "anyOf": ["technical_file"] }] },
       "basis": "The obligated operator must issue a Declaration of Conformity per Annex VIII and retain it 5 years for single-use packaging. This is the user's obligation; the screening only reports whether the prerequisites are assembled.",
       "note": "Deliberate fixture case: the report must instruct the user about their DoC obligation while never presenting itself as issuing one."
     },
     {
       "checkpointId": "EU-PPWR-operator-identification",
       "checkpointVersion": 1,
-      "subject": "pack",
+      "subject": "packaging_unit",
       "verdict": "conditional",
       "designAssessment": "no_inherent_risk",
       "evidenceState": "absent",
       "risk": "low",
       "reasonCode": "EVIDENCE_ABSENT",
-      "blockingEvidence": ["marking"],
+      "evidenceRequirements": { "allOf": [{ "anyOf": ["marking"] }] },
       "basis": "Name/trademark and postal address of manufacturer and importer to be marked on packaging."
     },
     {
       "checkpointId": "EU-EPR-producer-registration",
       "checkpointVersion": 1,
-      "subject": "consignment",
+      "subject": "organisation",
       "verdict": "conditional",
       "designAssessment": "no_inherent_risk",
       "evidenceState": "absent",
       "risk": "low",
       "reasonCode": "EVIDENCE_ABSENT",
-      "blockingEvidence": ["registration"],
+      "evidenceRequirements": { "allOf": [{ "anyOf": ["registration"] }] },
       "basis": "Producer registration in each Member State of first placing; authorised representative where required. A branch office does not qualify as importer.",
-      "note": "Subject is the consignment/market, not the pack — obligation depends on destination Member States, which the BOM does not carry."
+      "note": "Subject is the organisation/market, not the pack — obligation depends on destination Member States, which the BOM does not carry."
     }
   ],
   "bomCompletenessGaps": [
@@ -286,7 +286,7 @@
       "reasonCode": "NOT_IN_BOM",
       "reason": "Visible on stacked crates but absent from the BOM. Conformity assessment must cover every packaging component.",
       "requiredAction": "bom_addition",
-      "blockingEvidence": ["supplier_declaration"]
+      "evidenceRequirements": { "allOf": [{ "anyOf": ["supplier_declaration"] }] }
     },
     {
       "ref": "P2",
@@ -297,7 +297,7 @@
       "reasonCode": "NOT_IN_BOM",
       "reason": "Distinct packaging system absent from the BOM. Plywood is a wood-plus-adhesive composite requiring a different declaration to solid pine; steel hardware unlisted; liner material unidentified.",
       "requiredAction": "bom_addition",
-      "blockingEvidence": ["supplier_declaration", "technical_file"]
+      "evidenceRequirements": { "allOf": [{ "anyOf": ["supplier_declaration", "technical_file"] }] }
     }
   ],
   "dataCorrections": [
