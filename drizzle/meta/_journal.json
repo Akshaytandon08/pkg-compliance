@@ -57,6 +57,13 @@
       "when": 1786372131102,
       "tag": "0007_applies-when",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786372470939,
+      "tag": "0008_blank-no-transitional-pinpoint",
+      "breakpoints": true
     }
   ]
 }

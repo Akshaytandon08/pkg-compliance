@@ -3,7 +3,7 @@
 Working codename: `pkg-compliance` (product name TBD — do not invent one).
 Source of truth for product decisions: [docs/BRIEF.md](docs/BRIEF.md). Decisions there are settled; raise deltas to Akshay Tandon (product owner & interim regulatory owner). Every corpus change requires his sign-off — hard gate.
 
-**Status: Batch 1 seeded (11 draft checkpoints) and refactored to the resolved schema. Next: regulatory approval of Batch 1, then Batch 2. Last updated: 2026-08-07.**
+**Status: Batch 1 (11 draft checkpoints) ready for regulatory approval via `npm run corpus:review`/`:approve`/`:reject`. Schema deltas #2/#8 and the organisation-subject gap resolved (fixture format v3, `assessment_context` + `applies_when`). Next: Akshay's Batch 1 pass, then Batch 2. Last updated: 2026-08-10.**
 
 ## Hard constraints (enforce in code, verify in review)
 
@@ -51,6 +51,11 @@ Source of truth for product decisions: [docs/BRIEF.md](docs/BRIEF.md). Decisions
 
 Sequenced by certainty, not checklist order. Batches of 10–15 checkpoints, **one commit each**, commit body carrying the checkpoint diff plus the primary-source link per checkpoint — so the approval trail lives in git history alongside the data it approves. Checkpoints land as `draft`; approval rows (with `primary_source_url`) are what promote them to `in_force`.
 
+**Approval surface (the regulatory owner's working tools):**
+- `npm run corpus:review` — the full draft queue, ordered for one sitting: requirement, thresholds, evidence CNF, applicability, citation pinpoint + primary-source URL.
+- `npm run corpus:approve -- --id <id> --version <v> --source-url <url> --approved-by "Akshay Tandon" [--notes]` — records the approval and promotes in one transaction. **Refuses unless `--source-url` is a primary-source domain** (eur-lex.europa.eu / official gazette; extend via `CORPUS_PRIMARY_SOURCE_DOMAINS`).
+- `npm run corpus:reject -- --id <id> --version <v> --reason "<why>"` — supersedes a draft with the reason recorded, so the queue empties either way.
+
 - [~] **Batch 1 — EU Stack A / PPWR articles.** Seeded `draft` (migration `0003`), then refactored to the resolved schema (migration `0006`): **11 checkpoints** — `subject` set per row, operator identification split into manufacturer (Art 15(5),(6)) and importer (Art 18(3)) obligations, PFAS thresholds structured, citation pinpoints sharpened. **Awaiting Akshay's approval** — the `0003` and `0006` commit bodies are the review queue. `citation_verified_date` is NULL on every row: pinpoints are "verified via secondary cross-check, confirm on primary" (the EUR-Lex fetch returned only recitals), so each needs a link-click before promotion.
 - [ ] **Batch 2 — EU Stack B/C.** EPR calendar, labelling, claims.
 - [ ] **Batch 3 — India.** Slowest review: every value comes off the §6 re-verify list. Each checkpoint attaches the CPCB notification / gazette PDF link — never a consultancy summary.
@@ -95,7 +100,7 @@ Live regulation moves; these are tracked so a checkpoint is not approved against
 
 | Item | Owner | Status |
 |---|---|---|
-| Approve/promote the 11 Batch 1 drafts (confirm citation pinpoints on primary) | Akshay | Pending |
+| Approve/promote the 11 Batch 1 drafts via `corpus:review`/`:approve` (confirm pinpoints on primary; pin the no-transitional-stock article) | Akshay | Pending |
 | Remaining [docs/SCHEMA_DELTAS.md](docs/SCHEMA_DELTAS.md) decisions (#3, #4, #5, #6, #9) | Akshay | Pending |
 | 2 further real client packs for the golden dataset | Akshay | Pending |
 | Kyoto EF access + GreenAlign evidence-flow interface details | Akshay | Pending |

@@ -13,7 +13,10 @@
     "check": "npm run lint && npm run check:language && next typegen && tsc --noEmit && npm test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "corpus:review": "node scripts/corpus-review.ts",
+    "corpus:approve": "node scripts/corpus-approve.ts",
+    "corpus:reject": "node scripts/corpus-reject.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",

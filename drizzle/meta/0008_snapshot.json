@@ -1,0 +1,364 @@
+{
+  "id": "e4d306e0-7e7f-47c7-a430-c36fbb97d9a6",
+  "prevId": "f37258c9-7f50-4857-980d-2961d871c053",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.checkpoint_approvals": {
+      "name": "checkpoint_approvals",
+      "schema": "",
+      "columns": {
+        "checkpoint_id": {
+          "name": "checkpoint_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "checkpoint_version": {
+          "name": "checkpoint_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "corpus_version_id": {
+          "name": "corpus_version_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "approved_by": {
+          "name": "approved_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "approved_at": {
+          "name": "approved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "primary_source_url": {
+          "name": "primary_source_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "checkpoint_approvals_corpus_version_id_corpus_versions_id_fk": {
+          "name": "checkpoint_approvals_corpus_version_id_corpus_versions_id_fk",
+          "tableFrom": "checkpoint_approvals",
+          "columnsFrom": [
+            "corpus_version_id"
+          ],
+          "tableTo": "corpus_versions",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        },
+        "checkpoint_approvals_checkpoint_version_fk": {
+          "name": "checkpoint_approvals_checkpoint_version_fk",
+          "tableFrom": "checkpoint_approvals",
+          "columnsFrom": [
+            "checkpoint_id",
+            "checkpoint_version"
+          ],
+          "tableTo": "checkpoints",
+          "columnsTo": [
+            "id",
+            "version"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {
+        "checkpoint_approvals_checkpoint_id_checkpoint_version_pk": {
+          "name": "checkpoint_approvals_checkpoint_id_checkpoint_version_pk",
+          "columns": [
+            "checkpoint_id",
+            "checkpoint_version"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.checkpoints": {
+      "name": "checkpoints",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "geography": {
+          "name": "geography",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "jurisdiction_level": {
+          "name": "jurisdiction_level",
+          "type": "jurisdiction_level",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stack": {
+          "name": "stack",
+          "type": "stack",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "subject": {
+          "name": "subject",
+          "type": "checkpoint_subject",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "material": {
+          "name": "material",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "legal_role": {
+          "name": "legal_role",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "persona_relevance": {
+          "name": "persona_relevance",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "packaging_level": {
+          "name": "packaging_level",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "trigger_date": {
+          "name": "trigger_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sunset_date": {
+          "name": "sunset_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "checkpoint_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'draft'"
+        },
+        "requirement_text": {
+          "name": "requirement_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "thresholds": {
+          "name": "thresholds",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "evidence_requirements": {
+          "name": "evidence_requirements",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "applies_when": {
+          "name": "applies_when",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "test_method": {
+          "name": "test_method",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "citation": {
+          "name": "citation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "citation_verified_date": {
+          "name": "citation_verified_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "food_contact_only": {
+          "name": "food_contact_only",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "checkpoints_id_version_pk": {
+          "name": "checkpoints_id_version_pk",
+          "columns": [
+            "id",
+            "version"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.corpus_versions": {
+      "name": "corpus_versions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "approved_by": {
+          "name": "approved_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "approved_at": {
+          "name": "approved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "corpus_versions_label_unique": {
+          "name": "corpus_versions_label_unique",
+          "columns": [
+            "label"
+          ],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.checkpoint_status": {
+      "name": "checkpoint_status",
+      "schema": "public",
+      "values": [
+        "draft",
+        "in_force",
+        "upcoming",
+        "contested",
+        "superseded"
+      ]
+    },
+    "public.checkpoint_subject": {
+      "name": "checkpoint_subject",
+      "schema": "public",
+      "values": [
+        "component",
+        "packaging_unit",
+        "organisation"
+      ]
+    },
+    "public.jurisdiction_level": {
+      "name": "jurisdiction_level",
+      "schema": "public",
+      "values": [
+        "EU",
+        "MS",
+        "national",
+        "state"
+      ]
+    },
+    "public.stack": {
+      "name": "stack",
+      "schema": "public",
+      "values": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ]
+    }
+  },
+  "schemas": {},
+  "views": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

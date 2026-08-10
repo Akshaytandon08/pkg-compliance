@@ -75,19 +75,33 @@ export async function promoteCheckpointToInForce(
 }
 
 /**
- * Retires a checkpoint by moving it to `superseded`. Checkpoints are never
- * deleted (the approval FK is ON DELETE RESTRICT and blocks it anyway) — this
- * is the retirement path, so the checkpoint and its cited approval survive for
- * reproducibility.
+ * Retires a checkpoint by moving it to `superseded`, optionally recording why.
+ * Checkpoints are never deleted (the approval FK is ON DELETE RESTRICT and
+ * blocks it anyway) — this is the retirement path, so the checkpoint and its
+ * cited approval survive for reproducibility. Also the reject path for a draft
+ * that fails the primary-source check, so the review queue empties either way.
  */
 export async function supersedeCheckpoint(
   database: typeof Db,
   checkpointId: string,
   checkpointVersion: number,
+  reason?: string,
 ): Promise<void> {
+  const [current] = await database
+    .select({ notes: checkpoints.notes })
+    .from(checkpoints)
+    .where(
+      and(eq(checkpoints.id, checkpointId), eq(checkpoints.version, checkpointVersion)),
+    );
+  if (!current) {
+    throw new Error(`checkpoint ${checkpointId}@${checkpointVersion} does not exist`);
+  }
+  const notes = reason
+    ? [current.notes, `SUPERSEDED: ${reason}`].filter(Boolean).join(" | ")
+    : current.notes;
   await database
     .update(checkpoints)
-    .set({ status: "superseded" })
+    .set({ status: "superseded", notes })
     .where(
       and(
         eq(checkpoints.id, checkpointId),
