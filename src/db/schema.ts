@@ -112,6 +112,12 @@ export const checkpoints = pgTable(
     evidenceRequirements: jsonb("evidence_requirements")
       .$type<EvidenceRequirement>()
       .notNull(),
+    // Applicability conditions keyed on assessment_context fields (e.g.
+    // {"food_contact": true}, {"destination_member_states": "present"}). NULL
+    // means the checkpoint always applies. If a condition cannot be evaluated
+    // because the context is missing, the engine yields a `caveat`
+    // (CONTEXT_REQUIRED) — never a silent pass, never a gap.
+    appliesWhen: jsonb("applies_when").$type<Record<string, unknown> | null>(),
     testMethod: text("test_method"),
     // Primary legal source at article level — MANDATORY. A checkpoint without
     // a primary citation cannot ship.

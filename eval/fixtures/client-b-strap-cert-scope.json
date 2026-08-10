@@ -1,5 +1,5 @@
 {
-  "fixtureFormatVersion": 2,
+  "fixtureFormatVersion": 3,
   "pack": {
     "id": "client-b-strap-cert-scope",
     "description": "Single-component fixture exercising cert-scope coverage: a heavy-metals report is on file but its scope covers a different component.",
@@ -7,15 +7,21 @@
     "screeningDate": "2026-07-28"
   },
   "asOf": "2026-07-28",
+  "assessment_context": {
+    "destination_member_states": ["DE"],
+    "food_contact": false,
+    "persona": "2a",
+    "declared_reusable": false,
+    "legal_role_facts": {
+      "manufacturer_is_non_eu": true
+    }
+  },
   "scope": {
     "geography": "EU",
-    "foodContact": false,
     "packagingLevel": ["transport"],
-    "reusable": false,
     "scopingNotes": []
   },
   "legalRole": {
-    "persona": "2a",
     "derived": ["manufacturer"],
     "counterpartyRoles": ["importer"],
     "ambiguous": false

@@ -8,11 +8,12 @@ The eval harness is the contract between the corpus and the engine. Fixtures her
 
 Both are picked up by `npm test` / `npm run check`.
 
-## Fixture format (version 2) — the contract
+## Fixture format (version 3) — the contract
 
 If encoding a real pack cannot be expressed in this format without distortion, that is a **schema/format gap to report, not a fixture to bend**. Gaps found so far live in [docs/SCHEMA_DELTAS.md](../docs/SCHEMA_DELTAS.md) and in the "Known format gaps" section below.
 
-Version 2 (from the schema-deltas rulings) resolves SCHEMA_DELTAS **#2** (checkpoint `subject`) and **#8** (thresholds as a list), and the eval-format AND/OR gap via CNF evidence requirements.
+- **v2** resolved SCHEMA_DELTAS **#2** (checkpoint `subject`) and **#8** (thresholds as a list), and the eval-format AND/OR gap via CNF evidence requirements.
+- **v3** adds `assessment_context` (the evaluation inputs the BOM does not carry — destination Member States, food-contact, persona, reusability, role-derivation facts) and the `applies_when` applicability mechanism keyed on it. This closes the organisation-subject second-order gap: a checkpoint that needs context the assessment lacks yields a `caveat` (`CONTEXT_REQUIRED`), never a silent pass or a gap.
 
 ### Top level
 
@@ -21,7 +22,8 @@ Version 2 (from the schema-deltas rulings) resolves SCHEMA_DELTAS **#2** (checkp
 | `fixtureFormatVersion` | `2`. Bumped when this contract changes. |
 | `pack` | `{ id, description, source, screeningDate }`. Client identity is **anonymised** (`Client A`, …); no personal contact data. |
 | `asOf` | Screening date the expected verdicts are evaluated as-of. Forward-dated requirements are flags, not verdicts, relative to this. |
-| `scope` | `{ geography, foodContact, packagingLevel[], reusable, scopingNotes[] }`. |
+| `assessment_context` | The authoritative evaluation inputs (see below). `applies_when` conditions read these. |
+| `scope` | `{ geography, packagingLevel[], scopingNotes[] }` — descriptive only; evaluation inputs live in `assessment_context`. |
 | `legalRole` | Derived role + whether it was ambiguous. Ambiguous → `expectedFlag: "legal_confirmation_required"`, never a silent assignment. |
 | `components[]` | One per BOM line: `claims`, `evidenceDocuments[]`, and `expected[]` (one per checkpoint). |
 | `packLevelExpected[]` | Checkpoints whose `subject` is `packaging_unit` or `organisation`, not `component`. |
@@ -30,6 +32,32 @@ Version 2 (from the schema-deltas rulings) resolves SCHEMA_DELTAS **#2** (checkp
 | `notApplicable[]` | Out-of-scope checkpoints, each with a recorded scoping note. |
 | `forwardFlags[]` | Requirements applying from a future date. |
 | `expectedOverall` | `{ verdict, summary, hardBlockers[], counts }`. |
+
+### Assessment context
+
+The inputs an evaluation needs that the BOM alone does not carry. Every fixture carries one.
+
+```jsonc
+{
+  "destination_member_states": ["DE"],   // Member States of first placing; drives EPR applicability
+  "food_contact": false,                 // drives food-contact-only checkpoints (e.g. PFAS)
+  "persona": "2a",                        // commercial identity chosen at onboarding
+  "declared_reusable": false,             // reusable vs single-use packaging
+  "legal_role_facts": { "manufacturer_is_non_eu": true }  // facts for role derivation, never a role
+}
+```
+
+Where a value is not truly known it is marked assumed in `scope.scopingNotes` (the golden fixture assumes `DE`).
+
+### Applicability (`applies_when`)
+
+A corpus checkpoint may carry an `applies_when` object keyed on `assessment_context` fields; `null` means it always applies. Values are either a literal to match (`{ "food_contact": true }`) or the sentinel `"present"`, meaning the context field must be a non-empty array (`{ "destination_member_states": "present" }`).
+
+Evaluation:
+
+- condition satisfied → the checkpoint is evaluated normally;
+- condition not satisfied → `not_applicable` (with a recorded scoping note);
+- condition **cannot be evaluated** because the context field is missing/empty → verdict `caveat`, reason `CONTEXT_REQUIRED`. **Never a silent pass, never a gap.** The report asks the user for the missing context.
 
 ### Expected verdict entry
 
@@ -59,6 +87,8 @@ Each entry in `components[].expected[]` and `packLevelExpected[]`:
 
 `evidenceRequirements` is conjunctive normal form: an outer `allOf` (AND) of inner `anyOf` (OR) clauses, **exactly one nesting level**, every leaf an evidence type. The PET strap closes on a pigment specification **or** an XRF/lab test — `{ "allOf": [{ "anyOf": ["pigment_spec", "lab_test"] }] }`. Two independent things both required would be two `allOf` clauses.
 
+A **genuine `allOf`** (two independent things both required) — reusable packaging must have *both* a design specification *and* reuse-system documentation: `{ "allOf": [{ "anyOf": ["technical_file"] }, { "anyOf": ["technical_file", "supplier_declaration"] }] }`. Two clauses, both must be satisfied. Recognise this shape when a checkpoint needs more than one distinct evidence item, versus the single-clause `anyOf` used when any one document closes it.
+
 **The CNF rule: if a requirement cannot be expressed in one level of CNF, split the checkpoint.** No nesting beyond allOf→anyOf; no anyOf-of-allOf. This keeps evaluation and delta-action generation mechanical.
 
 ### Reason-code vocabulary
@@ -74,6 +104,7 @@ Each entry in `components[].expected[]` and `packLevelExpected[]`:
 | `NOT_IN_BOM` | gap | Component in the physical pack but absent from the BOM. |
 | `NOT_APPLICABLE_SCOPE` | not_applicable | Out of scope; scoping note recorded. |
 | `FORWARD_NOT_YET_IN_FORCE` | (flag) | Applies from a future date; reported as a forward flag, not a verdict. |
+| `CONTEXT_REQUIRED` | (caveat) | `applies_when` cannot be evaluated — required `assessment_context` is missing. Never a pass or a gap. |
 
 ### Evidence document schema
 

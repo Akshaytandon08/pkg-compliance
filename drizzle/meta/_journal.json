@@ -50,6 +50,13 @@
       "when": 1786369313723,
       "tag": "0006_batch1-refactor-pinpoints",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786372131102,
+      "tag": "0007_applies-when",
+      "breakpoints": true
     }
   ]
 }

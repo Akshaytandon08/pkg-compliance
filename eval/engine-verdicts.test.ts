@@ -23,6 +23,13 @@ type Expectation = {
 type Fixture = {
   pack: { id: string };
   asOf: string;
+  assessment_context: {
+    destination_member_states: string[];
+    food_contact: boolean;
+    persona: string;
+    declared_reusable: boolean;
+    legal_role_facts: Record<string, unknown>;
+  };
   components: { line: string; expected: Expectation[] }[];
   packLevelExpected: (Expectation & { subject: string })[];
   expectedOverall: { verdict: string; counts: Record<string, number> };
@@ -81,5 +88,19 @@ for (const file of FIXTURES) {
     // yield verdicts; draft/contested render as caveats (evaluability.ts).
     const result = evaluatePack(fixture);
     assert.ok(result.caveats.every((c: { verdict?: string }) => c.verdict === undefined));
+  });
+
+  test(`${file}: applies_when with missing context yields a CONTEXT_REQUIRED caveat`, ENGINE_PENDING, () => {
+    // Evaluate the same pack with destination_member_states stripped: the
+    // producer-registration checkpoint (applies_when destination present) must
+    // become a caveat/CONTEXT_REQUIRED — never a silent pass, never a gap.
+    const stripped = {
+      ...fixture,
+      assessment_context: { ...fixture.assessment_context, destination_member_states: [] },
+    };
+    const result = evaluatePack(stripped);
+    const caveat = result.caveats.find((c) => c.checkpointId === "EU-EPR-producer-registration");
+    assert.ok(caveat, "producer-registration must be a caveat when destination is unknown");
+    assert.equal(caveat.verdict, undefined, "a caveat is not a verdict");
   });
 }

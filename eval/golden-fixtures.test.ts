@@ -26,9 +26,18 @@ type Expectation = {
   basis?: string;
 };
 
+type AssessmentContext = {
+  destination_member_states: string[];
+  food_contact: boolean;
+  persona: string;
+  declared_reusable: boolean;
+  legal_role_facts: Record<string, unknown>;
+};
+
 type Fixture = {
   fixtureFormatVersion: number;
   asOf: string;
+  assessment_context: AssessmentContext;
   legalRole: { ambiguous: boolean; expectedFlag?: string };
   components: { line: string; name: string; evidenceDocuments: unknown[]; expected: Expectation[] }[];
   bomCompletenessGaps: {
@@ -57,6 +66,7 @@ const REASON_TO_VERDICT: Record<string, string> = {
   NOT_IN_BOM: "gap",
   NOT_APPLICABLE_SCOPE: "not_applicable",
   FORWARD_NOT_YET_IN_FORCE: "flag",
+  CONTEXT_REQUIRED: "caveat",
 };
 
 const VERDICT_SEVERITY: Record<string, number> = { qualified: 1, conditional: 2, gap: 3 };
@@ -94,7 +104,20 @@ for (const file of FIXTURES) {
   const allExpected = [...componentExpected, ...packExpected];
 
   test(`${file}: fixture format version is current`, () => {
-    assert.equal(fixture.fixtureFormatVersion, 2);
+    assert.equal(fixture.fixtureFormatVersion, 3);
+  });
+
+  test(`${file}: carries a well-formed assessment_context`, () => {
+    const ctx = fixture.assessment_context;
+    assert.ok(ctx, "assessment_context is required");
+    assert.ok(Array.isArray(ctx.destination_member_states), "destination_member_states must be an array");
+    assert.equal(typeof ctx.food_contact, "boolean", "food_contact must be boolean");
+    assert.equal(typeof ctx.persona, "string", "persona must be a string");
+    assert.equal(typeof ctx.declared_reusable, "boolean", "declared_reusable must be boolean");
+    assert.ok(
+      ctx.legal_role_facts && typeof ctx.legal_role_facts === "object",
+      "legal_role_facts must be an object",
+    );
   });
 
   test(`${file}: every expectation matches the deterministic rule table`, () => {
