@@ -1,0 +1,82 @@
+{
+  "fixtureFormatVersion": 2,
+  "pack": {
+    "id": "client-b-strap-cert-scope",
+    "description": "Single-component fixture exercising cert-scope coverage: a heavy-metals report is on file but its scope covers a different component.",
+    "source": "Synthetic fixture (Client B) for the evidenceDocuments[].scope dimension",
+    "screeningDate": "2026-07-28"
+  },
+  "asOf": "2026-07-28",
+  "scope": {
+    "geography": "EU",
+    "foodContact": false,
+    "packagingLevel": ["transport"],
+    "reusable": false,
+    "scopingNotes": []
+  },
+  "legalRole": {
+    "persona": "2a",
+    "derived": ["manufacturer"],
+    "counterpartyRoles": ["importer"],
+    "ambiguous": false
+  },
+  "components": [
+    {
+      "line": "1",
+      "name": "Green polyester strap (PET)",
+      "material": "plastic",
+      "claims": { "composition": "PET with green pigment" },
+      "evidenceDocuments": [
+        {
+          "docId": "HM-CERT-CORR-01",
+          "type": "test_report",
+          "issuer": "Paper mill (organisation only; no personal contact data)",
+          "issuedDate": "2026-05-01",
+          "expiryDate": "2027-05-01",
+          "scope": {
+            "components": ["Corrugated sheet"],
+            "materials": ["corrugated"],
+            "parameters": ["Pb", "Cd", "Hg", "Cr(VI)"]
+          },
+          "labAccreditation": "NABL"
+        }
+      ],
+      "expected": [
+        {
+          "checkpointId": "EU-PPWR-heavy-metals",
+          "checkpointVersion": 1,
+          "verdict": "conditional",
+          "designAssessment": "no_inherent_risk",
+          "evidenceState": "insufficient",
+          "risk": "low",
+          "reasonCode": "EVIDENCE_INCOMPLETE",
+          "evidenceRequirements": { "allOf": [{ "anyOf": ["supplier_declaration", "test_report", "lab_test"] }] },
+          "scopeMismatch": {
+            "documentId": "HM-CERT-CORR-01",
+            "coversComponent": false,
+            "reason": "Certificate scope covers the corrugated sheet, not this PET strap. A heavy-metals test on a different component/material does not evidence this component."
+          },
+          "basis": "A heavy-metals test report is on file, but its scope is the corrugated sheet; the PET strap remains unevidenced, so the checkpoint stays conditional rather than qualified."
+        }
+      ]
+    }
+  ],
+  "packLevelExpected": [],
+  "bomCompletenessGaps": [],
+  "dataCorrections": [],
+  "notApplicable": [],
+  "forwardFlags": [],
+  "expectedOverall": {
+    "verdict": "conditional",
+    "summary": "One component with a heavy-metals report on file whose scope does not cover it — evidence present but insufficient.",
+    "hardBlockers": [
+      "Heavy-metals report HM-CERT-CORR-01 covers the corrugated sheet, not the PET strap; the strap is unevidenced."
+    ],
+    "counts": {
+      "qualified": 0,
+      "conditional": 1,
+      "gap": 0,
+      "notApplicable": 0
+    }
+  }
+}

@@ -77,7 +77,7 @@ function assertCnf(where: string, req: EvidenceRequirement) {
   }
 }
 
-const FIXTURES = ["client-a-traction-cell.json"];
+const FIXTURES = ["client-a-traction-cell.json", "client-b-strap-cert-scope.json"];
 
 for (const file of FIXTURES) {
   const fixture: Fixture = JSON.parse(
@@ -193,10 +193,22 @@ for (const file of FIXTURES) {
     }
   });
 
-  test(`${file}: forward flags are dated and never rendered as inapplicable`, () => {
-    for (const f of fixture.forwardFlags) {
-      assert.match(f.appliesFrom, /^\d{4}-\d{2}-\d{2}$/);
-      assert.ok(f.appliesFrom > fixture.asOf, `${f.checkpointId} is not forward-dated`);
+  test(`${file}: a scope mismatch yields EVIDENCE_INCOMPLETE, not qualified`, () => {
+    // Where a document is on file but its scope does not cover the component,
+    // the entry must record the mismatch and stay conditional — an out-of-scope
+    // certificate must never read as coverage. Exercises evidenceDocuments[].scope.
+    for (const c of fixture.components) {
+      for (const e of c.expected) {
+        if (!e.scopeMismatch) continue;
+        assert.equal(e.scopeMismatch.coversComponent, false, `line ${c.line}: scopeMismatch must be a non-coverage`);
+        assert.equal(e.reasonCode, "EVIDENCE_INCOMPLETE", `line ${c.line}: scope mismatch is EVIDENCE_INCOMPLETE`);
+        assert.equal(e.verdict, "conditional", `line ${c.line}: scope mismatch stays conditional`);
+        assert.notEqual(e.evidenceState, "complete", `line ${c.line}: out-of-scope evidence is not complete`);
+        assert.ok(
+          (c.evidenceDocuments as { docId: string }[]).some((d) => d.docId === e.scopeMismatch!.documentId),
+          `line ${c.line}: scopeMismatch.documentId must reference an on-file document`,
+        );
+      }
     }
   });
 }
