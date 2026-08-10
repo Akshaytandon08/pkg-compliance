@@ -3,7 +3,7 @@
 Working codename: `pkg-compliance` (product name TBD — do not invent one).
 Source of truth for product decisions: [docs/BRIEF.md](docs/BRIEF.md). Decisions there are settled; raise deltas to Akshay Tandon (product owner & interim regulatory owner). Every corpus change requires his sign-off — hard gate.
 
-**Status: Sprint 0 complete + approved corrections landed. Next: schema-delta decisions, then Batch 1 seeding. Last updated: 2026-08-06.**
+**Status: Batch 1 seeded (11 draft checkpoints) and refactored to the resolved schema. Next: regulatory approval of Batch 1, then Batch 2. Last updated: 2026-08-07.**
 
 ## Hard constraints (enforce in code, verify in review)
 
@@ -43,7 +43,7 @@ Source of truth for product decisions: [docs/BRIEF.md](docs/BRIEF.md). Decisions
 
 ## Sprint 1 — Corpus + schema
 
-- [ ] **Gate: resolve [docs/SCHEMA_DELTAS.md](docs/SCHEMA_DELTAS.md) before Batch 1** — 8 gaps found by writing the Exide expected verdicts (checkpoint `subject`, threshold-as-list, BOM-completeness stage, data-integrity findings, N/A scoping note, action-type vocabulary, ID convention)
+- [~] **[docs/SCHEMA_DELTAS.md](docs/SCHEMA_DELTAS.md)** — #2 (checkpoint `subject`) and #8 (thresholds-as-list) **RESOLVED** (migration 0004) plus the eval-format AND/OR gap (CNF evidence). Still open: #3 BOM-completeness stage, #4 data-integrity findings, #5 N/A scoping/assessment-pending, #6 action-type vocabulary, #7 (as-of date — already threaded), #9 ID convention.
 - [x] Checkpoint schema per §5 of the brief (all fields; versioned data, not code)
 - [x] Corpus change workflow: versioned commit + regulatory-owner approval gate (trigger-enforced)
 
@@ -51,7 +51,7 @@ Source of truth for product decisions: [docs/BRIEF.md](docs/BRIEF.md). Decisions
 
 Sequenced by certainty, not checklist order. Batches of 10–15 checkpoints, **one commit each**, commit body carrying the checkpoint diff plus the primary-source link per checkpoint — so the approval trail lives in git history alongside the data it approves. Checkpoints land as `draft`; approval rows (with `primary_source_url`) are what promote them to `in_force`.
 
-- [~] **Batch 1 — EU Stack A / PPWR articles.** 10 checkpoints seeded as `draft` (migration `0003_seed-batch1-eu-ppwr.sql`). **Awaiting Akshay's approval** — the seed commit body is the review queue. `citation_verified_date` is NULL on every row: article/paragraph pinpoints were cross-checked against discovery sources but not yet confirmed against the primary enacting text (the EUR-Lex fetch returned only recitals), so each needs a link-click to confirm before promotion. Two deltas were worked around, not resolved: pack/consignment `subject` lives in `notes` (delta #2), and PFAS's three limits are in `requirement_text` with `threshold` NULL (delta #8) — both still need decisions.
+- [~] **Batch 1 — EU Stack A / PPWR articles.** Seeded `draft` (migration `0003`), then refactored to the resolved schema (migration `0006`): **11 checkpoints** — `subject` set per row, operator identification split into manufacturer (Art 15(5),(6)) and importer (Art 18(3)) obligations, PFAS thresholds structured, citation pinpoints sharpened. **Awaiting Akshay's approval** — the `0003` and `0006` commit bodies are the review queue. `citation_verified_date` is NULL on every row: pinpoints are "verified via secondary cross-check, confirm on primary" (the EUR-Lex fetch returned only recitals), so each needs a link-click before promotion.
 - [ ] **Batch 2 — EU Stack B/C.** EPR calendar, labelling, claims.
 - [ ] **Batch 3 — India.** Slowest review: every value comes off the §6 re-verify list. Each checkpoint attaches the CPCB notification / gazette PDF link — never a consultancy summary.
 - [ ] Seed to ~60–80 EU+India checkpoints total from the two reference artefacts
@@ -84,11 +84,19 @@ Sequenced by certainty, not checklist order. Batches of 10–15 checkpoints, **o
 
 **Acceptance:** 3 real client packs end-to-end, ≥1 paying.
 
+## Corpus monitoring (watch list — review before approving affected checkpoints)
+
+Live regulation moves; these are tracked so a checkpoint is not approved against a stale reading.
+
+- [ ] **Commission PPWR FAQ, 2nd edition (published 1 Aug 2026, 33 new/revised entries).** Ingest and review against every Batch 1 checkpoint before approval — FAQ entries frequently pin the article-level reading we currently mark "confirm on primary".
+- [ ] **Authorised-representative suspension proposal (Commission, Dec 2025).** Would suspend the AR obligation to 2035 for EU-based companies only; pending, and does **not** affect non-EU producers (persona 2a). Affects `EU-EPR-producer-registration`. Track status; do not weaken the AR requirement for non-EU producers on the strength of a pending proposal.
+
 ## Open items / blockers
 
 | Item | Owner | Status |
 |---|---|---|
-| **[docs/SCHEMA_DELTAS.md](docs/SCHEMA_DELTAS.md) decisions — blocks Batch 1** | Akshay | Pending |
+| Approve/promote the 11 Batch 1 drafts (confirm citation pinpoints on primary) | Akshay | Pending |
+| Remaining [docs/SCHEMA_DELTAS.md](docs/SCHEMA_DELTAS.md) decisions (#3, #4, #5, #6, #9) | Akshay | Pending |
 | 2 further real client packs for the golden dataset | Akshay | Pending |
 | Kyoto EF access + GreenAlign evidence-flow interface details | Akshay | Pending |
 | Product name | Akshay | TBD — use `pkg-compliance` |

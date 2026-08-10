@@ -43,6 +43,13 @@
       "when": 1786368781827,
       "tag": "0005_drop-legacy-threshold-evidence",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786369313723,
+      "tag": "0006_batch1-refactor-pinpoints",
+      "breakpoints": true
     }
   ]
 }

@@ -251,7 +251,7 @@
       "note": "Deliberate fixture case: the report must instruct the user about their DoC obligation while never presenting itself as issuing one."
     },
     {
-      "checkpointId": "EU-PPWR-operator-identification",
+      "checkpointId": "EU-PPWR-operator-id-manufacturer",
       "checkpointVersion": 1,
       "subject": "packaging_unit",
       "verdict": "conditional",
@@ -260,7 +260,19 @@
       "risk": "low",
       "reasonCode": "EVIDENCE_ABSENT",
       "evidenceRequirements": { "allOf": [{ "anyOf": ["marking"] }] },
-      "basis": "Name/trademark and postal address of manufacturer and importer to be marked on packaging."
+      "basis": "Manufacturer's name/trademark and postal address to be marked on packaging (Art 15(5),(6))."
+    },
+    {
+      "checkpointId": "EU-PPWR-operator-id-importer",
+      "checkpointVersion": 1,
+      "subject": "packaging_unit",
+      "verdict": "conditional",
+      "designAssessment": "no_inherent_risk",
+      "evidenceState": "absent",
+      "risk": "low",
+      "reasonCode": "EVIDENCE_ABSENT",
+      "evidenceRequirements": { "allOf": [{ "anyOf": ["marking"] }] },
+      "basis": "Importer's name/trademark and postal address to be marked on packaging; may be provided via data carrier/QR or accompanying document (Art 18(3))."
     },
     {
       "checkpointId": "EU-EPR-producer-registration",
@@ -360,7 +372,7 @@
     ],
     "counts": {
       "qualified": 1,
-      "conditional": 14,
+      "conditional": 15,
       "gap": 2,
       "notApplicable": 1
     }
