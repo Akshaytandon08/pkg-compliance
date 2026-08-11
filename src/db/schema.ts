@@ -68,6 +68,11 @@ export const EVIDENCE_TYPES = [
   "technical_file",
   "test_report",
   "pigment_spec",
+  // The user's EU declaration of conformity as a distinct evidence item —
+  // names the OBLIGATED OPERATOR's document, not any system output (so it is
+  // not a guardrail concern; the tripwire flags issuing claims, not this).
+  // Resolves the DoC/technical_file conflation in SCHEMA_DELTAS #6.
+  "conformity_declaration",
 ] as const;
 
 export type Threshold = {

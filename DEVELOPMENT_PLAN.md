@@ -43,7 +43,7 @@ Source of truth for product decisions: [docs/BRIEF.md](docs/BRIEF.md). Decisions
 
 ## Sprint 1 — Corpus + schema
 
-- [~] **[docs/SCHEMA_DELTAS.md](docs/SCHEMA_DELTAS.md)** — #2 (checkpoint `subject`) and #8 (thresholds-as-list) **RESOLVED** (migration 0004) plus the eval-format AND/OR gap (CNF evidence). Still open: #3 BOM-completeness stage, #4 data-integrity findings, #5 N/A scoping/assessment-pending, #6 action-type vocabulary, #7 (as-of date — already threaded), #9 ID convention.
+- [~] **[docs/SCHEMA_DELTAS.md](docs/SCHEMA_DELTAS.md)** — #2 (checkpoint `subject`) and #8 (thresholds-as-list) **RESOLVED** (migration 0004) plus the eval-format AND/OR gap (CNF evidence). Still open: #3 BOM-completeness stage, #4 data-integrity findings, #5 N/A scoping/assessment-pending, #9 ID convention. (#6 evidence/action vocabularies resolved — `conformity_declaration` added; #7 as-of date already threaded.)
 - [x] Checkpoint schema per §5 of the brief (all fields; versioned data, not code)
 - [x] Corpus change workflow: versioned commit + regulatory-owner approval gate (trigger-enforced)
 
@@ -101,7 +101,7 @@ Live regulation moves; these are tracked so a checkpoint is not approved against
 | Item | Owner | Status |
 |---|---|---|
 | Approve/promote the 11 Batch 1 drafts via `corpus:review`/`:approve` (confirm pinpoints on primary; pin the no-transitional-stock article) | Akshay | Pending |
-| Remaining [docs/SCHEMA_DELTAS.md](docs/SCHEMA_DELTAS.md) decisions (#3, #4, #5, #6, #9) | Akshay | Pending |
+| Remaining [docs/SCHEMA_DELTAS.md](docs/SCHEMA_DELTAS.md) decisions (#3, #4, #5, #9) | Akshay | Pending |
 | 2 further real client packs for the golden dataset | Akshay | Pending |
 | Kyoto EF access + GreenAlign evidence-flow interface details | Akshay | Pending |
 | Product name | Akshay | TBD — use `pkg-compliance` |

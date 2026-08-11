@@ -259,8 +259,8 @@
       "evidenceState": "absent",
       "risk": "low",
       "reasonCode": "EVIDENCE_ABSENT",
-      "evidenceRequirements": { "allOf": [{ "anyOf": ["technical_file"] }] },
-      "basis": "The obligated operator must issue a Declaration of Conformity per Annex VIII and retain it 5 years for single-use packaging. This is the user's obligation; the screening only reports whether the prerequisites are assembled.",
+      "evidenceRequirements": { "allOf": [{ "anyOf": ["conformity_declaration"] }] },
+      "basis": "The obligated operator must issue a Declaration of Conformity per Annex VIII and retain it 5 years for single-use packaging. This is the user's obligation; the screening only reports whether the prerequisites are assembled. Closing evidence is the operator's own conformity_declaration.",
       "note": "Deliberate fixture case: the report must instruct the user about their DoC obligation while never presenting itself as issuing one."
     },
     {

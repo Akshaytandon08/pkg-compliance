@@ -71,6 +71,13 @@
       "when": 1786437137066,
       "tag": "0009_faq-amendments-drop-food-contact",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786450752743,
+      "tag": "0010_preapproval-text-finalisation",
+      "breakpoints": true
     }
   ]
 }

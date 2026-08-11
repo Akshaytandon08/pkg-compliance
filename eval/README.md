@@ -125,7 +125,7 @@ A **genuine `allOf`** (two independent things both required) — reusable packag
 ```jsonc
 {
   "docId": "…",
-  "type": "supplier_declaration | lab_test | registration | marking | technical_file | test_report | pigment_spec",
+  "type": "supplier_declaration | lab_test | registration | marking | technical_file | test_report | pigment_spec | conformity_declaration",
   "issuer": "…",              // organisation only; no personal contact data
   "issuedDate": "YYYY-MM-DD | null",
   "expiryDate": "YYYY-MM-DD | null",
@@ -137,6 +137,8 @@ A **genuine `allOf`** (two independent things both required) — reusable packag
   "labAccreditation": "NABL | ILAC | null"
 }
 ```
+
+`conformity_declaration` names the obligated operator's own EU declaration of conformity — the user's document, never a system output. It is a distinct evidence type so a DoC is not conflated with a generic `technical_file` (SCHEMA_DELTAS #6).
 
 ## Known format gaps
 

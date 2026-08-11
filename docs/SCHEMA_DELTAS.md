@@ -59,7 +59,9 @@ Related: the manual run flagged as a data correction that recyclability on wood/
 
 **Proposal:** `not_applicable` requires a `scopingNote`; add a distinct `assessment_pending` disposition.
 
-## 6. `evidence_type` and action type are two vocabularies
+## 6. `evidence_type` and action type are two vocabularies — RESOLVED
+
+**Ruling:** the DoC/`technical_file` conflation (the core of this delta) is resolved by adding a distinct evidence type `conformity_declaration` (Commit 10); `EU-PPWR-declaration-of-conformity` now requires it. Actions that are not evidence are already separated in the fixture format — BOM completeness carries `requiredAction: "bom_addition"` and data-integrity findings live in their own `dataCorrections[]` section — so evidence and action vocabularies are distinct. `photo_record` is not yet needed by any checkpoint; it folds into the still-open delta #3 (BOM-completeness stage) if that is adopted.
 
 Brief §5 lists six `evidence_type` values. The Exide evidence tracker's "Type" column uses a different set: *Supplier declaration, Data correction, BOM addition, Technical file, DoC, Registration, Marking, Test report*. Mixing them conflates "what closes this checkpoint" with "what the user must do next".
 
