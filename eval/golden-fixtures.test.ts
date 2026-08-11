@@ -104,7 +104,7 @@ for (const file of FIXTURES) {
   const allExpected = [...componentExpected, ...packExpected];
 
   test(`${file}: fixture format version is current`, () => {
-    assert.equal(fixture.fixtureFormatVersion, 3);
+    assert.equal(fixture.fixtureFormatVersion, 4);
   });
 
   test(`${file}: carries a well-formed assessment_context`, () => {

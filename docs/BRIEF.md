@@ -54,6 +54,14 @@ test_method, citation (primary legal source, article-level — MANDATORY),
 citation_verified_date, notes, food_contact_only (bool)
 ```
 
+**Amendments (post-approval rulings — the field list above is the original settled spec; `src/db/schema.ts` + [SCHEMA_DELTAS.md](SCHEMA_DELTAS.md) are the field list of record):**
+
+- `threshold` (single object) → `thresholds[]` (array, ANDed) — delta #8.
+- `evidence_type[]` → `evidence_requirements` (CNF `{allOf:[{anyOf:[…]}]}`) — evidence AND/OR gap.
+- added `subject` (`component|packaging_unit|organisation`) — delta #2.
+- added `applies_when` (applicability keyed on assessment context).
+- **`food_contact_only` (bool) removed — collapsed into `applies_when` (`{"food_contact": true}`)** so applicability has a single mechanism.
+
 Rules for the corpus:
 
 * Every checkpoint cites primary law at article level (EUR-Lex, CPCB notification, gazette). Aggregator/consultancy sources are discovery aids only — a checkpoint without a primary citation cannot ship.

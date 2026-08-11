@@ -93,7 +93,7 @@ Sequenced by certainty, not checklist order. Batches of 10–15 checkpoints, **o
 
 Live regulation moves; these are tracked so a checkpoint is not approved against a stale reading.
 
-- [ ] **Commission PPWR FAQ, 2nd edition (published 1 Aug 2026, 33 new/revised entries).** Ingest and review against every Batch 1 checkpoint before approval — FAQ entries frequently pin the article-level reading we currently mark "confirm on primary".
+- [x] **Commission PPWR FAQ, 2nd edition (DG ENV, Aug 2026).** Ingested — amendments applied to Batch 1 (migration 0009): heavy-metals/soc/PFAS test methods, DoC one-per-unit + MS language, no-transitional-stock softening + Article 71 pinpoint, tech-doc manufacturer-holds-file, FAQ role-derivation rules. FAQ recorded as interpretive only (notes), registered in [docs/regulatory-sources.md](docs/regulatory-sources.md). Rows stay draft; each still needs primary confirmation at approval.
 - [ ] **Authorised-representative suspension proposal (Commission, Dec 2025).** Would suspend the AR obligation to 2035 for EU-based companies only; pending, and does **not** affect non-EU producers (persona 2a). Affects `EU-EPR-producer-registration`. Track status; do not weaken the AR requirement for non-EU producers on the strength of a pending proposal.
 
 ## Open items / blockers

@@ -1,5 +1,5 @@
 {
-  "fixtureFormatVersion": 3,
+  "fixtureFormatVersion": 4,
   "pack": {
     "id": "client-a-traction-cell",
     "description": "Traction-cell export packaging, pallet/transport, industrial B2B",
@@ -16,7 +16,10 @@
       "manufacturer_is_non_eu": true,
       "packaging_travels_around_client_goods": true,
       "exports_empty_packaging_to_eu": false,
-      "designs_own_packaging": false
+      "designs_own_packaging": false,
+      "packaging_branded": false,
+      "custom_vs_standardised": "custom",
+      "spec_defined_by": "customer"
     }
   },
   "scope": {
@@ -31,7 +34,7 @@
     "derived": ["manufacturer"],
     "counterpartyRoles": ["importer", "epr_producer"],
     "ambiguous": true,
-    "ambiguityReason": "Client A is the non-EU manufacturer; the EU importer carries importer obligations. Which party is 'manufacturer' (brand/spec owner) and which is EPR producer in each Member State of first placing must be contractually confirmed — engine flags for legal confirmation, does not assign.",
+    "ambiguityReason": "Packaging is unbranded and custom, with the specification defined by the user's customer (spec_defined_by: customer). Under the FAQ role-derivation rules, an unbranded custom pack makes the spec-definer the 'manufacturer' — so the manufacturer role plausibly sits with the user's customer, not with Client A the physical producer. This must be contractually confirmed; the engine flags for legal confirmation and does not assign. (Client A is also the non-EU party; the EU importer carries importer obligations.)",
     "expectedFlag": "legal_confirmation_required"
   },
   "components": [

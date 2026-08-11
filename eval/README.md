@@ -8,7 +8,7 @@ The eval harness is the contract between the corpus and the engine. Fixtures her
 
 Both are picked up by `npm test` / `npm run check`.
 
-## Fixture format (version 3) — the contract
+## Fixture format (version 4) — the contract
 
 If encoding a real pack cannot be expressed in this format without distortion, that is a **schema/format gap to report, not a fixture to bend**. Gaps found so far live in [docs/SCHEMA_DELTAS.md](../docs/SCHEMA_DELTAS.md) and in the "Known format gaps" section below.
 
@@ -40,14 +40,26 @@ The inputs an evaluation needs that the BOM alone does not carry. Every fixture 
 ```jsonc
 {
   "destination_member_states": ["DE"],   // Member States of first placing; drives EPR applicability
-  "food_contact": false,                 // drives food-contact-only checkpoints (e.g. PFAS)
+  "food_contact": false,                 // drives food-contact checkpoints (e.g. PFAS applies_when)
   "persona": "2a",                        // commercial identity chosen at onboarding
   "declared_reusable": false,             // reusable vs single-use packaging
-  "legal_role_facts": { "manufacturer_is_non_eu": true }  // facts for role derivation, never a role
+  "legal_role_facts": {                   // facts for role derivation — never a role
+    "packaging_branded": false,           // does the packaging carry a brand/trademark?
+    "custom_vs_standardised": "custom",   // "custom" | "standardised"
+    "spec_defined_by": "customer"         // who defined the spec: "user" | "customer" | "supplier"
+  }
 }
 ```
 
 Where a value is not truly known it is marked assumed in `scope.scopingNotes` (the golden fixture assumes `DE`).
+
+**FAQ role-derivation rules** (Commission PPWR FAQ, interpretive — see [docs/regulatory-sources.md](../docs/regulatory-sources.md)). The `manufacturer` legal role follows from `legal_role_facts`:
+
+- **branded** → the trademark owner is the manufacturer;
+- **unbranded + standardised** → the physical producer is the manufacturer;
+- **unbranded + custom** → the party that defined the specification (`spec_defined_by`) is the manufacturer.
+
+When these facts point outside the user's own organisation (e.g. an unbranded custom pack whose spec was defined by the user's *customer*), the manufacturer role is ambiguous — set `legalRole.ambiguous: true` with `expectedFlag: "legal_confirmation_required"`. The engine flags; it never silently assigns (brief §2). The golden fixture is exactly this case.
 
 ### Applicability (`applies_when`)
 

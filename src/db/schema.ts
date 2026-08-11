@@ -1,5 +1,4 @@
 import {
-  boolean,
   date,
   foreignKey,
   integer,
@@ -124,7 +123,8 @@ export const checkpoints = pgTable(
     citation: text("citation").notNull(),
     citationVerifiedDate: date("citation_verified_date"),
     notes: text("notes"),
-    foodContactOnly: boolean("food_contact_only").notNull().default(false),
+    // food_contact_only was collapsed into `applies_when` ({"food_contact":
+    // true}) — a single applicability mechanism instead of a special-case flag.
   },
   (t) => [primaryKey({ columns: [t.id, t.version] })],
 );
