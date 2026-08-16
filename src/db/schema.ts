@@ -45,35 +45,10 @@ export const checkpointStatusEnum = pgEnum("checkpoint_status", [
 
 // Array-valued fields use text[]; allowed values are validated at seed time so
 // vocabulary growth (new materials, roles) never requires an enum migration.
-export const MATERIALS = ["corrugated", "plastic", "wood", "metal", "all"] as const;
-export const LEGAL_ROLES = [
-  "manufacturer",
-  "importer",
-  "distributor",
-  "epr_producer",
-] as const;
-export const PACKAGING_LEVELS = [
-  "sales",
-  "inner",
-  "outer",
-  "transport",
-  "pallet",
-  "ecomm",
-] as const;
-export const EVIDENCE_TYPES = [
-  "supplier_declaration",
-  "lab_test",
-  "registration",
-  "marking",
-  "technical_file",
-  "test_report",
-  "pigment_spec",
-  // The user's EU declaration of conformity as a distinct evidence item —
-  // names the OBLIGATED OPERATOR's document, not any system output (so it is
-  // not a guardrail concern; the tripwire flags issuing claims, not this).
-  // Resolves the DoC/technical_file conflation in SCHEMA_DELTAS #6.
-  "conformity_declaration",
-] as const;
+// The vocabularies live in a client-safe module (no Drizzle) and are re-exported
+// here so corpus code and UI code share one source of truth. EVIDENCE_TYPES
+// includes `conformity_declaration` (the operator's own DoC — SCHEMA_DELTAS #6).
+export { EVIDENCE_TYPES, LEGAL_ROLES, MATERIALS, PACKAGING_LEVELS } from "../lib/vocab.ts";
 
 export type Threshold = {
   parameter: string;
@@ -182,3 +157,63 @@ export const checkpointApprovals = pgTable(
     }).onDelete("restrict"),
   ],
 );
+
+// --- Assessments (Sprint 2a intake) --------------------------------------
+// A user's uploaded pack: assessment context + BOM components + per-component
+// evidence metadata. The corpus version is stamped at creation so a report is
+// reproducible against the corpus that was in force when it ran (brief §5/§6).
+
+export type LegalRoleFacts = {
+  packaging_branded?: boolean;
+  custom_vs_standardised?: "custom" | "standardised";
+  spec_defined_by?: "user" | "customer" | "supplier";
+  [key: string]: unknown;
+};
+
+export type AssessmentContextRecord = {
+  destination_member_states: string[];
+  food_contact: boolean;
+  persona: string;
+  declared_reusable: boolean;
+  legal_role_facts: LegalRoleFacts;
+};
+
+export const assessments = pgTable("assessments", {
+  id: serial("id").primaryKey(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  packName: text("pack_name").notNull(),
+  description: text("description"),
+  assessmentContext: jsonb("assessment_context").$type<AssessmentContextRecord>().notNull(),
+  // Stamped at creation — the corpus version in force then (or a pre-approval
+  // sentinel while the corpus is still all draft). Never back-dated.
+  corpusVersion: text("corpus_version").notNull(),
+  asOf: date("as_of").notNull(),
+});
+
+export const assessmentComponents = pgTable("assessment_components", {
+  id: serial("id").primaryKey(),
+  assessmentId: integer("assessment_id")
+    .notNull()
+    .references(() => assessments.id, { onDelete: "cascade" }),
+  line: text("line").notNull(),
+  name: text("name").notNull(),
+  material: text("material").notNull(),
+  composition: text("composition"),
+  weightGrams: integer("weight_grams"),
+  sourcedFrom: text("sourced_from"),
+});
+
+export const assessmentEvidence = pgTable("assessment_evidence", {
+  id: serial("id").primaryKey(),
+  componentId: integer("component_id")
+    .notNull()
+    .references(() => assessmentComponents.id, { onDelete: "cascade" }),
+  // Metadata entry only — no file parsing in this slice.
+  evidenceType: text("evidence_type").notNull(),
+  reference: text("reference"),
+  issuedDate: date("issued_date"),
+  expiryDate: date("expiry_date"),
+  scopeComponents: text("scope_components").array(),
+  scopeMaterials: text("scope_materials").array(),
+  scopeParameters: text("scope_parameters").array(),
+});
