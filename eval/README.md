@@ -65,6 +65,8 @@ When these facts point outside the user's own organisation (e.g. an unbranded cu
 
 A corpus checkpoint may carry an `applies_when` object keyed on `assessment_context` fields; `null` means it always applies. Values are either a literal to match (`{ "food_contact": true }`) or the sentinel `"present"`, meaning the context field must be a non-empty array (`{ "destination_member_states": "present" }`).
 
+**BOM material facts.** An `applies_when` key may also reference a fact derived from the BOM rather than from `assessment_context`. The key `bom_material_present` resolves against the set of materials present in the pack — e.g. `INTL-ISPM15-heat-treatment` carries `{ "bom_material_present": "wood" }` (it applies only when solid wood is in the BOM). The engine resolves each key against `assessment_context` first, then BOM-derived facts; an unresolvable key yields `CONTEXT_REQUIRED` as usual.
+
 Evaluation:
 
 - condition satisfied → the checkpoint is evaluated normally;

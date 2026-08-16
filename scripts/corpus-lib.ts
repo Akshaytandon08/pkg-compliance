@@ -57,6 +57,9 @@ const DEFAULT_PRIMARY_DOMAINS = [
   "egazette.gov.in",
   "egazette.nic.in",
   "cpcb.nic.in",
+  // IPPC/FAO — primary source for ISPM standards (multi-regime checkpoints).
+  "ippc.int",
+  "fao.org",
 ];
 
 export function primaryDomains(): string[] {
