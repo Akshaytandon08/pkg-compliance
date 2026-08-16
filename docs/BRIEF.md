@@ -61,6 +61,7 @@ citation_verified_date, notes, food_contact_only (bool)
 - added `subject` (`component|packaging_unit|organisation`) — delta #2.
 - added `applies_when` (applicability keyed on assessment context).
 - **`food_contact_only` (bool) removed — collapsed into `applies_when` (`{"food_contact": true}`)** so applicability has a single mechanism.
+- **Eval harness decoupled from the corpus (Sprint 2a).** The deterministic evaluator is one pure core with two feed paths: a harness path (checkpoints hydrated from fixture snapshots) that makes the acceptance metric measurable before approval, and a production path (DB checkpoints, `in_force`-gated). The §7 acceptance metric is therefore reported off the harness; production verdicts remain `in_force`-only and untouched. Current agreement: 94.1% (16/17).
 
 Rules for the corpus:
 
