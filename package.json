@@ -14,6 +14,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
+    "seed:demo": "node --env-file=.env scripts/seed-demo.ts",
     "corpus:review": "node scripts/corpus-review.ts",
     "corpus:approve": "node scripts/corpus-approve.ts",
     "corpus:reject": "node scripts/corpus-reject.ts"

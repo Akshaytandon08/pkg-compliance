@@ -1,18 +1,92 @@
-export default function Home() {
+import Link from "next/link";
+import { listAssessments } from "@/db/assessments";
+
+function StatusBadge({ corpusVersion }: { corpusVersion: string }) {
+  const pending = corpusVersion.startsWith("pre-approval");
   return (
-    <main className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
-      <h1 className="text-3xl font-semibold">pkg-compliance</h1>
-      <p className="max-w-xl text-center text-neutral-500">
-        Packaging compliance qualification screening and evidence assembly.
-        Upload a bill of materials with supporting evidence to receive a
-        qualification report, questionnaire responses and a screening-grade
-        product carbon footprint.
-      </p>
-      {/* lang-ok: stating what the product is NOT (brief §1) */}
-      <p className="max-w-xl text-center text-sm text-neutral-400">
-        This tool performs qualification screening only. It does not issue a
-        Declaration of Conformity or any form of certification.
-      </p>
-    </main>
+    <span
+      className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+        pending
+          ? "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200"
+          : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200"
+      }`}
+    >
+      {pending ? "Pending corpus approval" : `Corpus ${corpusVersion}`}
+    </span>
+  );
+}
+
+export default async function Home() {
+  const items = await listAssessments();
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Assessments</h1>
+          <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">
+            Qualification screenings of packaging bills of materials against the compliance corpus.
+          </p>
+        </div>
+        <Link
+          href="/assessments/new"
+          className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+        >
+          New assessment
+        </Link>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-10 text-center dark:border-neutral-700 dark:bg-neutral-900">
+          <h2 className="text-sm font-semibold">No assessments yet</h2>
+          <p className="mx-auto mt-1 max-w-md text-sm text-neutral-500">
+            Create an assessment from a bill of materials and available evidence, or seed the
+            anonymised demo pack with <code className="rounded bg-neutral-100 px-1 dark:bg-neutral-800">npm run seed:demo</code>.
+          </p>
+          <Link
+            href="/assessments/new"
+            className="mt-4 inline-block rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900"
+          >
+            New assessment
+          </Link>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+          <table className="w-full text-sm">
+            <thead className="border-b border-neutral-200 text-left text-xs uppercase tracking-wide text-neutral-500 dark:border-neutral-800">
+              <tr>
+                <th className="px-4 py-2 font-medium">Pack</th>
+                <th className="px-4 py-2 font-medium">Status</th>
+                <th className="px-4 py-2 font-medium">As of</th>
+                <th className="px-4 py-2 font-medium">Created</th>
+                <th className="px-4 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((a) => (
+                <tr key={a.id} className="border-b border-neutral-100 last:border-0 dark:border-neutral-800/60">
+                  <td className="px-4 py-3 font-medium">{a.packName}</td>
+                  <td className="px-4 py-3">
+                    <StatusBadge corpusVersion={a.corpusVersion} />
+                  </td>
+                  <td className="px-4 py-3 text-neutral-500">{a.asOf}</td>
+                  <td className="px-4 py-3 text-neutral-500">
+                    {new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(a.createdAt)}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Link
+                      href={`/assessments/${a.id}/report`}
+                      className="text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white"
+                    >
+                      View report →
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }
