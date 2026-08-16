@@ -45,6 +45,11 @@ export const PERSONAS = [
 export const CUSTOM_VS_STANDARDISED = ["custom", "standardised"] as const;
 export const SPEC_DEFINED_BY = ["user", "customer", "supplier"] as const;
 
+// Optional per-component assessor risk annotation — the human chemistry/design
+// judgment the deterministic evaluator consumes as designAssessment. It never
+// adjudicates on its own; unannotated components default to no_inherent_risk.
+export const RISK_ANNOTATIONS = ["no_inherent_risk", "at_risk"] as const;
+
 // Curated EU Member States for the destination multi-select (slice scope).
 export const EU_MEMBER_STATES = [
   "DE",

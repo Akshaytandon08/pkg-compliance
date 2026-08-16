@@ -29,7 +29,18 @@ const components: NewComponent[] = [
   { line: "4", name: "Honeycomb buffer", material: "corrugated", composition: "Kraft paper 100%", sourcedFrom: "IN", evidence: [] },
   { line: "5", name: "Edge board", material: "corrugated", composition: "Kraft layers + water-based adhesive", sourcedFrom: "IN", evidence: [] },
   { line: "6", name: "Poly packet (LDPE bag)", material: "plastic", composition: "LDPE mono-material", sourcedFrom: "IN", evidence: [] },
-  { line: "7", name: "Green polyester strap (PET)", material: "plastic", composition: "PET with green pigment", sourcedFrom: "IN", evidence: [] },
+  {
+    line: "7",
+    name: "Green polyester strap (PET)",
+    material: "plastic",
+    composition: "PET with green pigment",
+    sourcedFrom: "IN",
+    riskAnnotation: "at_risk",
+    riskRationale:
+      "Green/yellow pigment families historically include lead chromate, which fails Pb and Cr(VI) simultaneously. Modern organic pigments comply but must be evidenced by a pigment specification or an XRF/lab test.",
+    riskAnnotatedBy: "Akshay Tandon",
+    evidence: [],
+  },
 ];
 
 const existing = await listAssessments();

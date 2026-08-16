@@ -50,6 +50,16 @@ test("the DoC delta names the operator's document, not a system output", () => {
   assert.match(text!, /drawn up by the obligated operator/);
 });
 
+test("new risk-annotation report strings carry no issuing language", () => {
+  const strings = [
+    "No risk annotation provided — defaulting to no inherent risk.",
+    "Assessor risk annotation: no inherent risk (by Akshay Tandon).",
+    "Assessor risk annotation: at risk (by Akshay Tandon) — pigment families may contain lead chromate.",
+    "Assessor rationale (at risk): green pigment must be evidenced by a pigment specification or lab test.",
+  ];
+  for (const s of strings) assert.deepEqual(findLanguageViolations(s), [], `violation in: ${s}`);
+});
+
 test("qualified cards have no delta action", () => {
   const text = describeDeltaAction(
     card({ outcome: { disposition: "verdict", verdict: "qualified", risk: "low", reasonCode: "EVIDENCE_COMPLETE", evidenceState: "complete" } }),

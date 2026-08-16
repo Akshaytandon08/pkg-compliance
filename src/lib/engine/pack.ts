@@ -11,7 +11,7 @@ import {
   type CheckpointOutcome,
   type EvidenceDocument,
 } from "./evaluate.ts";
-import type { Verdict } from "./verdict.ts";
+import type { DesignAssessment, Verdict } from "./verdict.ts";
 
 export type CheckpointSubject = "component" | "packaging_unit" | "organisation";
 
@@ -39,6 +39,11 @@ export type ComponentInput = {
   material: string;
   composition?: string;
   documents: EvidenceDocument[];
+  // Optional assessor risk annotation → designAssessment. Absent = unannotated;
+  // the evaluator defaults to no_inherent_risk and the report says so explicitly.
+  designAssessment?: DesignAssessment;
+  riskRationale?: string | null;
+  riskAnnotatedBy?: string | null;
 };
 
 export type CaveatInfo = { label: string; reason: string };
@@ -190,7 +195,8 @@ export function evaluatePack(input: EvaluatePackInput): PackReport {
         const outcome = evaluateCheckpoint({
           appliesWhen: cp.appliesWhen,
           evidenceRequirements: cp.evidenceRequirements,
-          designAssessment: "no_inherent_risk",
+          // Assessor annotation drives design risk; default no_inherent_risk.
+          designAssessment: component.designAssessment ?? "no_inherent_risk",
           documents: component.documents,
           context,
           bomMaterials,

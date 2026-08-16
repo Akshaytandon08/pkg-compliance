@@ -8,6 +8,7 @@ import {
   EU_MEMBER_STATES,
   EVIDENCE_TYPES,
   PERSONAS,
+  RISK_ANNOTATIONS,
   SPEC_DEFINED_BY,
 } from "@/lib/vocab";
 
@@ -37,6 +38,8 @@ type ComponentRow = {
   composition: string;
   weight: string;
   sourcedFrom: string;
+  riskAnnotation: string; // "" = none | "no_inherent_risk" | "at_risk"
+  riskRationale: string;
   evidence: EvidenceRow[];
 };
 
@@ -56,6 +59,8 @@ const emptyComponent = (): ComponentRow => ({
   composition: "",
   weight: "",
   sourcedFrom: "",
+  riskAnnotation: "",
+  riskRationale: "",
   evidence: [],
 });
 
@@ -77,6 +82,7 @@ export default function NewAssessmentPage() {
   const [packagingBranded, setPackagingBranded] = useState(false);
   const [customVsStd, setCustomVsStd] = useState<string>(CUSTOM_VS_STANDARDISED[0]);
   const [specDefinedBy, setSpecDefinedBy] = useState<string>(SPEC_DEFINED_BY[0]);
+  const [assessorName, setAssessorName] = useState("");
 
   const [components, setComponents] = useState<ComponentRow[]>([emptyComponent()]);
 
@@ -124,6 +130,9 @@ export default function NewAssessmentPage() {
         composition: c.composition || null,
         weightGrams: c.weight ? Number(c.weight) : null,
         sourcedFrom: c.sourcedFrom || null,
+        riskAnnotation: c.riskAnnotation || null,
+        riskRationale: c.riskAnnotation ? c.riskRationale || null : null,
+        riskAnnotatedBy: c.riskAnnotation ? assessorName || "unattributed" : null,
         evidence: c.evidence.map((e) => ({
           evidenceType: e.evidenceType,
           reference: e.reference || null,
@@ -287,6 +296,10 @@ export default function NewAssessmentPage() {
               ))}
             </select>
           </div>
+          <div className="sm:col-span-3">
+            <label className={label}>Assessor name (attribution for any risk annotations)</label>
+            <input className={input} value={assessorName} onChange={(e) => setAssessorName(e.target.value)} />
+          </div>
         </div>
       </section>
 
@@ -359,6 +372,35 @@ export default function NewAssessmentPage() {
                     onChange={(e) => updateComponent(ci, { sourcedFrom: e.target.value })}
                   />
                 </div>
+              </div>
+
+              {/* Assessor risk annotation (optional) */}
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <div>
+                  <label className={label}>Risk annotation (optional)</label>
+                  <select
+                    className={input}
+                    value={c.riskAnnotation}
+                    onChange={(e) => updateComponent(ci, { riskAnnotation: e.target.value })}
+                  >
+                    <option value="">Not annotated (defaults to no inherent risk)</option>
+                    {RISK_ANNOTATIONS.map((r) => (
+                      <option key={r} value={r}>
+                        {r.replace(/_/g, " ")}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {c.riskAnnotation === "at_risk" && (
+                  <div className="sm:col-span-2">
+                    <label className={label}>Rationale (why at risk)</label>
+                    <input
+                      className={input}
+                      value={c.riskRationale}
+                      onChange={(e) => updateComponent(ci, { riskRationale: e.target.value })}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Evidence */}

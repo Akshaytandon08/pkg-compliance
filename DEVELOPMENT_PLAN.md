@@ -3,7 +3,7 @@
 Working codename: `pkg-compliance` (product name TBD — do not invent one).
 Source of truth for product decisions: [docs/BRIEF.md](docs/BRIEF.md). Decisions there are settled; raise deltas to Akshay Tandon (product owner & interim regulatory owner). Every corpus change requires his sign-off — hard gate.
 
-**Status: Sprint 1 build-complete / approval-pending; Sprint 2a delivered. 12 draft checkpoints (Batch 1 + ISPM-15) await the regulatory approval pass — the sole blocker. Engine live, golden-fixture agreement 94.1%. Last updated: 2026-08-11.**
+**Status: Sprint 1 build-complete / approval-pending; Sprint 2a delivered. 12 draft checkpoints (Batch 1 + ISPM-15) await the regulatory approval pass — the sole blocker. Engine live, golden-fixture agreement 100% (17/17). Manual per-component risk annotation bridges designAssessment until extraction is built. Last updated: 2026-08-11.**
 
 ## Hard constraints (enforce in code, verify in review)
 
@@ -81,7 +81,7 @@ Sequenced by certainty, not checklist order. Batches of 10–15 checkpoints, **o
 - [ ] Report generator in Exide-workbook format (export); questionnaire auto-fill (Persona 2a). Not built.
 - [ ] Prompts under `/prompts` with eval harness (harness exists; prompts pending extraction).
 
-**Acceptance:** ≥95% checkpoint agreement with the manual assessment. **Current: 94.1% (16/17)** on the golden fixtures — one documented miss (client-a line 1 ISPM-15: fixture asserts complete evidence but records no `evidenceDocuments`; encoding the HT mark as a `marking` document closes it). Report <10 min from upload: met (evaluation is synchronous, sub-second).
+**Acceptance:** ≥95% checkpoint agreement with the manual assessment. **Current: 100% (17/17)** on the golden fixtures — the one prior miss (client-a line 1 ISPM-15) was a fixture-encoding gap, closed in Commit 17 by modelling the HT/IPPC mark as a `marking` evidence document. Report <10 min from upload: met (evaluation is synchronous, sub-second).
 
 ### Harness-decoupling decision (Commit 12)
 
@@ -94,6 +94,8 @@ Sequenced by certainty, not checklist order. Batches of 10–15 checkpoints, **o
 - [x] Intake `/assessments/new` — assessment_context + BOM + per-component evidence metadata; persists with corpus version stamped (Commit 13).
 - [x] Report `/assessments/[id]/report` — production evaluation, verdict/caveat cards, delta actions (Commit 14).
 - [x] List `/`, demo seed (`npm run seed:demo`), empty states, UK spelling (Commit 15).
+- [x] Golden fixture fidelity — HT mark modelled as evidence; agreement 100% (Commit 17).
+- [x] Manual per-component risk annotation (Commit 18): optional `no_inherent_risk | at_risk` + rationale, attributed to the assessor; the evaluator consumes it as `designAssessment`. Unannotated components default to no_inherent_risk, **rendered explicitly** ("No risk annotation provided"), never silently. The interim bridge until the extraction pipeline lands.
 
 ## Sprint 3 — Stack D + passport + pilot
 
@@ -118,7 +120,7 @@ Live regulation moves; these are tracked so a checkpoint is not approved against
 |---|---|---|
 | **Run the 12-row approval pass (`corpus:review` → the 12 commands below); confirm each pinpoint on primary — esp. no-transitional-stock Art 71, ISPM revision + Reg (EU) 2016/2031** | Akshay | **Pending — blocks the demo (~20 Aug)** |
 | Remaining [docs/SCHEMA_DELTAS.md](docs/SCHEMA_DELTAS.md) decisions (#3, #4, #5, #9) | Akshay | Pending |
-| Extraction pipeline (Claude API) — until built, production `designAssessment` defaults to no_inherent_risk | — | Sprint 2 remainder |
+| Extraction pipeline (Claude API) — interim: manual per-component risk annotation bridges `designAssessment`; extraction would populate it automatically | — | Sprint 2 remainder |
 | 2 further real client packs for the golden dataset | Akshay | Pending |
 | Kyoto EF access + GreenAlign evidence-flow interface details | Akshay | Pending |
 | Product name | Akshay | TBD — use `pkg-compliance` |

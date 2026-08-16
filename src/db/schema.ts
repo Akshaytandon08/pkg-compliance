@@ -201,6 +201,13 @@ export const assessmentComponents = pgTable("assessment_components", {
   composition: text("composition"),
   weightGrams: integer("weight_grams"),
   sourcedFrom: text("sourced_from"),
+  // Optional assessor risk annotation — the human design/chemistry judgment the
+  // evaluator consumes as designAssessment. NULL = unannotated (defaults to
+  // no_inherent_risk, rendered explicitly, never silently). Attributed to the
+  // entering user via riskAnnotatedBy.
+  riskAnnotation: text("risk_annotation"),
+  riskRationale: text("risk_rationale"),
+  riskAnnotatedBy: text("risk_annotated_by"),
 });
 
 export const assessmentEvidence = pgTable("assessment_evidence", {

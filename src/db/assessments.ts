@@ -28,6 +28,9 @@ export type NewComponent = {
   composition?: string | null;
   weightGrams?: number | null;
   sourcedFrom?: string | null;
+  riskAnnotation?: string | null;
+  riskRationale?: string | null;
+  riskAnnotatedBy?: string | null;
   evidence: NewEvidence[];
 };
 
@@ -76,6 +79,9 @@ export async function createAssessment(input: NewAssessment): Promise<number> {
           composition: c.composition ?? null,
           weightGrams: c.weightGrams ?? null,
           sourcedFrom: c.sourcedFrom ?? null,
+          riskAnnotation: c.riskAnnotation ?? null,
+          riskRationale: c.riskRationale ?? null,
+          riskAnnotatedBy: c.riskAnnotatedBy ?? null,
         })
         .returning({ id: assessmentComponents.id });
 
@@ -103,6 +109,9 @@ export type LoadedComponent = {
   composition: string | null;
   weightGrams: number | null;
   sourcedFrom: string | null;
+  riskAnnotation: string | null;
+  riskRationale: string | null;
+  riskAnnotatedBy: string | null;
   documents: EvidenceDocument[];
 };
 
@@ -139,6 +148,9 @@ export async function getAssessment(id: number): Promise<LoadedAssessment | null
       composition: c.composition,
       weightGrams: c.weightGrams,
       sourcedFrom: c.sourcedFrom,
+      riskAnnotation: c.riskAnnotation,
+      riskRationale: c.riskRationale,
+      riskAnnotatedBy: c.riskAnnotatedBy,
       documents: ev.map((e) => ({
         docId: String(e.id),
         type: e.evidenceType,

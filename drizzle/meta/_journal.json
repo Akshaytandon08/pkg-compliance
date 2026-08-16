@@ -92,6 +92,13 @@
       "when": 1786866097334,
       "tag": "0012_assessments",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1786868674171,
+      "tag": "0013_component-risk-annotation",
+      "breakpoints": true
     }
   ]
 }

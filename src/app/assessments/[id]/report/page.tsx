@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAssessment, loadCorpus } from "@/db/assessments";
-import { evaluatePack, type CheckpointCard } from "@/lib/engine/pack";
+import { evaluatePack, type CheckpointCard, type ComponentInput } from "@/lib/engine/pack";
 import { describeDeltaAction, describeRequirement } from "@/lib/report/deltaActions";
 import { SCREENING_DISCLAIMER } from "@/lib/report/language";
 
@@ -22,7 +22,32 @@ function Badge({ verdict }: { verdict: string }) {
   );
 }
 
-function VerdictCard({ card }: { card: CheckpointCard }) {
+function AnnotationLine({ component }: { component: ComponentInput }) {
+  const by = component.riskAnnotatedBy ? ` (by ${component.riskAnnotatedBy})` : "";
+  if (!component.designAssessment) {
+    return (
+      <p className="mb-2 text-xs text-neutral-500">
+        No risk annotation provided — defaulting to no inherent risk.
+      </p>
+    );
+  }
+  if (component.designAssessment === "at_risk") {
+    return (
+      <p className="mb-2 rounded bg-amber-50 px-2 py-1 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+        Assessor risk annotation: <strong>at risk</strong>
+        {by}
+        {component.riskRationale ? ` — ${component.riskRationale}` : ""}
+      </p>
+    );
+  }
+  return (
+    <p className="mb-2 text-xs text-neutral-500">
+      Assessor risk annotation: no inherent risk{by}.
+    </p>
+  );
+}
+
+function VerdictCard({ card, rationale }: { card: CheckpointCard; rationale?: string | null }) {
   const outcome = card.outcome!;
   const delta = describeDeltaAction(card);
   return (
@@ -48,6 +73,12 @@ function VerdictCard({ card }: { card: CheckpointCard }) {
           <dd className="truncate">{card.citation.split(". http")[0]}</dd>
         </div>
       </dl>
+      {outcome.reasonCode === "TEST_REQUIRED" && rationale && (
+        <p className="mt-2 rounded bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+          <span className="font-semibold">Assessor rationale (at risk): </span>
+          {rationale}
+        </p>
+      )}
       {delta && (
         <p className="mt-3 rounded bg-neutral-50 px-3 py-2 text-sm text-neutral-700 dark:bg-neutral-800/60 dark:text-neutral-200">
           <span className="font-semibold">Action: </span>
@@ -102,6 +133,9 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
       material: c.material,
       composition: c.composition ?? undefined,
       documents: c.documents,
+      designAssessment: c.riskAnnotation === "at_risk" ? "at_risk" : c.riskAnnotation === "no_inherent_risk" ? "no_inherent_risk" : undefined,
+      riskRationale: c.riskRationale,
+      riskAnnotatedBy: c.riskAnnotatedBy,
     })),
     asOf: assessment.asOf,
     corpusVersion: assessment.corpusVersion,
@@ -164,14 +198,15 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
         <div className="space-y-4">
           {report.componentSections.map((s) => (
             <div key={s.component.line}>
-              <h3 className="mb-2 text-sm font-medium">
+              <h3 className="mb-1 text-sm font-medium">
                 {s.component.line}. {s.component.name}{" "}
                 <span className="text-neutral-400">· {s.component.material}</span>
               </h3>
+              <AnnotationLine component={s.component} />
               {s.cards.length > 0 ? (
                 <div className="grid gap-2">
                   {s.cards.map((card, i) => (
-                    <VerdictCard key={`${card.checkpointId}-${i}`} card={card} />
+                    <VerdictCard key={`${card.checkpointId}-${i}`} card={card} rationale={s.component.riskRationale} />
                   ))}
                 </div>
               ) : (
