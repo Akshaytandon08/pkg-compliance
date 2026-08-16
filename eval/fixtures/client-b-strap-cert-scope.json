@@ -1,5 +1,5 @@
 {
-  "fixtureFormatVersion": 4,
+  "fixtureFormatVersion": 5,
   "pack": {
     "id": "client-b-strap-cert-scope",
     "description": "Single-component fixture exercising cert-scope coverage: a heavy-metals report is on file but its scope covers a different component.",

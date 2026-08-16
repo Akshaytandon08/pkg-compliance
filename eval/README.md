@@ -77,11 +77,14 @@ Evaluation:
 
 Each entry in `components[].expected[]` and `packLevelExpected[]`:
 
+The harness (`engine-verdicts.test.ts`) feeds these entries to `evaluateCheckpoint` — the SAME core the production path uses — and measures agreement. `evidenceRequirements` and `appliesWhen` are the checkpoint-definition snapshot embedded per entry (corpus-independent). `designAssessment` is an **extraction input**, not something the deterministic evaluator derives; the golden pack pins it and the harness feeds it. What the engine derives — and what the agreement rate measures — is evidence state (CNF + scope + expiry), applicability, reason code and risk.
+
 ```jsonc
 {
   "checkpointId": "EU-PPWR-heavy-metals",  // matches a corpus checkpoint id
   "checkpointVersion": 1,                   // the corpus version this verdict is pinned to
   "subject": "component",                   // component | packaging_unit | organisation (packLevelExpected only)
+  "appliesWhen": null,                       // optional; the checkpoint's applies_when snapshot
   "verdict": "qualified | conditional | gap | not_applicable",
   "designAssessment": "no_inherent_risk | at_risk | non_compliant",
   "evidenceState": "complete | insufficient | absent | expired",

@@ -1,5 +1,5 @@
 {
-  "fixtureFormatVersion": 4,
+  "fixtureFormatVersion": 5,
   "pack": {
     "id": "client-a-traction-cell",
     "description": "Traction-cell export packaging, pallet/transport, industrial B2B",
@@ -74,13 +74,14 @@
         {
           "checkpointId": "INTL-ISPM15-heat-treatment",
           "checkpointVersion": 1,
+          "appliesWhen": { "bom_material_present": "wood" },
           "verdict": "qualified",
           "designAssessment": "no_inherent_risk",
           "evidenceState": "complete",
           "risk": "low",
           "reasonCode": "EVIDENCE_COMPLETE",
-          "evidenceRequirements": { "allOf": [{ "anyOf": ["technical_file", "test_report"] }] },
-          "basis": "HT stamp IN-747 visible on component; treatment provider certificate on file."
+          "evidenceRequirements": { "allOf": [{ "anyOf": ["marking", "supplier_declaration"] }] },
+          "basis": "HT stamp IN-747 visible on component (a marking is itself evidence); treatment provider certificate on file."
         }
       ]
     },
@@ -291,6 +292,7 @@
       "checkpointId": "EU-EPR-producer-registration",
       "checkpointVersion": 1,
       "subject": "organisation",
+      "appliesWhen": { "destination_member_states": "present" },
       "verdict": "conditional",
       "designAssessment": "no_inherent_risk",
       "evidenceState": "absent",
