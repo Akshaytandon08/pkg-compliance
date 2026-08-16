@@ -47,15 +47,12 @@ type Fixture = {
 
 const FIXTURES = ["client-a-traction-cell.json", "client-b-strap-cert-scope.json"];
 
-// Known, documented misses — the deliverable, pinned so regressions/fixes surface.
-// client-a line 1 ISPM-15: the fixture asserts complete evidence (the HT/IPPC
-// mark on the component + treatment certificate) but records ZERO
-// evidenceDocuments, so the engine derives evidence as absent. A fixture-
-// encoding gap, not an engine defect: encoding the HT mark as a `marking`
-// evidenceDocument (Commit 11 makes marking valid ISPM evidence) closes it.
-const KNOWN_MISSES = [
-  "client-a-traction-cell.json::INTL-ISPM15-heat-treatment::Pine wood pallet / crate (heat treated)",
-];
+// Known, documented misses — pinned so regressions/fixes surface. Now EMPTY:
+// the ISPM-15 miss was a fixture-encoding gap (the HT/IPPC mark on the pine
+// pallet was narrated as "complete" but never modelled as an evidenceDocument).
+// Commit 17 encodes the HT stamp as a `marking` document, so the engine derives
+// it as complete and agreement is 17/17. Any future divergence fails here.
+const KNOWN_MISSES: string[] = [];
 
 type Row = {
   key: string;

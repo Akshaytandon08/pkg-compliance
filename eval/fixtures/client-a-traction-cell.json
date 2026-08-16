@@ -47,7 +47,19 @@
         "ispm15Mark": "IN-747 HT",
         "chemicalPreservative": null
       },
-      "evidenceDocuments": [],
+      "evidenceDocuments": [
+        {
+          "docId": "ISPM15-MARK-1",
+          "type": "marking",
+          "reference": "ISPM-15 stamp IN-747 HT",
+          "issuedDate": null,
+          "expiryDate": null,
+          "scope": {
+            "components": ["Pine wood pallet / crate (heat treated)"],
+            "materials": ["wood"]
+          }
+        }
+      ],
       "expected": [
         {
           "checkpointId": "EU-PPWR-heavy-metals",

@@ -145,6 +145,8 @@ A **genuine `allOf`** (two independent things both required) — reusable packag
 
 `conformity_declaration` names the obligated operator's own EU declaration of conformity — the user's document, never a system output. It is a distinct evidence type so a DoC is not conflated with a generic `technical_file` (SCHEMA_DELTAS #6).
 
+**On-component markings must be modelled as `evidenceDocuments` to score.** The engine derives evidence state only from `evidenceDocuments`, so a mark stamped on the component (e.g. the ISPM-15 HT/IPPC mark) counts only when entered as a `marking` document scoped to that component — narrating it in `claims` alone leaves the checkpoint `absent`. This pattern applies to any "the mark is the evidence" checkpoint (ISPM-15, operator identification). The golden pack's pine pallet carries its HT stamp as a `marking` document, which is what makes ISPM-15 score `qualified` (agreement 17/17).
+
 ## Known format gaps
 
 1. ~~`blockingEvidence` has no AND/OR semantics.~~ **Resolved** — replaced by CNF `evidenceRequirements` (`allOf` of `anyOf`), with the split rule above.
