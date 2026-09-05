@@ -57,6 +57,9 @@ const DEFAULT_PRIMARY_DOMAINS = [
   "egazette.gov.in",
   "egazette.nic.in",
   "cpcb.nic.in",
+  "cpcb.gov.in", // CPCB EPR portal (eprplastic.cpcb.gov.in)
+  "moef.gov.in", // India Ministry of Environment, Forest and Climate Change
+  "legifrance.gouv.fr", // France — official legal texts (Batch 2 MS layer)
   // IPPC/FAO — primary source for ISPM standards (multi-regime checkpoints).
   "ippc.int",
   "fao.org",

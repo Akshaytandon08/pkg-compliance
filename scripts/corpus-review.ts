@@ -25,6 +25,7 @@ try {
 
   rows.sort(
     (a, b) =>
+      a.geography.localeCompare(b.geography) ||
       a.stack.localeCompare(b.stack) ||
       (SUBJECT_ORDER[a.subject] ?? 9) - (SUBJECT_ORDER[b.subject] ?? 9) ||
       a.id.localeCompare(b.id),
@@ -40,7 +41,7 @@ try {
   let group = "";
   let n = 0;
   for (const r of rows) {
-    const header = `Stack ${r.stack} · ${r.subject}`;
+    const header = `${r.geography} · Stack ${r.stack} · ${r.subject}`;
     if (header !== group) {
       group = header;
       console.log(`\n── ${header} ${"─".repeat(Math.max(0, 60 - header.length))}`);
