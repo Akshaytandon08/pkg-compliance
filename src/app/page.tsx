@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { listAssessments } from "@/db/assessments";
 
+// Reads live data — render on demand, never prerender a build-time snapshot.
+export const dynamic = "force-dynamic";
+
 function StatusBadge({ corpusVersion }: { corpusVersion: string }) {
   const pending = corpusVersion.startsWith("pre-approval");
   return (

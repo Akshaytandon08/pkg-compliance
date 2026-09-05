@@ -35,6 +35,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <Link href="/" className="hover:text-neutral-900 dark:hover:text-white">
                 Assessments
               </Link>
+              <Link href="/corpus" className="hover:text-neutral-900 dark:hover:text-white">
+                Corpus
+              </Link>
               <Link
                 href="/assessments/new"
                 className="rounded-md bg-neutral-900 px-3 py-1.5 font-medium text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
