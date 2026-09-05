@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db } from "./index.ts";
 import {
   assessmentComponents,
@@ -103,6 +103,7 @@ export async function createAssessment(input: NewAssessment): Promise<number> {
 }
 
 export type LoadedComponent = {
+  id: number;
   line: string;
   name: string;
   material: string;
@@ -142,6 +143,7 @@ export async function getAssessment(id: number): Promise<LoadedAssessment | null
       .from(assessmentEvidence)
       .where(eq(assessmentEvidence.componentId, c.id));
     components.push({
+      id: c.id,
       line: c.line,
       name: c.name,
       material: c.material,
@@ -184,6 +186,39 @@ export type AssessmentSummary = {
   corpusVersion: string;
   asOf: string;
 };
+
+/**
+ * Adds one evidence-metadata row to a component, after verifying the component
+ * belongs to the given assessment (so the report's inline form cannot write
+ * across assessments). Returns false if the component is not in the assessment.
+ */
+export async function addEvidence(
+  assessmentId: number,
+  componentId: number,
+  e: NewEvidence,
+): Promise<boolean> {
+  const [comp] = await db
+    .select({ id: assessmentComponents.id })
+    .from(assessmentComponents)
+    .where(
+      and(
+        eq(assessmentComponents.id, componentId),
+        eq(assessmentComponents.assessmentId, assessmentId),
+      ),
+    );
+  if (!comp) return false;
+  await db.insert(assessmentEvidence).values({
+    componentId,
+    evidenceType: e.evidenceType,
+    reference: e.reference ?? null,
+    issuedDate: e.issuedDate ?? null,
+    expiryDate: e.expiryDate ?? null,
+    scopeComponents: e.scopeComponents ?? null,
+    scopeMaterials: e.scopeMaterials ?? null,
+    scopeParameters: e.scopeParameters ?? null,
+  });
+  return true;
+}
 
 export async function listAssessments(): Promise<AssessmentSummary[]> {
   const rows = await db

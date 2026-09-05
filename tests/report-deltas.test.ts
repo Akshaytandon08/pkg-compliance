@@ -60,6 +60,22 @@ test("new risk-annotation report strings carry no issuing language", () => {
   for (const s of strings) assert.deepEqual(findLanguageViolations(s), [], `violation in: ${s}`);
 });
 
+test("new guidance/add-evidence report strings carry no issuing language", () => {
+  const strings = [
+    "How to obtain this evidence",
+    "Guidance pending approval.",
+    "Must contain:",
+    "Watch for:",
+    "Typical source:",
+    "Cost & turnaround:",
+    "Add evidence",
+    "Save evidence",
+    "Add evidence for Green polyester strap (PET)",
+    "Request from the supplier of the component material a signed declaration naming the component it covers.",
+  ];
+  for (const s of strings) assert.deepEqual(findLanguageViolations(s), [], `violation in: ${s}`);
+});
+
 test("qualified cards have no delta action", () => {
   const text = describeDeltaAction(
     card({ outcome: { disposition: "verdict", verdict: "qualified", risk: "low", reasonCode: "EVIDENCE_COMPLETE", evidenceState: "complete" } }),

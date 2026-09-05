@@ -46,6 +46,16 @@ export async function getGuidanceForCheckpoint(
   return new Map(rows.map((r) => [r.evidenceType, shape(r)]));
 }
 
+/** Every guidance row, keyed "checkpointId@version/evidenceType" (any status). */
+export async function getAllGuidance(database: typeof Db): Promise<Map<string, GuidanceRow>> {
+  const rows = await database.select().from(evidenceGuidance);
+  return new Map(rows.map((r) => [`${r.checkpointId}@${r.checkpointVersion}/${r.evidenceType}`, shape(r)]));
+}
+
+export function guidanceKey(checkpointId: string, version: number, evidenceType: string): string {
+  return `${checkpointId}@${version}/${evidenceType}`;
+}
+
 export async function listGuidanceByStatus(
   database: typeof Db,
   status: GuidanceStatus,

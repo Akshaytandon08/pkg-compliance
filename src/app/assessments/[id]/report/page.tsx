@@ -1,9 +1,74 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { db } from "@/db";
 import { getAssessment, loadCorpus } from "@/db/assessments";
+import { getAllGuidance, guidanceKey, type GuidanceRow } from "@/db/guidance";
 import { evaluatePack, type CheckpointCard, type ComponentInput } from "@/lib/engine/pack";
 import { describeDeltaAction, describeRequirement } from "@/lib/report/deltaActions";
 import { SCREENING_DISCLAIMER } from "@/lib/report/language";
+import { AddEvidenceForm } from "./AddEvidenceForm";
+
+function evidenceTypesOf(card: CheckpointCard): string[] {
+  return [...new Set((card.evidenceRequirements.allOf ?? []).flatMap((c) => c.anyOf))];
+}
+
+function GuidancePanel({ card, guidance }: { card: CheckpointCard; guidance: Map<string, GuidanceRow> }) {
+  const entries = evidenceTypesOf(card)
+    .map((t) => ({ t, g: guidance.get(guidanceKey(card.checkpointId, card.version, t)) }))
+    .filter((e): e is { t: string; g: GuidanceRow } => !!e.g);
+  if (entries.length === 0) return null;
+  return (
+    <div className="mt-3 rounded-md border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+      <p className="mb-2 text-xs font-semibold text-neutral-600 dark:text-neutral-300">
+        How to obtain this evidence
+      </p>
+      <div className="space-y-3">
+        {entries.map(({ t, g }) => (
+          <div key={t} className="text-xs">
+            <p className="font-medium">{t.replace(/_/g, " ")}</p>
+            {g.status === "draft" ? (
+              <p className="text-neutral-500">Guidance pending approval.</p>
+            ) : (
+              <div className="mt-1 space-y-1 text-neutral-600 dark:text-neutral-400">
+                {g.issuerGuidance && <p>{g.issuerGuidance}</p>}
+                {g.mustContain && g.mustContain.length > 0 && (
+                  <div>
+                    <span className="font-medium">Must contain:</span>
+                    <ul className="ml-4 list-disc">
+                      {g.mustContain.map((m, i) => (
+                        <li key={i}>{m}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {g.redFlags && g.redFlags.length > 0 && (
+                  <div>
+                    <span className="font-medium">Watch for:</span>
+                    <ul className="ml-4 list-disc">
+                      {g.redFlags.map((m, i) => (
+                        <li key={i}>{m}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {g.typicalSourceOrgRole && (
+                  <p>
+                    <span className="font-medium">Typical source:</span> {g.typicalSourceOrgRole}
+                  </p>
+                )}
+                {g.costTurnaroundNote && (
+                  <p>
+                    <span className="font-medium">Cost &amp; turnaround:</span> {g.costTurnaroundNote}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 const VERDICT_STYLE: Record<string, string> = {
   qualified: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200",
@@ -47,7 +112,19 @@ function AnnotationLine({ component }: { component: ComponentInput }) {
   );
 }
 
-function VerdictCard({ card, rationale }: { card: CheckpointCard; rationale?: string | null }) {
+function VerdictCard({
+  card,
+  rationale,
+  guidance,
+  assessmentId,
+  componentId,
+}: {
+  card: CheckpointCard;
+  rationale?: string | null;
+  guidance: Map<string, GuidanceRow>;
+  assessmentId: number;
+  componentId?: number;
+}) {
   const outcome = card.outcome!;
   const delta = describeDeltaAction(card);
   return (
@@ -84,6 +161,15 @@ function VerdictCard({ card, rationale }: { card: CheckpointCard; rationale?: st
           <span className="font-semibold">Action: </span>
           {delta}
         </p>
+      )}
+      {delta && <GuidancePanel card={card} guidance={guidance} />}
+      {delta && componentId !== undefined && (
+        <AddEvidenceForm
+          assessmentId={assessmentId}
+          componentId={componentId}
+          componentName={card.componentName ?? ""}
+          evidenceTypes={evidenceTypesOf(card)}
+        />
       )}
     </div>
   );
@@ -124,10 +210,12 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
   if (!assessment) notFound();
 
   const corpus = await loadCorpus();
+  const guidanceMap = await getAllGuidance(db);
   const report = evaluatePack({
     checkpoints: corpus,
     context: assessment.context,
     components: assessment.components.map((c) => ({
+      id: c.id,
       line: c.line,
       name: c.name,
       material: c.material,
@@ -206,7 +294,14 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
               {s.cards.length > 0 ? (
                 <div className="grid gap-2">
                   {s.cards.map((card, i) => (
-                    <VerdictCard key={`${card.checkpointId}-${i}`} card={card} rationale={s.component.riskRationale} />
+                    <VerdictCard
+                      key={`${card.checkpointId}-${i}`}
+                      card={card}
+                      rationale={s.component.riskRationale}
+                      guidance={guidanceMap}
+                      assessmentId={assessment.id}
+                      componentId={s.component.id}
+                    />
                   ))}
                 </div>
               ) : (
@@ -224,7 +319,7 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-500">Packaging unit</h2>
           <div className="grid gap-2">
             {report.packagingUnit.map((card, i) => (
-              <VerdictCard key={`${card.checkpointId}-${i}`} card={card} />
+              <VerdictCard key={`${card.checkpointId}-${i}`} card={card} guidance={guidanceMap} assessmentId={assessment.id} />
             ))}
           </div>
         </section>
@@ -235,7 +330,7 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-500">Organisation</h2>
           <div className="grid gap-2">
             {report.organisation.map((card, i) => (
-              <VerdictCard key={`${card.checkpointId}-${i}`} card={card} />
+              <VerdictCard key={`${card.checkpointId}-${i}`} card={card} guidance={guidanceMap} assessmentId={assessment.id} />
             ))}
           </div>
         </section>

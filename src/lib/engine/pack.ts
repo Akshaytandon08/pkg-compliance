@@ -34,6 +34,7 @@ export type ProductionCheckpoint = {
 };
 
 export type ComponentInput = {
+  id?: number;
   line: string;
   name: string;
   material: string;
