@@ -18,7 +18,8 @@
     "seed:demo": "node --env-file=.env scripts/seed-demo.ts",
     "corpus:review": "node scripts/corpus-review.ts",
     "corpus:approve": "node scripts/corpus-approve.ts",
-    "corpus:reject": "node scripts/corpus-reject.ts"
+    "corpus:reject": "node scripts/corpus-reject.ts",
+    "corpus:verify": "node scripts/corpus-verify.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",

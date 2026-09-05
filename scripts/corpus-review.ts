@@ -1,12 +1,17 @@
 // npm run corpus:review — prints every draft checkpoint for a single review
 // sitting: id, requirement one-liner, thresholds, evidence CNF, applicability,
 // citation pinpoint and its primary-source URL. Read-only.
-import { eq } from "drizzle-orm";
-import { checkpoints } from "../src/db/schema.ts";
+//
+// npm run corpus:review -- --verified-gap — instead lists in_force checkpoints
+// (and approved guidance) whose citation has NOT yet been verified against
+// primary by a human. This is the corpus:verify work queue. Read-only.
+import { and, eq, isNull } from "drizzle-orm";
+import { checkpoints, evidenceGuidance } from "../src/db/schema.ts";
 import { listGuidanceByStatus } from "../src/db/guidance.ts";
 import {
   connect,
   oneLiner,
+  parseArgs,
   renderAppliesWhen,
   renderCnf,
   renderThresholds,
@@ -19,7 +24,50 @@ const SUBJECT_ORDER: Record<string, number> = {
   organisation: 2,
 };
 
+const args = parseArgs(process.argv.slice(2));
 const { sql, db } = connect();
+
+if (args["verified-gap"] === true) {
+  try {
+    const unverified = await db
+      .select()
+      .from(checkpoints)
+      .where(and(eq(checkpoints.status, "in_force"), isNull(checkpoints.citationVerifiedDate)));
+    unverified.sort((a, b) => a.geography.localeCompare(b.geography) || a.id.localeCompare(b.id));
+
+    console.log(
+      `\nVerification gap — ${unverified.length} in_force checkpoint(s) with no primary-source verification`,
+    );
+    console.log(
+      'Verify: npm run corpus:verify -- --id <id> --version <v> --verified-by "Akshay Tandon"',
+    );
+    for (const r of unverified) {
+      const { pinpoint, url } = splitCitation(r.citation);
+      console.log(`\n  ${r.id}@${r.version}   ${r.geography} · Stack ${r.stack}`);
+      console.log(`    Citation: ${pinpoint || "(pinpoint blank)"}`);
+      console.log(`    Source:   ${url || "(none)"}`);
+    }
+
+    const unverifiedGuidance = await db
+      .select()
+      .from(evidenceGuidance)
+      .where(and(eq(evidenceGuidance.status, "approved"), isNull(evidenceGuidance.verifiedAt)));
+    console.log(
+      `\n── Approved guidance with no verification — ${unverifiedGuidance.length} row(s) ──`,
+    );
+    console.log(
+      'Verify: npm run corpus:verify -- --guidance --id <checkpoint-id> --version <v> --evidence-type <type> --verified-by "Akshay Tandon"',
+    );
+    for (const g of unverifiedGuidance) {
+      console.log(`  ${g.checkpointId}@${g.checkpointVersion} / ${g.evidenceType}`);
+    }
+    console.log("");
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+  process.exit(0);
+}
+
 try {
   const rows = await db.select().from(checkpoints).where(eq(checkpoints.status, "draft"));
 

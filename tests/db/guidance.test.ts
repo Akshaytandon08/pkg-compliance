@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import * as schema from "../../src/db/schema.ts";
-import { approveGuidance } from "../../src/db/guidance.ts";
+import { approveGuidance, verifyGuidance } from "../../src/db/guidance.ts";
 
 try {
   process.loadEnvFile(".env");
@@ -96,5 +96,62 @@ test("approving a non-existent guidance row is refused", dbRequired, async () =>
         corpusVersion: "batch-1",
       }),
     /no guidance/,
+  );
+});
+
+// --- Trigger-level gate (parity with checkpoints) ------------------------
+// The application path (approveGuidance) always supplies attribution; these
+// prove the DB itself refuses a bad state even if written by hand.
+
+test("trigger refuses status='approved' without approved_by/corpus_version", dbRequired, async () => {
+  const db = sql!;
+  await assert.rejects(
+    () =>
+      db`
+        insert into evidence_guidance (checkpoint_id, checkpoint_version, evidence_type, status)
+        values ('EU-PPWR-heavy-metals', 1, 'TEST-badapprove', 'approved')
+      `,
+    /cannot be approved without approved_by/,
+  );
+});
+
+test("trigger freezes an approved guidance row's content", dbRequired, async () => {
+  // ETYPE is approved by the earlier test; its advice must now be immutable.
+  const db = sql!;
+  await assert.rejects(
+    () => db`update evidence_guidance set issuer_guidance = 'changed' where evidence_type = ${ETYPE}`,
+    /immutable/,
+  );
+});
+
+// --- Verification (corpus:verify --guidance path) ------------------------
+
+test("verifyGuidance stamps verifier on an approved row", dbRequired, async () => {
+  await verifyGuidance(orm!, {
+    checkpointId: "EU-PPWR-heavy-metals",
+    checkpointVersion: 1,
+    evidenceType: ETYPE,
+    verifiedBy: "Test Verifier",
+  });
+  const [row] = await sql!`select verified_by, verified_at from evidence_guidance where evidence_type = ${ETYPE}`;
+  assert.equal(row.verified_by, "Test Verifier");
+  assert.ok(row.verified_at, "verified_at should be set");
+});
+
+test("verifyGuidance refuses a draft (non-approved) row", dbRequired, async () => {
+  const db = sql!;
+  await db`
+    insert into evidence_guidance (checkpoint_id, checkpoint_version, evidence_type, issuer_guidance)
+    values ('EU-PPWR-heavy-metals', 1, 'TEST-draft-verify', 'draft')
+  `;
+  await assert.rejects(
+    () =>
+      verifyGuidance(orm!, {
+        checkpointId: "EU-PPWR-heavy-metals",
+        checkpointVersion: 1,
+        evidenceType: "TEST-draft-verify",
+        verifiedBy: "Test Verifier",
+      }),
+    /not 'approved'/,
   );
 });

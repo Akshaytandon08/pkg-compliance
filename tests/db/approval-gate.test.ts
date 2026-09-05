@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import * as schema from "../../src/db/schema.ts";
-import { promoteCheckpointToInForce } from "../../src/db/corpus.ts";
+import { promoteCheckpointToInForce, verifyCheckpoint } from "../../src/db/corpus.ts";
 
 try {
   process.loadEnvFile(".env");
@@ -171,5 +171,39 @@ test("guarded helper is the single legal path: draft → approval + in_force ato
         primarySourceUrl: "https://eur-lex.europa.eu/eli/reg/2025/40/oj",
       }),
     /not 'draft'/,
+  );
+});
+
+// --- Verification (corpus:verify path) -----------------------------------
+// A distinct, later human step: stamps that the citation was checked against
+// primary. Touches only the verification columns, never approved content.
+
+test("verifyCheckpoint stamps citation_verified_date/by on an in_force row without touching content", dbRequired, async () => {
+  const db = sql!;
+  // ID_HELPER is in_force from the previous test.
+  const [before] = await db`select requirement_text, citation from checkpoints where id = ${ID_HELPER}`;
+  await verifyCheckpoint(orm!, { checkpointId: ID_HELPER, checkpointVersion: 1, verifiedBy: "Test Verifier" });
+  const [after] = await db`
+    select citation_verified_by, citation_verified_date, requirement_text, citation
+    from checkpoints where id = ${ID_HELPER}
+  `;
+  assert.equal(after.citation_verified_by, "Test Verifier");
+  assert.ok(after.citation_verified_date, "citation_verified_date should be set");
+  // The immutability trigger must NOT have blocked this, and content is intact.
+  assert.equal(after.requirement_text, before.requirement_text);
+  assert.equal(after.citation, before.citation);
+});
+
+test("verifyCheckpoint refuses a checkpoint that is not in_force", dbRequired, async () => {
+  const db = sql!;
+  await insertDraft(db, `${ID}-toverify`); // status 'draft'
+  await assert.rejects(
+    () =>
+      verifyCheckpoint(orm!, {
+        checkpointId: `${ID}-toverify`,
+        checkpointVersion: 1,
+        verifiedBy: "Test Verifier",
+      }),
+    /not 'in_force'/,
   );
 });

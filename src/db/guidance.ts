@@ -111,3 +111,30 @@ export async function approveGuidance(
     })
     .where(key);
 }
+
+/** Stamps a human's verification on an approved guidance row (corpus:verify --guidance). */
+export async function verifyGuidance(
+  database: typeof Db,
+  input: { checkpointId: string; checkpointVersion: number; evidenceType: string; verifiedBy: string },
+): Promise<void> {
+  const key = and(
+    eq(evidenceGuidance.checkpointId, input.checkpointId),
+    eq(evidenceGuidance.checkpointVersion, input.checkpointVersion),
+    eq(evidenceGuidance.evidenceType, input.evidenceType),
+  );
+  const [current] = await database.select().from(evidenceGuidance).where(key);
+  if (!current) {
+    throw new Error(
+      `no guidance for ${input.checkpointId}@${input.checkpointVersion}/${input.evidenceType}`,
+    );
+  }
+  if (current.status !== "approved") {
+    throw new Error(
+      `guidance ${input.checkpointId}@${input.checkpointVersion}/${input.evidenceType} is '${current.status}', not 'approved'; only approved guidance is verified`,
+    );
+  }
+  await database
+    .update(evidenceGuidance)
+    .set({ verifiedAt: new Date(), verifiedBy: input.verifiedBy })
+    .where(key);
+}

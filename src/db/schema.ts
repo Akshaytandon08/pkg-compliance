@@ -101,7 +101,11 @@ export const checkpoints = pgTable(
     // Primary legal source at article level — MANDATORY. A checkpoint without
     // a primary citation cannot ship.
     citation: text("citation").notNull(),
+    // Stamped post-approval by a human via corpus:verify — confirms the citation
+    // was checked against primary. NOT frozen by the immutability trigger, so it
+    // can be set on an in_force row without touching approved content.
     citationVerifiedDate: date("citation_verified_date"),
+    citationVerifiedBy: text("citation_verified_by"),
     notes: text("notes"),
     // food_contact_only was collapsed into `applies_when` ({"food_contact":
     // true}) — a single applicability mechanism instead of a special-case flag.
@@ -181,6 +185,9 @@ export const evidenceGuidance = pgTable(
     approvedBy: text("approved_by"),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
     corpusVersion: text("corpus_version"),
+    // Post-approval human verification (corpus:verify --guidance).
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    verifiedBy: text("verified_by"),
     notes: text("notes"),
   },
   (t) => [

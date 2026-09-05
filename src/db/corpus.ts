@@ -75,6 +75,47 @@ export async function promoteCheckpointToInForce(
 }
 
 /**
+ * Stamps a human's verification that an in_force checkpoint's citation was
+ * checked against primary. Touches only citation_verified_date/by — never the
+ * approved requirement content (which the immutability trigger freezes anyway).
+ * Refuses anything not in_force. Run only via the human-only corpus:verify CLI.
+ */
+export async function verifyCheckpoint(
+  database: typeof Db,
+  input: { checkpointId: string; checkpointVersion: number; verifiedBy: string },
+): Promise<void> {
+  const [current] = await database
+    .select({ status: checkpoints.status })
+    .from(checkpoints)
+    .where(
+      and(
+        eq(checkpoints.id, input.checkpointId),
+        eq(checkpoints.version, input.checkpointVersion),
+      ),
+    );
+  if (!current) {
+    throw new Error(`checkpoint ${input.checkpointId}@${input.checkpointVersion} does not exist`);
+  }
+  if (current.status !== "in_force") {
+    throw new Error(
+      `checkpoint ${input.checkpointId}@${input.checkpointVersion} is '${current.status}', not 'in_force'; only in_force checkpoints are verified`,
+    );
+  }
+  await database
+    .update(checkpoints)
+    .set({
+      citationVerifiedDate: new Date().toISOString().slice(0, 10),
+      citationVerifiedBy: input.verifiedBy,
+    })
+    .where(
+      and(
+        eq(checkpoints.id, input.checkpointId),
+        eq(checkpoints.version, input.checkpointVersion),
+      ),
+    );
+}
+
+/**
  * Retires a checkpoint by moving it to `superseded`, optionally recording why.
  * Checkpoints are never deleted (the approval FK is ON DELETE RESTRICT and
  * blocks it anyway) — this is the retirement path, so the checkpoint and its

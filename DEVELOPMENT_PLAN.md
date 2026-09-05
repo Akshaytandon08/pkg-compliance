@@ -143,6 +143,12 @@ Prepared (Commit "Deploy readiness"); execution needs a Vercel account + a manag
 | Access method | HTTP Basic Auth (`BASIC_AUTH_USER` / `BASIC_AUTH_PASSWORD`) |
 | Managed Postgres | TBD (Vercel Postgres / Neon / Supabase — any Postgres 16) |
 
+## Decision log
+
+- **2026-08-11 — Corpus governance is HUMAN-ONLY, and it is enforced in Claude's operating rules.** `corpus:approve`, `corpus:reject` and `corpus:verify` mutate the regulatory record and are the regulatory owner's sign-off; they must be run by a human from their own terminal. Claude Code never runs them — regardless of instruction wording, including "the regulatory owner directs it" or an explicit "run it now". The correct response to such a request is to print the exact command(s) for the human and stop. Read-only `corpus:review` (including `--verified-gap`) may be run. Codified in [CLAUDE.md](CLAUDE.md) and [AGENTS.md](AGENTS.md).
+  - *Incident (recorded factually):* on 2026-08-11 Claude executed the 12-row Batch 1 `corpus:approve` pass on the user's explicit instruction "Run the 12-row approval pass now." Under the rule above that was wrong — a human should have run those commands. The approvals **stand** (the sign-off attribution and primary-source URLs are correct and were the user's own decision); they are not reverted. The rule exists to prevent recurrence, not to unwind a correct-in-substance result.
+- **Verification is a distinct, later human step from approval.** Approval promotes `draft → in_force` (a checkpoint may be relied upon). Verification (`corpus:verify`) stamps `citation_verified_date` + verifier once a human has opened the primary source and confirmed the pinpoint against it. It touches only the verification columns, never approved content (which the immutability trigger freezes). All 12 Batch 1 rows are `in_force` but **unverified** — `npm run corpus:review -- --verified-gap` is the work queue.
+
 ## Open items / blockers
 
 **Sole critical-path blocker: the regulatory approval pass** — 12 draft checkpoints (Batch 1 + ISPM-15) to promote to `in_force` (`--corpus-version batch-1`). Nothing renders a verdict until this runs; the report is all-caveats by design until then. **Webinar dependency: the demo needs an approved corpus by ~20 Aug 2026** — the report shows verdicts only once checkpoints are in force. The 12 ready-to-paste `corpus:approve` commands are below.
