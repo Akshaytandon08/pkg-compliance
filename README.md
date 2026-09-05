@@ -29,3 +29,27 @@ Postgres runs on host port **5433** (5432 is taken by `asset-directory-db` local
 - `npm run db:generate` — generate a migration after editing `src/db/schema.ts`
 
 Corpus (checkpoint) changes require regulatory-owner sign-off. This is enforced, not requested: checkpoints insert as `draft`, and only an approval record in `checkpoint_approvals` permits `in_force` — the evaluator refuses to produce a verdict from anything else. See [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) and [docs/SCHEMA_DELTAS.md](docs/SCHEMA_DELTAS.md).
+
+## Deployment (pilot)
+
+Target: **Vercel + managed Postgres** (Vercel Postgres, Neon, or Supabase — any Postgres 16 URL). The actual deploy requires a Vercel account and a provisioned database; the repo is wired so that once those exist, deploying is configuration only.
+
+**Environment variables** (set in the hosting dashboard):
+
+| Var | Purpose |
+|---|---|
+| `DATABASE_URL` | Managed Postgres connection string (Postgres 16). |
+| `BASIC_AUTH_USER`, `BASIC_AUTH_PASSWORD` | **Access gate.** When both are set, every route requires HTTP Basic Auth (`src/proxy.ts`) — client BOM data must not sit on an open URL. Leave unset only for local dev. |
+| `ANTHROPIC_API_KEY` | Reserved for the extraction pipeline (not yet used). |
+
+**Migrations are wired into deploy:** the `vercel-build` script runs `drizzle-kit migrate && next build`, so the hosted DB is migrated on every deployment. (Set the platform Build Command to `npm run vercel-build` if it is not auto-detected.)
+
+**Seed the demo pack against the hosted DB** (one-off, from a machine with the prod URL):
+
+```bash
+DATABASE_URL="<prod-postgres-url>" node scripts/seed-demo.ts
+```
+
+**The corpus approval CLIs stay local.** `corpus:review` / `:approve` / `:reject` are `scripts/*.ts` run by a human against a database — they are **not** web routes and are never exposed on the hosted surface. Approving/promoting a checkpoint or guidance row remains a local, human-run action.
+
+**Hosted URL & access:** recorded in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) once deployed (URL TBD; access via the Basic Auth credentials above).

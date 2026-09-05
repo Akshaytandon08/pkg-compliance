@@ -3,7 +3,7 @@
 Working codename: `pkg-compliance` (product name TBD — do not invent one).
 Source of truth for product decisions: [docs/BRIEF.md](docs/BRIEF.md). Decisions there are settled; raise deltas to Akshay Tandon (product owner & interim regulatory owner). Every corpus change requires his sign-off — hard gate.
 
-**Status: Batch 1 + ISPM-15 APPROVED — 12 checkpoints `in_force` under corpus version `batch-1`. Sprint 2a delivered; report renders real verdicts; engine 100% golden agreement. In progress: Sprint 2b (evidence guidance loop), then Batch 2 corpus seeding (EU Member-State layer + India), then pilot deployment. Last updated: 2026-08-11.**
+**Status: Batch 1 (12) `in_force` under `batch-1`. Sprint 2a + 2b delivered (report loop, guidance, templates). Batch 2 seeded — 17 DRAFT rows (10 EU + 7 India) awaiting approval. Deployment prepared (access gate + migrate-on-deploy); actual deploy needs a Vercel account + managed Postgres. Engine 100% golden agreement. Last updated: 2026-08-11.**
 
 ## Hard constraints (enforce in code, verify in review)
 
@@ -57,8 +57,7 @@ Sequenced by certainty, not checklist order. Batches of 10–15 checkpoints, **o
 - `npm run corpus:reject -- --id <id> --version <v> --reason "<why>"` — supersedes a draft with the reason recorded, so the queue empties either way.
 
 - [~] **Batch 1 — EU Stack A / PPWR articles.** Seeded `draft` (migration `0003`), then refactored to the resolved schema (migration `0006`): **11 checkpoints** — `subject` set per row, operator identification split into manufacturer (Art 15(5),(6)) and importer (Art 18(3)) obligations, PFAS thresholds structured, citation pinpoints sharpened. **Awaiting Akshay's approval** — the `0003` and `0006` commit bodies are the review queue. `citation_verified_date` is NULL on every row: pinpoints are "verified via secondary cross-check, confirm on primary" (the EUR-Lex fetch returned only recitals), so each needs a link-click before promotion.
-- [ ] **Batch 2 — EU Stack B/C.** EPR calendar, labelling, claims.
-- [ ] **Batch 3 — India.** Slowest review: every value comes off the §6 re-verify list. Each checkpoint attaches the CPCB notification / gazette PDF link — never a consultancy summary.
+- [~] **Batch 2 — EU (Commit 24) + India (Commit 25).** 17 DRAFT rows. EU: 6 Member-State EPR-registration rows (DE/FR/ES/IT/NL/PL, cite PPWR Art 44; national register names + legal bases TODO), FR Triman/info-tri labelling (Décret 2021-835), EU green-claims (Directive (EU) 2024/825), and the two 2030 forward rows (Art 6/7, thresholds empty pending primary). India: PWM Rules 2016 (as amended) Stack A restrictions + Stack B producer obligations (CPCB); **all numeric values left empty with TODO** (on the §6 re-verify list, not fetchable from primary here). `corpus:review` groups by geography. Awaiting approval — see the enhancement proposals below before approving the MS/India rows.
 - [ ] Seed to ~60–80 EU+India checkpoints total from the two reference artefacts
 - [ ] Re-cite every rule to primary law (EUR-Lex / CPCB / gazette, article level)
 - [ ] Clear the §6 re-verify list from primary sources (do NOT trust conversation values):
@@ -113,12 +112,36 @@ Turns each gap/conditional into an actionable "how to obtain this" loop.
 
 **Acceptance:** 3 real client packs end-to-end, ≥1 paying.
 
+## Proposed enhancements (decide before approving the affected Batch 2 rows)
+
+Surfaced by Batch 2; **not improvised into the schema/engine** — proposed here for a decision.
+
+1. **Per-Member-State `applies_when` (contains-semantics).** The MS rows and the FR labelling row should apply *when that Member State is among the destinations* — e.g. `{ "destination_member_states": { "contains": "DE" } }`. The engine currently supports only a literal match or the `"present"` sentinel, so those rows are seeded with `"present"` (applies whenever any destination is set). Proposed: add a `contains` operator to `evaluateApplicability`. Until then, do not rely on per-MS scoping.
+2. **Destination-market context field (beyond EU Member States).** India rows apply when the destination market includes India, which `assessment_context` (EU-Member-State-only) does not capture. They are seeded with `applies_when { "destination_market": "IN" }`, an unrecognised key, so the engine returns `CONTEXT_REQUIRED` (safe — never a false pass). Proposed: add `destination_markets: string[]` (e.g. `["EU","IN"]`) to `assessment_context` and to the intake form, and teach the engine the key.
+3. **Recurring-obligation "next-due" semantics.** Stack B filing/registration is recurring (annual reports, renewals). Cadence is currently descriptive text in `requirement_text`/`notes` only. Proposed shape: a `recurrence` field on the checkpoint (e.g. `{ "every": "P1Y", "due": "--03-31" }`) plus a per-assessment obligation-calendar view that computes next-due from the as-of date. This is the Stack B "obligation calendar" (brief §3) — worth designing before Stack B is approved and relied upon.
+
 ## Corpus monitoring (watch list — review before approving affected checkpoints)
 
 Live regulation moves; these are tracked so a checkpoint is not approved against a stale reading.
 
 - [x] **Commission PPWR FAQ, 2nd edition (DG ENV, Aug 2026).** Ingested — amendments applied to Batch 1 (migration 0009): heavy-metals/soc/PFAS test methods, DoC one-per-unit + MS language, no-transitional-stock softening + Article 71 pinpoint, tech-doc manufacturer-holds-file, FAQ role-derivation rules. FAQ recorded as interpretive only (notes), registered in [docs/regulatory-sources.md](docs/regulatory-sources.md). Rows stay draft; each still needs primary confirmation at approval.
 - [ ] **Authorised-representative suspension proposal (Commission, Dec 2025).** Would suspend the AR obligation to 2035 for EU-based companies only; pending, and does **not** affect non-EU producers (persona 2a). Affects `EU-EPR-producer-registration`. Track status; do not weaken the AR requirement for non-EU producers on the strength of a pending proposal.
+
+## Deployment (pilot)
+
+Prepared (Commit "Deploy readiness"); execution needs a Vercel account + a managed Postgres instance.
+
+- **Access gate:** `src/proxy.ts` — HTTP Basic Auth on every route when `BASIC_AUTH_USER`/`BASIC_AUTH_PASSWORD` are set; transparent locally. Client BOM data is never on an open URL.
+- **Migrate-on-deploy:** `vercel-build` = `drizzle-kit migrate && next build`.
+- **Seed:** `DATABASE_URL="<prod>" node scripts/seed-demo.ts`.
+- **Corpus CLIs stay local** — never deployed to any web surface.
+- Full steps + env table in [README.md](README.md#deployment-pilot).
+
+| Item | Value |
+|---|---|
+| Hosted URL | **TBD — record here once deployed** |
+| Access method | HTTP Basic Auth (`BASIC_AUTH_USER` / `BASIC_AUTH_PASSWORD`) |
+| Managed Postgres | TBD (Vercel Postgres / Neon / Supabase — any Postgres 16) |
 
 ## Open items / blockers
 
