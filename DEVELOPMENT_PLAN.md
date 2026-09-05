@@ -103,7 +103,7 @@ Turns each gap/conditional into an actionable "how to obtain this" loop.
 
 - [x] **Guidance data model (Commit 21)** — `evidence_guidance` table keyed `(checkpoint_id, checkpoint_version, evidence_type)`: issuer guidance, `must_contain[]`, `red_flags[]`, typical source-org role, cost/turnaround. Same draft→approved discipline as checkpoints (human-only `corpus:approve --guidance`; nothing self-approves). Six rows seeded **draft** for the demo pack's evidence situations, content **derived from the checkpoint records** (thresholds, reference methods, notes), not new research. `corpus:review` lists guidance drafts.
 - [ ] **Close the report loop (Commit 22)** — action cards render approved guidance; draft guidance shows as pending; inline "Add evidence" form re-evaluates in place.
-- [ ] **Request templates (Commit 23)** — downloadable supplier self-declaration and lab test requests, populated from the checkpoint. **Templates are drafting aids the user sends to their supplier/lab — never system-issued conformity documents.**
+- [x] **Request templates (Commit 23)** — downloadable supplier self-declaration and laboratory test requests (`GET /api/assessments/[id]/template`), populated from the checkpoint's threshold, reference method and component details, offered from the action card. **Templates are drafting aids the user sends OUT to their supplier/lab — never system-issued conformity documents; the wording says so, and `tests/report-templates.test.ts` enforces it.**
 
 ## Sprint 3 — Stack D + passport + pilot
 

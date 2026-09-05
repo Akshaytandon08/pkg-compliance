@@ -112,6 +112,38 @@ function AnnotationLine({ component }: { component: ComponentInput }) {
   );
 }
 
+function TemplateLinks({
+  card,
+  assessmentId,
+  componentId,
+}: {
+  card: CheckpointCard;
+  assessmentId: number;
+  componentId: number;
+}) {
+  const types = evidenceTypesOf(card);
+  const hasSupplier = types.includes("supplier_declaration");
+  const hasLab = types.includes("lab_test") || types.includes("test_report");
+  if (!hasSupplier && !hasLab) return null;
+  const base = `/api/assessments/${assessmentId}/template?component=${componentId}&checkpoint=${encodeURIComponent(card.checkpointId)}&version=${card.version}`;
+  const link = "rounded border border-neutral-300 px-2.5 py-1 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800";
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+      <span className="text-neutral-500">Request templates:</span>
+      {hasSupplier && (
+        <a href={`${base}&kind=supplier_declaration`} className={link}>
+          ↓ Supplier declaration request
+        </a>
+      )}
+      {hasLab && (
+        <a href={`${base}&kind=lab_test`} className={link}>
+          ↓ Lab test request
+        </a>
+      )}
+    </div>
+  );
+}
+
 function VerdictCard({
   card,
   rationale,
@@ -163,6 +195,9 @@ function VerdictCard({
         </p>
       )}
       {delta && <GuidancePanel card={card} guidance={guidance} />}
+      {delta && componentId !== undefined && (
+        <TemplateLinks card={card} assessmentId={assessmentId} componentId={componentId} />
+      )}
       {delta && componentId !== undefined && (
         <AddEvidenceForm
           assessmentId={assessmentId}
