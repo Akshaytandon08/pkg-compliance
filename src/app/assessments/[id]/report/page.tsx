@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { getAssessment, loadCorpusAsOf } from "@/db/assessments";
 import { getAllGuidance, guidanceKey, type GuidanceRow } from "@/db/guidance";
 import { evaluatePack, type CheckpointCard, type ComponentInput } from "@/lib/engine/pack";
+import { buildObligationCalendar } from "@/lib/report/obligations";
 import { describeDeltaAction, describeRequirement } from "@/lib/report/deltaActions";
 import { SCREENING_DISCLAIMER } from "@/lib/report/language";
 import { AddEvidenceForm } from "./AddEvidenceForm";
@@ -267,6 +268,8 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
   });
 
   const hasVerdicts = report.overall.evaluatedCount > 0;
+  const bomMaterials = [...new Set(assessment.components.map((c) => c.material))];
+  const obligations = buildObligationCalendar(corpus, assessment.context, bomMaterials, assessment.asOf);
 
   return (
     <div className="space-y-6">
@@ -378,6 +381,35 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
           No verdicts have been produced: every applicable checkpoint in the corpus is still a draft pending
           regulatory approval. Once approved, this report renders verdicts with no change to the assessment.
         </p>
+      )}
+
+      {obligations.length > 0 && (
+        <section>
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-500">
+            Compliance calendar ({obligations.length})
+          </h2>
+          <p className="mb-3 text-xs text-neutral-500">
+            Recurring obligations that apply to this pack, with the next occurrence computed from the
+            as-of date. Dates are indicative screening output; confirm the statutory deadline for each
+            market against the primary source.
+          </p>
+          <ul className="divide-y divide-neutral-200 rounded-md border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
+            {obligations.map((o) => (
+              <li key={o.checkpointId} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="font-mono text-xs text-neutral-500">{o.checkpointId}</p>
+                  <p className="text-sm">{o.requirementText}</p>
+                </div>
+                <div className="text-right text-xs">
+                  <p className="font-medium text-neutral-700 dark:text-neutral-300">{o.cadenceLabel}</p>
+                  <p className="text-neutral-500">
+                    {o.nextDue ? `Next due ${o.nextDue}` : "Next due date to be confirmed"}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       <Link href="/" className="inline-block text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-white">

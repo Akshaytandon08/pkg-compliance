@@ -24,6 +24,9 @@ export type EvidenceDocument = {
 };
 
 export type AssessmentContext = {
+  // Regime-level markets the pack ships into ("EU", "IN", ...); superset of
+  // destination_member_states (the EU-internal detail). India rules key off this.
+  destination_markets: string[];
   destination_member_states: string[];
   food_contact: boolean;
   persona: string;
@@ -55,6 +58,7 @@ export type CheckpointOutcome = {
 export type Applicability = "applicable" | "not_applicable" | "context_required";
 
 const CONTEXT_KEYS = new Set([
+  "destination_markets",
   "destination_member_states",
   "food_contact",
   "persona",
@@ -90,6 +94,15 @@ export function evaluateApplicability(
         } else if (actual == null) {
           return "context_required";
         }
+        continue;
+      }
+      // { "contains": value } — the field is an array that must include `value`
+      // (e.g. destination_markets contains "IN", destination_member_states
+      // contains "FR"). An empty/absent array is unknown, not a silent "no".
+      if (expected && typeof expected === "object" && "contains" in (expected as object)) {
+        const needle = (expected as { contains: unknown }).contains;
+        if (!Array.isArray(actual) || actual.length === 0) return "context_required";
+        if (!actual.includes(needle)) return "not_applicable";
         continue;
       }
       if (actual === undefined || actual === null) return "context_required";

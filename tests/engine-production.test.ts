@@ -8,6 +8,7 @@ import { evaluatePack, type ProductionCheckpoint, type ComponentInput } from "..
 import type { AssessmentContext } from "../src/lib/engine/evaluate.ts";
 
 const context: AssessmentContext = {
+  destination_markets: ["EU"],
   destination_member_states: ["DE"],
   food_contact: false,
   persona: "2a",
@@ -30,6 +31,7 @@ const checkpoint = (status: ProductionCheckpoint["status"]): ProductionCheckpoin
   evidenceRequirements: { allOf: [{ anyOf: ["supplier_declaration"] }] },
   appliesWhen: null,
   thresholds: null,
+  recurrence: null,
   citation: "Regulation (EU) 2025/40, Article 5. https://eur-lex.europa.eu/eli/reg/2025/40/oj/eng",
   triggerDate: "2026-08-12",
   sunsetDate: null,

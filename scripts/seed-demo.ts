@@ -54,6 +54,7 @@ const id = await createAssessment({
   description: "Anonymised golden-run pack: pallet/transport, industrial B2B, non-food-contact.",
   asOf: "2026-08-12",
   context: {
+    destination_markets: ["EU"],
     destination_member_states: ["DE"],
     food_contact: false,
     persona: "2a",

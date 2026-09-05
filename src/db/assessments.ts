@@ -247,6 +247,7 @@ function toProductionCheckpoint(c: typeof checkpoints.$inferSelect): ProductionC
     evidenceRequirements: c.evidenceRequirements,
     appliesWhen: c.appliesWhen,
     thresholds: c.thresholds,
+    recurrence: c.recurrence,
     citation: c.citation,
     triggerDate: c.triggerDate,
     sunsetDate: c.sunsetDate,

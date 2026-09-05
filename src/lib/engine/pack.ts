@@ -4,7 +4,7 @@
 
 import { evaluability } from "../corpus/evaluability.ts";
 import type { CheckpointStatus } from "../corpus/evaluability.ts";
-import type { Threshold, EvidenceRequirement } from "../../db/schema.ts";
+import type { Threshold, EvidenceRequirement, Recurrence } from "../../db/schema.ts";
 import {
   evaluateCheckpoint,
   type AssessmentContext,
@@ -26,6 +26,7 @@ export type ProductionCheckpoint = {
   evidenceRequirements: EvidenceRequirement;
   appliesWhen: Record<string, unknown> | null;
   thresholds: Threshold[] | null;
+  recurrence: Recurrence | null;
   citation: string;
   triggerDate: string | null;
   sunsetDate: string | null;

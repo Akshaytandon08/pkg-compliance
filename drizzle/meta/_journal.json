@@ -127,6 +127,13 @@
       "when": 1788609367929,
       "tag": "0017_verification-and-guidance-gate",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788610286891,
+      "tag": "0018_recurrence-and-destination-markets",
+      "breakpoints": true
     }
   ]
 }

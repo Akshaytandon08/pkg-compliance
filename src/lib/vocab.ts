@@ -63,3 +63,10 @@ export const EU_MEMBER_STATES = [
   "AT",
   "IE",
 ] as const;
+
+// Regime-level destination markets (superset of EU Member States). "EU" covers
+// the Union-wide + Member-State layers; "IN" the Plastic Waste Management Rules.
+export const DESTINATION_MARKETS = [
+  { code: "EU", label: "European Union" },
+  { code: "IN", label: "India" },
+] as const;

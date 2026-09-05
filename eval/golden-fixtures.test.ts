@@ -27,6 +27,7 @@ type Expectation = {
 };
 
 type AssessmentContext = {
+  destination_markets: string[];
   destination_member_states: string[];
   food_contact: boolean;
   persona: string;
@@ -104,12 +105,13 @@ for (const file of FIXTURES) {
   const allExpected = [...componentExpected, ...packExpected];
 
   test(`${file}: fixture format version is current`, () => {
-    assert.equal(fixture.fixtureFormatVersion, 5);
+    assert.equal(fixture.fixtureFormatVersion, 6);
   });
 
   test(`${file}: carries a well-formed assessment_context`, () => {
     const ctx = fixture.assessment_context;
     assert.ok(ctx, "assessment_context is required");
+    assert.ok(Array.isArray(ctx.destination_markets), "destination_markets must be an array");
     assert.ok(Array.isArray(ctx.destination_member_states), "destination_member_states must be an array");
     assert.equal(typeof ctx.food_contact, "boolean", "food_contact must be boolean");
     assert.equal(typeof ctx.persona, "string", "persona must be a string");

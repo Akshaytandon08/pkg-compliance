@@ -68,6 +68,19 @@ export type EvidenceRequirement = {
   allOf: { anyOf: string[] }[];
 };
 
+// Recurring-obligation cadence for Stack B filings (registration renewals,
+// annual declarations). NULL = a one-off obligation. Resolves SCHEMA_DELTAS #3
+// (recurring next-due semantics). The obligation calendar computes the next
+// occurrence from the assessment's as-of date.
+export type Recurrence = {
+  // ISO-8601 duration between occurrences: "P1Y" annual, "P6M" half-yearly, etc.
+  every: string;
+  // Optional recurring anchor the occurrence falls on, as ISO "--MM-DD" (annual).
+  // Absent when the statutory deadline is not yet confirmed against primary —
+  // the calendar then states the cadence without inventing a date.
+  due?: string;
+};
+
 export const checkpoints = pgTable(
   "checkpoints",
   {
@@ -97,6 +110,8 @@ export const checkpoints = pgTable(
     // because the context is missing, the engine yields a `caveat`
     // (CONTEXT_REQUIRED) — never a silent pass, never a gap.
     appliesWhen: jsonb("applies_when").$type<Record<string, unknown> | null>(),
+    // Recurring cadence for Stack B filings; NULL for one-off obligations.
+    recurrence: jsonb("recurrence").$type<Recurrence | null>(),
     testMethod: text("test_method"),
     // Primary legal source at article level — MANDATORY. A checkpoint without
     // a primary citation cannot ship.
@@ -213,6 +228,14 @@ export type LegalRoleFacts = {
 };
 
 export type AssessmentContextRecord = {
+  // Superset of destination_member_states: the markets the pack ships into, as
+  // regime codes ("EU", "IN", ...). destination_member_states remains the
+  // EU-internal detail (which Member States), so an EU pack has
+  // destination_markets ["EU"] plus its Member-State list; a pack also shipping
+  // to India adds "IN". India checkpoints key off destination_markets; the EU
+  // Member-State layer keys off destination_member_states. One is not derivable
+  // from the other, so both are stored.
+  destination_markets: string[];
   destination_member_states: string[];
   food_contact: boolean;
   persona: string;

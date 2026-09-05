@@ -5,6 +5,7 @@ import { useState } from "react";
 import {
   BOM_MATERIALS,
   CUSTOM_VS_STANDARDISED,
+  DESTINATION_MARKETS,
   EU_MEMBER_STATES,
   EVIDENCE_TYPES,
   PERSONAS,
@@ -74,6 +75,7 @@ export default function NewAssessmentPage() {
   const [description, setDescription] = useState("");
   const [asOf, setAsOf] = useState("2026-08-12");
 
+  const [markets, setMarkets] = useState<string[]>(["EU"]);
   const [destinations, setDestinations] = useState<string[]>([]);
   const [extraDestinations, setExtraDestinations] = useState("");
   const [foodContact, setFoodContact] = useState(false);
@@ -92,6 +94,8 @@ export default function NewAssessmentPage() {
 
   const toggleDestination = (ms: string) =>
     setDestinations((d) => (d.includes(ms) ? d.filter((x) => x !== ms) : [...d, ms]));
+  const toggleMarket = (m: string) =>
+    setMarkets((ms) => (ms.includes(m) ? ms.filter((x) => x !== m) : [...ms, m]));
 
   const updateComponent = (i: number, patch: Partial<ComponentRow>) =>
     setComponents((cs) => cs.map((c, idx) => (idx === i ? { ...c, ...patch } : c)));
@@ -108,11 +112,15 @@ export default function NewAssessmentPage() {
     setSubmitting(true);
     setError(null);
     const allDestinations = [...destinations, ...(csv(extraDestinations) ?? [])];
+    // Keep the superset invariant: choosing any EU Member State implies the "EU"
+    // market, even if the market chip was deselected.
+    const allMarkets = [...new Set([...markets, ...(allDestinations.length ? ["EU"] : [])])];
     const payload = {
       packName,
       description: description || null,
       asOf,
       context: {
+        destination_markets: allMarkets,
         destination_member_states: allDestinations,
         food_contact: foodContact,
         persona,
@@ -236,6 +244,28 @@ export default function NewAssessmentPage() {
               />
               Declared reusable
             </label>
+          </div>
+          <div className="sm:col-span-2">
+            <label className={label}>Destination markets</label>
+            <div className="flex flex-wrap gap-2">
+              {DESTINATION_MARKETS.map((m) => (
+                <button
+                  key={m.code}
+                  type="button"
+                  onClick={() => toggleMarket(m.code)}
+                  className={`rounded-md border px-2.5 py-1 text-xs font-medium ${
+                    markets.includes(m.code)
+                      ? "border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900"
+                      : "border-neutral-300 dark:border-neutral-700"
+                  }`}
+                >
+                  {m.code} — {m.label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-neutral-500">
+              The regimes this pack ships into. India obligations apply only when IN is selected.
+            </p>
           </div>
           <div className="sm:col-span-2">
             <label className={label}>Destination Member States (of first placing)</label>

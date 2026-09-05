@@ -1,5 +1,5 @@
 {
-  "fixtureFormatVersion": 5,
+  "fixtureFormatVersion": 6,
   "pack": {
     "id": "client-a-traction-cell",
     "description": "Traction-cell export packaging, pallet/transport, industrial B2B",
@@ -8,6 +8,7 @@
   },
   "asOf": "2026-07-28",
   "assessment_context": {
+    "destination_markets": ["EU"],
     "destination_member_states": ["DE"],
     "food_contact": false,
     "persona": "2a",

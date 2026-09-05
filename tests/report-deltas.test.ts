@@ -76,6 +76,19 @@ test("new guidance/add-evidence report strings carry no issuing language", () =>
   for (const s of strings) assert.deepEqual(findLanguageViolations(s), [], `violation in: ${s}`);
 });
 
+test("obligation-calendar report strings carry no issuing language", () => {
+  const strings = [
+    "Compliance calendar",
+    "Recurring obligations that apply to this pack, with the next occurrence computed from the as-of date. Dates are indicative screening output; confirm the statutory deadline for each market against the primary source.",
+    "Annual",
+    "Every 6 months",
+    "Next due 2027-03-31",
+    "Next due date to be confirmed",
+    "The regimes this pack ships into. India obligations apply only when IN is selected.",
+  ];
+  for (const s of strings) assert.deepEqual(findLanguageViolations(s), [], `violation in: ${s}`);
+});
+
 test("qualified cards have no delta action", () => {
   const text = describeDeltaAction(
     card({ outcome: { disposition: "verdict", verdict: "qualified", risk: "low", reasonCode: "EVIDENCE_COMPLETE", evidenceState: "complete" } }),

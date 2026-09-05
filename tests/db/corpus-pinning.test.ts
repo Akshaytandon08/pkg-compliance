@@ -35,12 +35,13 @@ if (url) {
 
 const dbRequired = { skip: reachable ? false : "no reachable DATABASE_URL (run: docker compose up -d)" };
 
-const V1 = "TEST-pin-v1";
-const V2 = "TEST-pin-v2";
-const A = "TEST-pin-A"; // approved under v1 (older)
-const B = "TEST-pin-B"; // approved under v2 (newer)
+const V1 = "PINtst-v1";
+const V2 = "PINtst-v2";
+const A = "PINtst-A"; // approved under v1 (older)
+const B = "PINtst-B"; // approved under v2 (newer)
 
 const CONTEXT: AssessmentContext = {
+  destination_markets: ["EU"],
   destination_member_states: [],
   food_contact: false,
   persona: "2a",
@@ -73,9 +74,9 @@ async function approveUnder(db: NonNullable<typeof sql>, id: string, corpusLabel
 }
 
 async function cleanup(db: NonNullable<typeof sql>) {
-  await db`delete from checkpoint_approvals where checkpoint_id like 'TEST-pin-%'`;
-  await db`delete from checkpoints where id like 'TEST-pin-%'`;
-  await db`delete from corpus_versions where label like 'TEST-pin-%'`;
+  await db`delete from checkpoint_approvals where checkpoint_id like 'PINtst-%'`;
+  await db`delete from checkpoints where id like 'PINtst-%'`;
+  await db`delete from corpus_versions where label like 'PINtst-%'`;
 }
 
 const ONE_COMPONENT = [
@@ -126,13 +127,13 @@ test("approving a newer corpus version does not change an older pinned report", 
   await insertDraft(db, A);
   await approveUnder(db, A, V1, "2026-08-11T00:00:00Z");
 
-  const before = reportFor((await loadCorpusAsOf(V1, orm!)).filter((c) => c.id.startsWith("TEST-pin-")));
+  const before = reportFor((await loadCorpusAsOf(V1, orm!)).filter((c) => c.id.startsWith("PINtst-")));
 
   // Later: B is seeded and approved under a newer version.
   await insertDraft(db, B);
   await approveUnder(db, B, V2, "2026-09-01T00:00:00Z");
 
-  const after = reportFor((await loadCorpusAsOf(V1, orm!)).filter((c) => c.id.startsWith("TEST-pin-")));
+  const after = reportFor((await loadCorpusAsOf(V1, orm!)).filter((c) => c.id.startsWith("PINtst-")));
 
   assert.deepEqual(after, before, "the v1-pinned report is byte-identical before and after v2 approval");
 });
