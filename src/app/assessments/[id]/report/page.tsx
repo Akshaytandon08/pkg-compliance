@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
-import { getAssessment, loadCorpus } from "@/db/assessments";
+import { getAssessment, loadCorpusAsOf } from "@/db/assessments";
 import { getAllGuidance, guidanceKey, type GuidanceRow } from "@/db/guidance";
 import { evaluatePack, type CheckpointCard, type ComponentInput } from "@/lib/engine/pack";
 import { describeDeltaAction, describeRequirement } from "@/lib/report/deltaActions";
@@ -244,7 +244,9 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
   const assessment = Number.isInteger(numId) ? await getAssessment(numId) : null;
   if (!assessment) notFound();
 
-  const corpus = await loadCorpus();
+  // Pin the corpus to the version stamped on the assessment — a later batch's
+  // approval must never change a report this assessment already produced.
+  const corpus = await loadCorpusAsOf(assessment.corpusVersion);
   const guidanceMap = await getAllGuidance(db);
   const report = evaluatePack({
     checkpoints: corpus,

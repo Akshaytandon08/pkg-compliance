@@ -1,9 +1,10 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "./index.ts";
 import {
   assessmentComponents,
   assessmentEvidence,
   assessments,
+  checkpointApprovals,
   checkpoints,
   corpusVersions,
   type AssessmentContextRecord,
@@ -234,10 +235,8 @@ export async function listAssessments(): Promise<AssessmentSummary[]> {
   return rows;
 }
 
-/** Loads the whole corpus (all statuses) for the production evaluator. */
-export async function loadCorpus(): Promise<ProductionCheckpoint[]> {
-  const rows = await db.select().from(checkpoints);
-  return rows.map((c) => ({
+function toProductionCheckpoint(c: typeof checkpoints.$inferSelect): ProductionCheckpoint {
+  return {
     id: c.id,
     version: c.version,
     status: c.status,
@@ -253,5 +252,64 @@ export async function loadCorpus(): Promise<ProductionCheckpoint[]> {
     sunsetDate: c.sunsetDate,
     testMethod: c.testMethod,
     notes: c.notes,
-  }));
+  };
+}
+
+/** Loads the whole corpus (all statuses) for the production evaluator. */
+export async function loadCorpus(database: typeof db = db): Promise<ProductionCheckpoint[]> {
+  const rows = await database.select().from(checkpoints);
+  return rows.map(toProductionCheckpoint);
+}
+
+/**
+ * Loads the corpus AS OF a stamped corpus version — the pin that makes a report
+ * reproducible. A checkpoint is included only if it is `in_force` under an
+ * approval whose corpus version was approved no later than the pinned one.
+ * Later approvals — and drafts, which have no approval — are excluded entirely,
+ * so approving Batch 2 cannot change a report an assessment stamped `batch-1`
+ * already produced.
+ *
+ * If the label does not resolve to an approved corpus version (e.g. the
+ * pre-approval sentinel, when the whole corpus is still draft), there is nothing
+ * to pin to: fall back to the full corpus so drafts render as the pending
+ * caveats they are, matching the pre-approval report.
+ *
+ * Note: a row in force at pin time but since moved to `superseded` drops out —
+ * full temporal replay of retired rules is out of scope for the prototype; the
+ * pin's job here is to keep newer approvals from leaking backwards.
+ */
+export async function loadCorpusAsOf(
+  corpusVersionLabel: string,
+  database: typeof db = db,
+): Promise<ProductionCheckpoint[]> {
+  const [pin] = await database
+    .select({ id: corpusVersions.id })
+    .from(corpusVersions)
+    .where(eq(corpusVersions.label, corpusVersionLabel));
+  if (!pin) return loadCorpus(database);
+
+  // The boundary comparison stays in SQL: approved_at is a microsecond-precision
+  // timestamptz, and round-tripping it through a JS Date truncates to
+  // milliseconds — which would drop the pinned version's own rows (its stored
+  // sub-millisecond fraction is > the truncated value). Compare against the pin
+  // by id so full precision is preserved.
+  const rows = await database
+    .select({ cp: checkpoints })
+    .from(checkpoints)
+    .innerJoin(
+      checkpointApprovals,
+      and(
+        eq(checkpointApprovals.checkpointId, checkpoints.id),
+        eq(checkpointApprovals.checkpointVersion, checkpoints.version),
+      ),
+    )
+    .innerJoin(corpusVersions, eq(corpusVersions.id, checkpointApprovals.corpusVersionId))
+    .where(
+      and(
+        eq(checkpoints.status, "in_force"),
+        sql`${corpusVersions.approvedAt} <= (select approved_at from ${corpusVersions} where ${corpusVersions.id} = ${pin.id})`,
+      ),
+    );
+
+  return rows.map((r) => toProductionCheckpoint(r.cp));
 }
