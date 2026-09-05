@@ -158,6 +158,41 @@ export const checkpointApprovals = pgTable(
   ],
 );
 
+// --- Evidence guidance (Sprint 2b) ---------------------------------------
+// "How to obtain this evidence", keyed per (checkpoint version, evidence type).
+// Advisory content derived from the checkpoint record — not a verdict rule — but
+// held to the same approval discipline: seeds `draft`, promoted to `approved`
+// only by a human via corpus:approve (guidance mode). The report renders
+// approved guidance; draft guidance shows as pending, like a draft checkpoint.
+export type GuidanceStatus = "draft" | "approved";
+
+export const evidenceGuidance = pgTable(
+  "evidence_guidance",
+  {
+    checkpointId: text("checkpoint_id").notNull(),
+    checkpointVersion: integer("checkpoint_version").notNull(),
+    evidenceType: text("evidence_type").notNull(),
+    status: text("status").$type<GuidanceStatus>().notNull().default("draft"),
+    issuerGuidance: text("issuer_guidance"),
+    mustContain: jsonb("must_contain").$type<string[]>(),
+    redFlags: jsonb("red_flags").$type<string[]>(),
+    typicalSourceOrgRole: text("typical_source_org_role"),
+    costTurnaroundNote: text("cost_turnaround_note"),
+    approvedBy: text("approved_by"),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    corpusVersion: text("corpus_version"),
+    notes: text("notes"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.checkpointId, t.checkpointVersion, t.evidenceType] }),
+    foreignKey({
+      name: "evidence_guidance_checkpoint_fk",
+      columns: [t.checkpointId, t.checkpointVersion],
+      foreignColumns: [checkpoints.id, checkpoints.version],
+    }).onDelete("restrict"),
+  ],
+);
+
 // --- Assessments (Sprint 2a intake) --------------------------------------
 // A user's uploaded pack: assessment context + BOM components + per-component
 // evidence metadata. The corpus version is stamped at creation so a report is

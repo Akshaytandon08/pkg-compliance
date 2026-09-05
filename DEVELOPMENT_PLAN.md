@@ -3,7 +3,7 @@
 Working codename: `pkg-compliance` (product name TBD — do not invent one).
 Source of truth for product decisions: [docs/BRIEF.md](docs/BRIEF.md). Decisions there are settled; raise deltas to Akshay Tandon (product owner & interim regulatory owner). Every corpus change requires his sign-off — hard gate.
 
-**Status: Sprint 1 build-complete / approval-pending; Sprint 2a delivered. 12 draft checkpoints (Batch 1 + ISPM-15) await the regulatory approval pass — the sole blocker. Engine live, golden-fixture agreement 100% (17/17). Manual per-component risk annotation bridges designAssessment until extraction is built. Last updated: 2026-08-11.**
+**Status: Batch 1 + ISPM-15 APPROVED — 12 checkpoints `in_force` under corpus version `batch-1`. Sprint 2a delivered; report renders real verdicts; engine 100% golden agreement. In progress: Sprint 2b (evidence guidance loop), then Batch 2 corpus seeding (EU Member-State layer + India), then pilot deployment. Last updated: 2026-08-11.**
 
 ## Hard constraints (enforce in code, verify in review)
 
@@ -96,6 +96,14 @@ Sequenced by certainty, not checklist order. Batches of 10–15 checkpoints, **o
 - [x] List `/`, demo seed (`npm run seed:demo`), empty states, UK spelling (Commit 15).
 - [x] Golden fixture fidelity — HT mark modelled as evidence; agreement 100% (Commit 17).
 - [x] Manual per-component risk annotation (Commit 18): optional `no_inherent_risk | at_risk` + rationale, attributed to the assessor; the evaluator consumes it as `designAssessment`. Unannotated components default to no_inherent_risk, **rendered explicitly** ("No risk annotation provided"), never silently. The interim bridge until the extraction pipeline lands.
+
+## Sprint 2b — Evidence guidance loop
+
+Turns each gap/conditional into an actionable "how to obtain this" loop.
+
+- [x] **Guidance data model (Commit 21)** — `evidence_guidance` table keyed `(checkpoint_id, checkpoint_version, evidence_type)`: issuer guidance, `must_contain[]`, `red_flags[]`, typical source-org role, cost/turnaround. Same draft→approved discipline as checkpoints (human-only `corpus:approve --guidance`; nothing self-approves). Six rows seeded **draft** for the demo pack's evidence situations, content **derived from the checkpoint records** (thresholds, reference methods, notes), not new research. `corpus:review` lists guidance drafts.
+- [ ] **Close the report loop (Commit 22)** — action cards render approved guidance; draft guidance shows as pending; inline "Add evidence" form re-evaluates in place.
+- [ ] **Request templates (Commit 23)** — downloadable supplier self-declaration and lab test requests, populated from the checkpoint. **Templates are drafting aids the user sends to their supplier/lab — never system-issued conformity documents.**
 
 ## Sprint 3 — Stack D + passport + pilot
 

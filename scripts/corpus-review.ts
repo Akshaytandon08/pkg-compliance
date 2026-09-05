@@ -3,6 +3,7 @@
 // citation pinpoint and its primary-source URL. Read-only.
 import { eq } from "drizzle-orm";
 import { checkpoints } from "../src/db/schema.ts";
+import { listGuidanceByStatus } from "../src/db/guidance.ts";
 import {
   connect,
   oneLiner,
@@ -54,6 +55,21 @@ try {
     console.log(`    Citation:    ${pinpoint || "(pinpoint blank — to be pinned at approval)"}`);
     console.log(`    Source:      ${url || "(none)"}`);
     if (r.notes) console.log(`    Notes:       ${oneLiner(r.notes, 200)}`);
+  }
+  console.log("");
+
+  // Evidence guidance drafts (Sprint 2b) — same draft→approved discipline.
+  const guidance = await listGuidanceByStatus(db, "draft");
+  console.log(`── Evidence guidance — ${guidance.length} draft row(s) awaiting approval ──`);
+  console.log(
+    'Approve: npm run corpus:approve -- --guidance --id <checkpoint-id> --version <v> --evidence-type <type> --approved-by "Akshay Tandon"',
+  );
+  for (const g of guidance) {
+    console.log(`\n  ${g.checkpointId}@${g.checkpointVersion} / ${g.evidenceType}`);
+    console.log(`    Issuer:       ${oneLiner(g.issuerGuidance ?? "—", 160)}`);
+    console.log(
+      `    Must contain: ${(g.mustContain ?? []).length} item(s) · Red flags: ${(g.redFlags ?? []).length} · Source: ${g.typicalSourceOrgRole ?? "—"}`,
+    );
   }
   console.log("");
 } finally {
