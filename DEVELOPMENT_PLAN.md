@@ -112,13 +112,13 @@ Turns each gap/conditional into an actionable "how to obtain this" loop.
 
 **Acceptance:** 3 real client packs end-to-end, ≥1 paying.
 
-## Proposed enhancements (decide before approving the affected Batch 2 rows)
+## Proposed enhancements (surfaced by Batch 2)
 
-Surfaced by Batch 2; **not improvised into the schema/engine** — proposed here for a decision.
+All three below shipped in **Commit 28 (`090377e`, migration 0018)** — the schema/engine changes the Batch 2 rows depend on are now in place, so those rows can be relied upon once their content is primary-confirmed and approved.
 
-1. **Per-Member-State `applies_when` (contains-semantics).** The MS rows and the FR labelling row should apply *when that Member State is among the destinations* — e.g. `{ "destination_member_states": { "contains": "DE" } }`. The engine currently supports only a literal match or the `"present"` sentinel, so those rows are seeded with `"present"` (applies whenever any destination is set). Proposed: add a `contains` operator to `evaluateApplicability`. Until then, do not rely on per-MS scoping.
-2. **Destination-market context field (beyond EU Member States).** India rows apply when the destination market includes India, which `assessment_context` (EU-Member-State-only) does not capture. They are seeded with `applies_when { "destination_market": "IN" }`, an unrecognised key, so the engine returns `CONTEXT_REQUIRED` (safe — never a false pass). Proposed: add `destination_markets: string[]` (e.g. `["EU","IN"]`) to `assessment_context` and to the intake form, and teach the engine the key.
-3. **Recurring-obligation "next-due" semantics.** Stack B filing/registration is recurring (annual reports, renewals). Cadence is currently descriptive text in `requirement_text`/`notes` only. Proposed shape: a `recurrence` field on the checkpoint (e.g. `{ "every": "P1Y", "due": "--03-31" }`) plus a per-assessment obligation-calendar view that computes next-due from the as-of date. This is the Stack B "obligation calendar" (brief §3) — worth designing before Stack B is approved and relied upon.
+1. [x] **Per-Member-State `applies_when` (contains-semantics).** DELIVERED — `evaluateApplicability` gained a `contains` operator; the six MS rows and the FR labelling row re-expressed from the `"present"` sentinel to `{ "destination_member_states": { "contains": "<cc>" } }` (empty array → `CONTEXT_REQUIRED`, never a silent no).
+2. [x] **Destination-market context field (beyond EU Member States).** DELIVERED — `assessment_context` gained `destination_markets: string[]` (regime-level superset of `destination_member_states`; both stored, one not derivable from the other), plus an intake-form selector; existing assessments migrated to `["EU"]`. India rows re-expressed from the unrecognised `{ "destination_market": "IN" }` to `{ "destination_markets": { "contains": "IN" } }`.
+3. [x] **Recurring-obligation "next-due" semantics.** DELIVERED — `checkpoints.recurrence` jsonb (`{ "every": "P1Y", "due?": "--MM-DD" }`; NULL = one-off; in the immutability frozen set) plus the per-assessment obligation calendar (`src/lib/report/obligations.ts` → report section). MS registration rows carry `P1Y`; the national due date is omitted (per-MS, on the primary re-verify list) rather than guessed.
 
 ## Corpus monitoring (watch list — review before approving affected checkpoints)
 
@@ -151,32 +151,35 @@ Prepared (Commit "Deploy readiness"); execution needs a Vercel account + a manag
 
 ## Open items / blockers
 
-**Sole critical-path blocker: the regulatory approval pass** — 12 draft checkpoints (Batch 1 + ISPM-15) to promote to `in_force` (`--corpus-version batch-1`). Nothing renders a verdict until this runs; the report is all-caveats by design until then. **Webinar dependency: the demo needs an approved corpus by ~20 Aug 2026** — the report shows verdicts only once checkpoints are in force. The 12 ready-to-paste `corpus:approve` commands are below.
+Batch 1 is **approved** — 12 checkpoints `in_force` under corpus version `batch-1`, and the report renders real verdicts. The remaining work is a verification pass on those rows, primary-sourcing the Batch 2 numbers before their approval, approving the guidance rows, and pressing the deploy button.
 
 | Item | Owner | Status |
 |---|---|---|
-| **Run the 12-row approval pass (`corpus:review` → the 12 commands below); confirm each pinpoint on primary — esp. no-transitional-stock Art 71, ISPM revision + Reg (EU) 2016/2031** | Akshay | **Pending — blocks the demo (~20 Aug)** |
-| Remaining [docs/SCHEMA_DELTAS.md](docs/SCHEMA_DELTAS.md) decisions (#3, #4, #5, #9) | Akshay | Pending |
+| **Verify the 12 Batch 1 rows against primary** (`corpus:verify`) — all 12 are `in_force` but `citation_verified_date` NULL; `corpus:review --verified-gap` is the queue. Confirm each pinpoint on primary, esp. no-transitional-stock Art 71 and ISPM revision + Reg (EU) 2016/2031. Human-only; commands below. | Akshay | **Pending** |
+| **Batch 2 (17 drafts)** — blocked on primary-sourced numbers + pinpoints: every India numeric (recycled-content %, category targets, carry-bag micron) and the two 2030 EU forward rows (Art 6/7 thresholds) are empty with a TODO; MS national register legal bases and the 2030 delegated-act detail need primary confirmation. No approval until the numbers come from CPCB/MoEF/EUR-Lex primary, never a consultancy summary. | Akshay | **Blocked on primary sources** |
+| **Evidence guidance (6 rows)** — seeded `draft` for the demo pack; approve via `corpus:approve --guidance` (human-only) once reviewed. | Akshay | Pending |
+| **Deploy the pilot** — readiness done (access gate, migrate-on-deploy, docs); needs a Vercel account + a managed Postgres instance, then the deploy itself. Record the hosted URL in the Deployment table. | Akshay | **Readiness done — button pending** |
+| Remaining [docs/SCHEMA_DELTAS.md](docs/SCHEMA_DELTAS.md) decisions (#4, #5, #9) — #2 and #3 now resolved (Commit 28) | Akshay | Pending |
 | Extraction pipeline (Claude API) — interim: manual per-component risk annotation bridges `designAssessment`; extraction would populate it automatically | — | Sprint 2 remainder |
 | 2 further real client packs for the golden dataset | Akshay | Pending |
 | Kyoto EF access + GreenAlign evidence-flow interface details | Akshay | Pending |
 | Product name | Akshay | TBD — use `pkg-compliance` |
 
-### Batch 1 + ISPM-15 approval pass — ready to paste
+### Batch 1 verification pass — ready to paste (human-only)
 
-Review first with `npm run corpus:review`, click each source, then run the matching command. All are version 1, corpus version `batch-1`.
+Batch 1 is already `in_force`; this stamps `citation_verified_date` + verifier once each pinpoint is confirmed against primary. It touches only the verification columns, never approved content. Review the queue first with `npm run corpus:review -- --verified-gap`, open each source, then run the matching command. All are version 1.
 
 ```bash
-npm run corpus:approve -- --id EU-PPWR-heavy-metals --version 1 --source-url "https://eur-lex.europa.eu/eli/reg/2025/40/oj/eng" --approved-by "Akshay Tandon" --corpus-version batch-1
-npm run corpus:approve -- --id EU-PPWR-pfas-food-contact --version 1 --source-url "https://eur-lex.europa.eu/eli/reg/2025/40/oj/eng" --approved-by "Akshay Tandon" --corpus-version batch-1
-npm run corpus:approve -- --id EU-PPWR-soc-minimisation --version 1 --source-url "https://eur-lex.europa.eu/eli/reg/2025/40/oj/eng" --approved-by "Akshay Tandon" --corpus-version batch-1
-npm run corpus:approve -- --id EU-PPWR-no-chemical-preservative --version 1 --source-url "https://eur-lex.europa.eu/eli/reg/2025/40/oj/eng" --approved-by "Akshay Tandon" --corpus-version batch-1
-npm run corpus:approve -- --id EU-PPWR-composite-plastic-relevant --version 1 --source-url "https://eur-lex.europa.eu/eli/reg/2025/40/oj/eng" --approved-by "Akshay Tandon" --corpus-version batch-1
-npm run corpus:approve -- --id EU-PPWR-technical-documentation --version 1 --source-url "https://eur-lex.europa.eu/eli/reg/2025/40/oj/eng" --approved-by "Akshay Tandon" --corpus-version batch-1
-npm run corpus:approve -- --id EU-PPWR-declaration-of-conformity --version 1 --source-url "https://eur-lex.europa.eu/eli/reg/2025/40/oj/eng" --approved-by "Akshay Tandon" --corpus-version batch-1
-npm run corpus:approve -- --id EU-PPWR-operator-id-manufacturer --version 1 --source-url "https://eur-lex.europa.eu/eli/reg/2025/40/oj/eng" --approved-by "Akshay Tandon" --corpus-version batch-1
-npm run corpus:approve -- --id EU-PPWR-operator-id-importer --version 1 --source-url "https://eur-lex.europa.eu/eli/reg/2025/40/oj/eng" --approved-by "Akshay Tandon" --corpus-version batch-1
-npm run corpus:approve -- --id EU-PPWR-no-transitional-stock --version 1 --source-url "https://eur-lex.europa.eu/eli/reg/2025/40/oj/eng" --approved-by "Akshay Tandon" --corpus-version batch-1
-npm run corpus:approve -- --id EU-EPR-producer-registration --version 1 --source-url "https://eur-lex.europa.eu/eli/reg/2025/40/oj/eng" --approved-by "Akshay Tandon" --corpus-version batch-1
-npm run corpus:approve -- --id INTL-ISPM15-heat-treatment --version 1 --source-url "https://www.ippc.int/en/core-activities/standards-setting/ispms/" --approved-by "Akshay Tandon" --corpus-version batch-1
+npm run corpus:verify -- --id EU-PPWR-heavy-metals --version 1 --verified-by "Akshay Tandon"
+npm run corpus:verify -- --id EU-PPWR-pfas-food-contact --version 1 --verified-by "Akshay Tandon"
+npm run corpus:verify -- --id EU-PPWR-soc-minimisation --version 1 --verified-by "Akshay Tandon"
+npm run corpus:verify -- --id EU-PPWR-no-chemical-preservative --version 1 --verified-by "Akshay Tandon"
+npm run corpus:verify -- --id EU-PPWR-composite-plastic-relevant --version 1 --verified-by "Akshay Tandon"
+npm run corpus:verify -- --id EU-PPWR-technical-documentation --version 1 --verified-by "Akshay Tandon"
+npm run corpus:verify -- --id EU-PPWR-declaration-of-conformity --version 1 --verified-by "Akshay Tandon"
+npm run corpus:verify -- --id EU-PPWR-operator-id-manufacturer --version 1 --verified-by "Akshay Tandon"
+npm run corpus:verify -- --id EU-PPWR-operator-id-importer --version 1 --verified-by "Akshay Tandon"
+npm run corpus:verify -- --id EU-PPWR-no-transitional-stock --version 1 --verified-by "Akshay Tandon"
+npm run corpus:verify -- --id EU-EPR-producer-registration --version 1 --verified-by "Akshay Tandon"
+npm run corpus:verify -- --id INTL-ISPM15-heat-treatment --version 1 --verified-by "Akshay Tandon"
 ```
