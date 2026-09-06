@@ -30,6 +30,14 @@ Postgres runs on host port **5433** (5432 is taken by `asset-directory-db` local
 
 Corpus (checkpoint) changes require regulatory-owner sign-off. This is enforced, not requested: checkpoints insert as `draft`, and only an approval record in `checkpoint_approvals` permits `in_force` — the evaluator refuses to produce a verdict from anything else. See [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) and [docs/SCHEMA_DELTAS.md](docs/SCHEMA_DELTAS.md).
 
+## UI, brand & navigation
+
+Light-first Fitsol theme: brand tokens (green/teal/neutral scales, semantic colours, surfaces) are CSS variables mapped to Tailwind utilities in [src/app/globals.css](src/app/globals.css); DM Sans for UI/body; one `StatusChip` component for every verdict/tag; Lucide icons only. The gated app renders in an `(app)` route group (header + nav); the **public** passport (`/passport/<token>`) renders on the bare root layout with no app chrome.
+
+**Brand logo drop-in.** The official Fitsol SVGs are not bundled. Drop them into [`public/brand/`](public/brand/README.md) with the exact names `fitsol-logo-full-colour.svg`, `fitsol-logo-white.svg`, `fitsol-logomark.svg`. Until they exist a text wordmark is shown ([`src/app/_components/Wordmark.tsx`](src/app/_components/Wordmark.tsx)) and the logo is never drawn or approximated — the component comments show the one-line swap to `<img>`.
+
+**Routes.** `/` assessments list · `/assessments/new` intake · `/assessments/[id]/report` screening report · `/corpus` corpus review (all gated) · `/passport/[token]` **public** passport (ungated, reached by the QR/link on a report).
+
 ## Deployment (pilot)
 
 Target: **Vercel + managed Postgres** (Vercel Postgres, Neon, or Supabase — any Postgres 16 URL). The actual deploy requires a Vercel account and a provisioned database; the repo is wired so that once those exist, deploying is configuration only.
