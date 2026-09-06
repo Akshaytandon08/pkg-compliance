@@ -6,7 +6,7 @@ import { getAllGuidance, guidanceKey, type GuidanceRow } from "@/db/guidance";
 import { evaluatePack, type CheckpointCard, type ComponentInput } from "@/lib/engine/pack";
 import { buildObligationCalendar } from "@/lib/report/obligations";
 import { describeDeltaAction, describeRequirement } from "@/lib/report/deltaActions";
-import { SCREENING_DISCLAIMER } from "@/lib/report/language";
+import { DEMO_DATA_LABEL, SCREENING_DISCLAIMER } from "@/lib/report/language";
 import { AddEvidenceForm } from "./AddEvidenceForm";
 
 function evidenceTypesOf(card: CheckpointCard): string[] {
@@ -84,6 +84,14 @@ function Badge({ verdict }: { verdict: string }) {
   return (
     <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${VERDICT_STYLE[verdict] ?? VERDICT_STYLE.not_applicable}`}>
       {label}
+    </span>
+  );
+}
+
+function DemoTag() {
+  return (
+    <span className="rounded-full border border-purple-300 bg-purple-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-purple-800 dark:border-purple-800 dark:bg-purple-950/50 dark:text-purple-200">
+      {DEMO_DATA_LABEL}
     </span>
   );
 }
@@ -280,7 +288,10 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
             <h1 className="text-xl font-semibold tracking-tight">{assessment.packName}</h1>
             <p className="text-sm text-neutral-500">Qualification screening report</p>
           </div>
-          <Badge verdict={report.overall.verdict} />
+          <div className="flex items-center gap-2">
+            {assessment.demo && <DemoTag />}
+            <Badge verdict={report.overall.verdict} />
+          </div>
         </div>
         <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-neutral-500">
           <div>Corpus version: <span className="font-medium text-neutral-700 dark:text-neutral-300">{report.corpusVersion}</span></div>

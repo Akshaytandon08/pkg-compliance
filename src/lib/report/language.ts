@@ -63,3 +63,7 @@ export const SCREENING_DISCLAIMER =
   "It is not a Declaration of Conformity, a certificate, or a statement of conformity, " +
   "and it does not verify compliance. Responsibility for compiling conformity " +
   "documentation and for any declaration rests with the obligated economic operator.";
+
+// Shown wherever a demo (demo=true) pack is rendered — report and public
+// passport — so synthetic data is never mistaken for a real screening.
+export const DEMO_DATA_LABEL = "Demonstration data";

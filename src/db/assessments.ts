@@ -41,6 +41,8 @@ export type NewAssessment = {
   asOf: string;
   context: AssessmentContextRecord;
   components: NewComponent[];
+  /** Demonstration data — renders a visible tag; never a real screening. */
+  demo?: boolean;
 };
 
 /** The corpus version stamped on a new assessment. */
@@ -66,6 +68,7 @@ export async function createAssessment(input: NewAssessment): Promise<number> {
         assessmentContext: input.context,
         corpusVersion,
         asOf: input.asOf,
+        demo: input.demo ?? false,
       })
       .returning({ id: assessments.id });
 
@@ -125,6 +128,7 @@ export type LoadedAssessment = {
   context: AssessmentContextRecord;
   corpusVersion: string;
   asOf: string;
+  demo: boolean;
   components: LoadedComponent[];
 };
 
@@ -176,6 +180,7 @@ export async function getAssessment(id: number): Promise<LoadedAssessment | null
     context: a.assessmentContext,
     corpusVersion: a.corpusVersion,
     asOf: a.asOf,
+    demo: a.demo,
     components,
   };
 }
@@ -186,6 +191,7 @@ export type AssessmentSummary = {
   createdAt: Date;
   corpusVersion: string;
   asOf: string;
+  demo: boolean;
 };
 
 /**
@@ -229,6 +235,7 @@ export async function listAssessments(): Promise<AssessmentSummary[]> {
       createdAt: assessments.createdAt,
       corpusVersion: assessments.corpusVersion,
       asOf: assessments.asOf,
+      demo: assessments.demo,
     })
     .from(assessments)
     .orderBy(desc(assessments.createdAt));

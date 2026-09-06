@@ -1,4 +1,5 @@
 import {
+  boolean,
   date,
   foreignKey,
   integer,
@@ -253,6 +254,10 @@ export const assessments = pgTable("assessments", {
   // sentinel while the corpus is still all draft). Never back-dated.
   corpusVersion: text("corpus_version").notNull(),
   asOf: date("as_of").notNull(),
+  // Demonstration data flag. Seeded demo packs set this true so the report and
+  // the public passport render a visible "Demonstration data" tag — a synthetic
+  // pack must never be mistaken for a real screening.
+  demo: boolean("demo").notNull().default(false),
 });
 
 export const assessmentComponents = pgTable("assessment_components", {

@@ -76,6 +76,10 @@ test("new guidance/add-evidence report strings carry no issuing language", () =>
   for (const s of strings) assert.deepEqual(findLanguageViolations(s), [], `violation in: ${s}`);
 });
 
+test("demonstration-data tag carries no issuing language", () => {
+  assert.deepEqual(findLanguageViolations("Demonstration data"), []);
+});
+
 test("obligation-calendar report strings carry no issuing language", () => {
   const strings = [
     "Compliance calendar",
