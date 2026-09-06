@@ -1,19 +1,12 @@
 import { notFound } from "next/navigation";
 import { getPassportByToken } from "@/db/passport";
-import { DEMO_DATA_LABEL, PCF_DISCLAIMER, SCREENING_DISCLAIMER } from "@/lib/report/language";
+import { PCF_DISCLAIMER, SCREENING_DISCLAIMER } from "@/lib/report/language";
+import { StatusChip, toChipStatus } from "@/app/_components/StatusChip";
 
 // Public tier — reached without the access gate (see src/proxy.ts). Renders only
 // the passport payload, which by construction carries no evidence, no
 // per-checkpoint detail, and nothing from a draft/contested checkpoint.
 export const dynamic = "force-dynamic";
-
-const VERDICT_STYLE: Record<string, string> = {
-  qualified: "bg-emerald-100 text-emerald-800",
-  conditional: "bg-amber-100 text-amber-800",
-  gap: "bg-red-100 text-red-800",
-  pending: "bg-neutral-100 text-neutral-600",
-  not_applicable: "bg-neutral-100 text-neutral-600",
-};
 
 function Count({ n, label, href }: { n: number; label: string; href?: string }) {
   const body = (
@@ -56,14 +49,8 @@ export default async function PassportPage({ params }: PageProps<"/passport/[tok
             <h1 className="mt-0.5 text-xl font-semibold tracking-tight">{p.packName}</h1>
           </div>
           <div className="flex items-center gap-2">
-            {p.demo && (
-              <span className="rounded-full border border-purple-300 bg-purple-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-purple-800">
-                {DEMO_DATA_LABEL}
-              </span>
-            )}
-            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${VERDICT_STYLE[p.overallVerdict] ?? VERDICT_STYLE.not_applicable}`}>
-              {p.overallVerdict.replace(/_/g, " ")}
-            </span>
+            {p.demo && <StatusChip status="demo" />}
+            <StatusChip status={toChipStatus(p.overallVerdict)} />
           </div>
         </div>
         <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-neutral-500">
@@ -108,9 +95,7 @@ export default async function PassportPage({ params }: PageProps<"/passport/[tok
                         <p className="font-mono text-xs text-neutral-500">{c.checkpointId}@{c.version}</p>
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-neutral-500">{c.reasonCategory}</span>
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${VERDICT_STYLE[c.verdict] ?? VERDICT_STYLE.not_applicable}`}>
-                            {c.verdict.replace(/_/g, " ")}
-                          </span>
+                          <StatusChip status={toChipStatus(c.verdict)} label={c.verdict.replace(/_/g, " ")} />
                         </div>
                       </div>
                       <p className="mt-1 text-sm text-neutral-700">{c.requirement}</p>

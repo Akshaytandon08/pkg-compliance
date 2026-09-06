@@ -8,7 +8,8 @@ import { getAllGuidance, guidanceKey, type GuidanceRow } from "@/db/guidance";
 import { evaluatePack, type CheckpointCard, type ComponentInput } from "@/lib/engine/pack";
 import { buildObligationCalendar } from "@/lib/report/obligations";
 import { describeDeltaAction, describeRequirement } from "@/lib/report/deltaActions";
-import { DEMO_DATA_LABEL, PCF_DISCLAIMER, SCREENING_DISCLAIMER } from "@/lib/report/language";
+import { PCF_DISCLAIMER, SCREENING_DISCLAIMER } from "@/lib/report/language";
+import { StatusChip, toChipStatus } from "@/app/_components/StatusChip";
 import { AddEvidenceForm } from "./AddEvidenceForm";
 import { GeneratePassport } from "./GeneratePassport";
 
@@ -71,31 +72,6 @@ function GuidancePanel({ card, guidance }: { card: CheckpointCard; guidance: Map
         ))}
       </div>
     </div>
-  );
-}
-
-const VERDICT_STYLE: Record<string, string> = {
-  qualified: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200",
-  conditional: "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200",
-  gap: "bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200",
-  not_applicable: "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300",
-  pending: "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300",
-};
-
-function Badge({ verdict }: { verdict: string }) {
-  const label = verdict.replace(/_/g, " ");
-  return (
-    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${VERDICT_STYLE[verdict] ?? VERDICT_STYLE.not_applicable}`}>
-      {label}
-    </span>
-  );
-}
-
-function DemoTag() {
-  return (
-    <span className="rounded-full border border-purple-300 bg-purple-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-purple-800 dark:border-purple-800 dark:bg-purple-950/50 dark:text-purple-200">
-      {DEMO_DATA_LABEL}
-    </span>
   );
 }
 
@@ -178,7 +154,7 @@ function VerdictCard({
           <p className="font-mono text-xs text-neutral-500">{card.checkpointId}@{card.version}</p>
           <p className="mt-0.5 text-sm">{card.requirementText}</p>
         </div>
-        {outcome.verdict && <Badge verdict={outcome.verdict} />}
+        {outcome.verdict && <StatusChip status={toChipStatus(outcome.verdict)} />}
       </div>
       <dl className="mt-3 grid gap-1 text-xs text-neutral-600 dark:text-neutral-400">
         <div className="flex gap-2">
@@ -362,8 +338,8 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
             <p className="text-sm text-neutral-500">Qualification screening report</p>
           </div>
           <div className="flex items-center gap-2">
-            {assessment.demo && <DemoTag />}
-            <Badge verdict={report.overall.verdict} />
+            {assessment.demo && <StatusChip status="demo" />}
+            <StatusChip status={toChipStatus(report.overall.verdict)} />
           </div>
         </div>
         <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-neutral-500">

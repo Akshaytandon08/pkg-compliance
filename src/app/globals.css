@@ -1,26 +1,70 @@
 @import "tailwindcss";
 
+/* Light-first: redefine the `dark:` variant to be CLASS-based (needs a `.dark`
+   ancestor). We never add `.dark`, so every legacy `dark:` utility across the app
+   becomes inert and light is the single default — no per-file edits required. An
+   optional dark theme could later be enabled by adding the class. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Fitsol brand tokens (design system). */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Brand */
+  --brand-primary: #05a070; /* primary green — actions, positive/completion */
+  --brand-teal: #04524e; /* dark teal — navigation/header ground */
+  --brand-accent-blue: #060dbf; /* sparingly: analytics / AI highlights only */
+
+  /* Green scale */
+  --p900: #012016; --p800: #02402d; --p700: #036043; --p600: #04805a;
+  --p500: #05a070; --p400: #37b38d; --p300: #69c6a9; --p200: #9bd9c6;
+  --p100: #cdece2; --p50: #d7f0e8;
+
+  /* Neutrals */
+  --n900: #010326; --n800: #1a1c3c; --n700: #343551; --n600: #4d4f67;
+  --n500: #67687d; --n400: #808193; --n300: #999aa8; --n200: #b3b3be;
+  --n100: #cccdd4; --n50: #e6e6e9;
+
+  /* Semantic */
+  --error: #ef4444; --error-light: #fef2f2; --error-dark: #7f1d1d;
+  --warning: #eab308; --warning-light: #fefce8; --warning-dark: #713f12;
+
+  /* Surfaces */
+  --surface-page: #f8faf9;
+  --surface-card: #ffffff;
 }
 
+/* Map tokens to Tailwind color utilities (bg-primary, text-n700, bg-p100, …). */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-dm-sans);
   --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-primary: var(--brand-primary);
+  --color-teal: var(--brand-teal);
+  --color-accent-blue: var(--brand-accent-blue);
+
+  --color-p900: var(--p900); --color-p800: var(--p800); --color-p700: var(--p700);
+  --color-p600: var(--p600); --color-p500: var(--p500); --color-p400: var(--p400);
+  --color-p300: var(--p300); --color-p200: var(--p200); --color-p100: var(--p100);
+  --color-p50: var(--p50);
+
+  --color-n900: var(--n900); --color-n800: var(--n800); --color-n700: var(--n700);
+  --color-n600: var(--n600); --color-n500: var(--n500); --color-n400: var(--n400);
+  --color-n300: var(--n300); --color-n200: var(--n200); --color-n100: var(--n100);
+  --color-n50: var(--n50);
+
+  --color-error: var(--error); --color-error-light: var(--error-light); --color-error-dark: var(--error-dark);
+  --color-warning: var(--warning); --color-warning-light: var(--warning-light); --color-warning-dark: var(--warning-dark);
+
+  --color-page: var(--surface-page);
+  --color-card: var(--surface-card);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--surface-page);
+  color: var(--n700); /* body text */
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Headings default to N800, labels to N600 — sentence case is an authoring rule. */
+h1, h2, h3, h4 {
+  color: var(--n800);
 }
