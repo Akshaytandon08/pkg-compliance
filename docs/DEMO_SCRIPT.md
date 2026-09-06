@@ -9,6 +9,7 @@ prefixed `SYNTHETIC-DEMO`). Nothing here is a real client screening.
 ```bash
 docker compose up -d          # Postgres (host port 5433)
 npm run db:migrate            # ensure schema is current
+npm run seed:factors          # emission factors for the footprint (SEED-ESTIMATE)
 npm run seed:demo-suite       # (re)seed exactly three demo packs — idempotent
 npm run dev                   # http://localhost:3000
 ```
@@ -31,7 +32,11 @@ component checkpoints resolve **qualified** (≈9 qualified vs ≈6 conditional)
 conditional rows are the *pack-level* obligations that evidence cannot close from
 a BOM alone — the Declaration of Conformity, technical documentation, operator
 identification and producer registration. Point out that PFAS shows as **N/A**
-here: it is a non-food pack.
+here: it is a non-food pack. Scroll to the **Cradle-to-gate footprint
+(screening-grade)** card — a per-component mass × emission-factor estimate with a
+pack total, each figure showing its factor source and data-quality tier. Stress
+the label: a screening estimate on placeholder factors, not audit-level and not
+independently assured; no LLM touches the number.
 
 **3 — The gap → guidance → template → evidence loop.** Open **Client A —
 traction-cell (demo)**. It is mostly conditional — the pack is blocked by missing
@@ -54,9 +59,20 @@ coating** is annotated at-risk on fluorochemistry grounds → a `TEST_REQUIRED`
 conditional. Same engine, different context — applicability is data-driven, not a
 special case.
 
+**5 — The public passport.** Back on any report (the carton reads best), open the
+**Public passport** card and click **Generate passport**. A QR appears with an
+unguessable public link. Open it (or scan the QR): the `/passport/<token>` page is
+the **public tier** — pack name, material summary, verdict counts and the
+footprint total, with a "Demonstration data" tag — and shows a **content hash**
+and version. It carries *no* evidence and *no* per-checkpoint detail. Note two
+things: the passport URL works **without the login** (it is the public disclosure
+layer; everything else stays behind the access gate), and if you regenerate after
+changing the pack, it appends a **new hash-chained version** — the prior hash is
+recorded, so tampering is evident.
+
 Close on: every verdict is deterministic (no LLM decides pass/fail), every
-checkpoint cites primary law, and the report is a screening — never a Declaration
-of Conformity.
+checkpoint cites primary law, the footprint is a labelled screening estimate, and
+the report is a screening — never a Declaration of Conformity.
 
 ## Reset
 

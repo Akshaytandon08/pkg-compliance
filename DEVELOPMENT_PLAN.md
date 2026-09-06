@@ -3,7 +3,7 @@
 Working codename: `pkg-compliance` (product name TBD — do not invent one).
 Source of truth for product decisions: [docs/BRIEF.md](docs/BRIEF.md). Decisions there are settled; raise deltas to Akshay Tandon (product owner & interim regulatory owner). Every corpus change requires his sign-off — hard gate.
 
-**Status: Batch 1 (12) `in_force` under `batch-1`. Sprint 2a + 2b delivered (report loop, guidance, templates). Batch 2 seeded — 17 DRAFT rows (10 EU + 7 India) awaiting approval. Deployment prepared (access gate + migrate-on-deploy); actual deploy needs a Vercel account + managed Postgres. Engine 100% golden agreement. Last updated: 2026-08-11.**
+**Status: Batch 1 (12) `in_force` under `batch-1`. Sprint 2a + 2b delivered (report loop, guidance, templates). Batch 2 seeded — 17 DRAFT rows (10 EU + 7 India) awaiting approval. Demo-completeness delivered: three-pack demo suite (`seed:demo-suite`, all `demo=true`), Stack D screening-grade PCF (demo slice) and Stack C public passport (demo slice). Deployment prepared (access gate + migrate-on-deploy); actual deploy needs a Vercel account + managed Postgres. Engine 100% golden agreement. Last updated: 2026-09-06.**
 
 ## Hard constraints (enforce in code, verify in review)
 
@@ -106,9 +106,10 @@ Turns each gap/conditional into an actionable "how to obtain this" loop.
 
 ## Sprint 3 — Stack D + passport + pilot
 
-- [ ] PCF module: mass × material EF + conversion + inbound transport; ISO 14067 cradle-to-gate; data hierarchy (primary supplier → India secondary EF → global proxy) with provenance shown; seed EF library from Fitsol pallet research + bamboo calculator methodology
-- [ ] QR → hash-signed tiered-disclosure passport page (public / buyer / audit layers, change-logged)
-- [ ] Stack B obligation calendar (renewals, filing deadlines — no fee computation)
+- [~] **PCF module (demo slice — Commit 32).** Per-component mass × material emission factor + optional inbound transport leg; ISO 14067-aligned cradle-to-gate; provenance (source + data-quality tier) shown per figure; deterministic, no LLM. `emission_factors` table seeded from `reference/emission_factors_seed.csv` — **all rows `SEED-ESTIMATE` placeholders**. Remaining: real EF library (Fitsol pallet research + bamboo calculator, Kyoto EF), the full data hierarchy (primary supplier → India secondary → global proxy), and unit conversions beyond mass.
+- [~] **Passport page (demo slice — Commit 33).** `/passport/<token>` renders the **public tier** (pack name, material summary, verdict counts, corpus version, PCF summary, demo tag) — never evidence or per-checkpoint detail, never a draft/contested row. Unguessable stable token, QR from the report, SHA-256 content hash chained per version (`prev_hash`), change-logged. Access gate bypasses `passport/` deliberately (documented in `src/proxy.ts` + README). Remaining: the **buyer / audit tiers** (tiered disclosure) beyond the public layer.
+- [x] **Stack B obligation calendar (Commit 28)** — recurring obligations with next-due from the as-of date; no fee computation.
+- [x] **Demo suite (Commits 30–31)** — `seed:demo-suite` seeds three `demo=true` packs (golden, corrugated carton, food-contact pouch); `demo` renders a "Demonstration data" tag on report + passport; synthetic evidence prefixed `SYNTHETIC-DEMO`. The 5-minute path is [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
 
 **Acceptance:** 3 real client packs end-to-end, ≥1 paying.
 
