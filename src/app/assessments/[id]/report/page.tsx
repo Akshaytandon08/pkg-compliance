@@ -2,12 +2,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { getAssessment, loadCorpusAsOf } from "@/db/assessments";
+import { loadEmissionFactors } from "@/db/factors";
+import { computePackFootprint } from "@/lib/engine/pcf";
 import { getAllGuidance, guidanceKey, type GuidanceRow } from "@/db/guidance";
 import { evaluatePack, type CheckpointCard, type ComponentInput } from "@/lib/engine/pack";
 import { buildObligationCalendar } from "@/lib/report/obligations";
 import { describeDeltaAction, describeRequirement } from "@/lib/report/deltaActions";
-import { SCREENING_DISCLAIMER } from "@/lib/report/language";
+import { DEMO_DATA_LABEL, PCF_DISCLAIMER, SCREENING_DISCLAIMER } from "@/lib/report/language";
 import { AddEvidenceForm } from "./AddEvidenceForm";
+import { GeneratePassport } from "./GeneratePassport";
 
 function evidenceTypesOf(card: CheckpointCard): string[] {
   return [...new Set((card.evidenceRequirements.allOf ?? []).flatMap((c) => c.anyOf))];
@@ -84,6 +87,14 @@ function Badge({ verdict }: { verdict: string }) {
   return (
     <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${VERDICT_STYLE[verdict] ?? VERDICT_STYLE.not_applicable}`}>
       {label}
+    </span>
+  );
+}
+
+function DemoTag() {
+  return (
+    <span className="rounded-full border border-purple-300 bg-purple-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-purple-800 dark:border-purple-800 dark:bg-purple-950/50 dark:text-purple-200">
+      {DEMO_DATA_LABEL}
     </span>
   );
 }
@@ -239,6 +250,69 @@ function Count({ n, label }: { n: number; label: string }) {
   );
 }
 
+// 3 significant figures, screening-grade — never implies precision we don't have.
+function kg(n: number): string {
+  return `${Number(n.toPrecision(3))} kg CO₂e`;
+}
+
+function FootprintCard({ footprint }: { footprint: ReturnType<typeof computePackFootprint> }) {
+  return (
+    <section className="rounded-lg border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+          Cradle-to-gate footprint (screening-grade)
+        </h2>
+        <div className="text-lg font-semibold">{kg(footprint.totalKgCo2e)}</div>
+      </div>
+      <p className="mt-1 text-xs leading-relaxed text-neutral-500">{PCF_DISCLAIMER}</p>
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="text-left text-neutral-500">
+            <tr>
+              <th className="py-1 pr-3 font-medium">Component</th>
+              <th className="py-1 pr-3 font-medium">Mass</th>
+              <th className="py-1 pr-3 font-medium">Factor</th>
+              <th className="py-1 pr-3 font-medium">Source · tier</th>
+              <th className="py-1 pr-3 text-right font-medium">kg CO₂e</th>
+            </tr>
+          </thead>
+          <tbody>
+            {footprint.components.map((c) => (
+              <tr key={c.line} className="border-t border-neutral-100 dark:border-neutral-800/60">
+                <td className="py-1 pr-3">{c.line}. {c.name}</td>
+                <td className="py-1 pr-3 whitespace-nowrap">{c.massKg != null ? `${Number((c.massKg).toPrecision(3))} kg` : "—"}</td>
+                <td className="py-1 pr-3 whitespace-nowrap">{c.factor ? `${c.factor.factor} ${c.factor.unit}` : "—"}</td>
+                <td className="py-1 pr-3">{c.factor ? `${c.factor.source} · ${c.factor.dataQuality}` : "—"}</td>
+                <td className="py-1 pr-3 text-right whitespace-nowrap">
+                  {c.kgCo2e != null
+                    ? Number(c.kgCo2e.toPrecision(3))
+                    : c.unresolvedReason === "no_weight"
+                      ? "no weight"
+                      : "no factor"}
+                </td>
+              </tr>
+            ))}
+            {footprint.transport && (
+              <tr className="border-t border-neutral-100 dark:border-neutral-800/60">
+                <td className="py-1 pr-3">Inbound transport ({footprint.transport.mode}, {footprint.transport.km} km)</td>
+                <td className="py-1 pr-3 whitespace-nowrap">{Number(footprint.transport.massKg.toPrecision(3))} kg</td>
+                <td className="py-1 pr-3 whitespace-nowrap">{footprint.transport.factor.factor} {footprint.transport.factor.unit}</td>
+                <td className="py-1 pr-3">{footprint.transport.factor.source} · {footprint.transport.factor.dataQuality}</td>
+                <td className="py-1 pr-3 text-right whitespace-nowrap">{Number(footprint.transport.kgCo2e.toPrecision(3))}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      {footprint.unresolved.length > 0 && (
+        <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+          Excluded from the total (no weight or no emission factor on file): {footprint.unresolved.join(", ")}.
+        </p>
+      )}
+    </section>
+  );
+}
+
 export default async function ReportPage({ params }: PageProps<"/assessments/[id]/report">) {
   const { id } = await params;
   const numId = Number(id);
@@ -271,6 +345,13 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
   const bomMaterials = [...new Set(assessment.components.map((c) => c.material))];
   const obligations = buildObligationCalendar(corpus, assessment.context, bomMaterials, assessment.asOf);
 
+  const factors = await loadEmissionFactors();
+  const footprint = computePackFootprint(
+    assessment.components.map((c) => ({ line: c.line, name: c.name, material: c.material, weightGrams: c.weightGrams })),
+    factors,
+    assessment.context.inbound_transport,
+  );
+
   return (
     <div className="space-y-6">
       {/* Persistent screening-only header */}
@@ -280,7 +361,10 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
             <h1 className="text-xl font-semibold tracking-tight">{assessment.packName}</h1>
             <p className="text-sm text-neutral-500">Qualification screening report</p>
           </div>
-          <Badge verdict={report.overall.verdict} />
+          <div className="flex items-center gap-2">
+            {assessment.demo && <DemoTag />}
+            <Badge verdict={report.overall.verdict} />
+          </div>
         </div>
         <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-neutral-500">
           <div>Corpus version: <span className="font-medium text-neutral-700 dark:text-neutral-300">{report.corpusVersion}</span></div>
@@ -300,6 +384,12 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
         <Count n={report.counts.not_applicable} label="N/A" />
         <Count n={report.counts.caveat} label="Caveats" />
       </div>
+
+      {/* Screening-grade cradle-to-gate footprint (Stack D) */}
+      <FootprintCard footprint={footprint} />
+
+      {/* Public passport (Stack C) */}
+      <GeneratePassport assessmentId={assessment.id} />
 
       {/* Caveats — visibly distinct, not errors */}
       {report.caveats.length > 0 && (

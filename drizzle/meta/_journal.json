@@ -134,6 +134,27 @@
       "when": 1788610286891,
       "tag": "0018_recurrence-and-destination-markets",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1788703944568,
+      "tag": "0019_assessment-demo-flag",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1788704316918,
+      "tag": "0020_emission-factors",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1788704697513,
+      "tag": "0021_passports",
+      "breakpoints": true
     }
   ]
 }

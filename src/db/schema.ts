@@ -1,5 +1,7 @@
 import {
+  boolean,
   date,
+  doublePrecision,
   foreignKey,
   integer,
   jsonb,
@@ -9,6 +11,7 @@ import {
   serial,
   text,
   timestamp,
+  unique,
 } from "drizzle-orm/pg-core";
 
 // Checkpoints are versioned DATA, not code (brief §5). Every corpus change is a
@@ -241,6 +244,9 @@ export type AssessmentContextRecord = {
   persona: string;
   declared_reusable: boolean;
   legal_role_facts: LegalRoleFacts;
+  // Optional inbound (supplier → point of placing) transport leg for the
+  // screening-grade PCF. Absent = the footprint reports material production only.
+  inbound_transport?: { mode: string; km: number } | null;
 };
 
 export const assessments = pgTable("assessments", {
@@ -253,6 +259,10 @@ export const assessments = pgTable("assessments", {
   // sentinel while the corpus is still all draft). Never back-dated.
   corpusVersion: text("corpus_version").notNull(),
   asOf: date("as_of").notNull(),
+  // Demonstration data flag. Seeded demo packs set this true so the report and
+  // the public passport render a visible "Demonstration data" tag — a synthetic
+  // pack must never be mistaken for a real screening.
+  demo: boolean("demo").notNull().default(false),
 });
 
 export const assessmentComponents = pgTable("assessment_components", {
@@ -289,3 +299,54 @@ export const assessmentEvidence = pgTable("assessment_evidence", {
   scopeMaterials: text("scope_materials").array(),
   scopeParameters: text("scope_parameters").array(),
 });
+
+// --- Emission factors (Sprint 3 / Stack D, screening-grade PCF) -----------
+// Reference data for the cradle-to-gate footprint: one factor per
+// (material, process). Material-production rows carry a per-kg factor; transport
+// rows a per-kg·km factor (unit column disambiguates). Every row records its
+// source, year, geography and data-quality tier so each figure on the report can
+// show its provenance. Seed rows are marked data_quality 'SEED-ESTIMATE' — a
+// clearly-labelled placeholder, never dressed up as an authoritative source.
+export const emissionFactors = pgTable("emission_factors", {
+  id: serial("id").primaryKey(),
+  // Material vocab (corrugated|plastic|wood|metal) for production rows, or
+  // 'transport' for a transport-mode row.
+  material: text("material").notNull(),
+  // 'production' for a material row; the mode (road|sea|air) for transport.
+  process: text("process").notNull(),
+  // Numeric factor; unit given by `unit` (never mix units in one column).
+  factor: doublePrecision("factor").notNull(),
+  unit: text("unit").notNull(), // 'kgCO2e/kg' | 'kgCO2e/kg.km'
+  source: text("source").notNull(),
+  year: integer("year").notNull(),
+  geography: text("geography").notNull(),
+  // Provenance tier: 'SEED-ESTIMATE' (placeholder) | 'secondary' | 'primary'.
+  dataQuality: text("data_quality").notNull(),
+  notes: text("notes"),
+});
+
+// --- Passports (Sprint 3 / Stack C, public tier) --------------------------
+// A shareable public snapshot of an assessment's PUBLIC tier (pack name, material
+// summary, verdict counts, corpus version, PCF summary — never per-checkpoint
+// detail or evidence). Addressed by an unguessable `token` (NOT the assessment
+// id), stable across versions so a printed QR keeps working. Each regeneration
+// after a data change appends a new version, chained by prev_hash → a simple
+// tamper-evident hash-chain (no blockchain). `content_hash` is over the DATA
+// payload only (not the timestamp), so regenerating unchanged data is a no-op.
+export const passports = pgTable(
+  "passports",
+  {
+    id: serial("id").primaryKey(),
+    assessmentId: integer("assessment_id")
+      .notNull()
+      .references(() => assessments.id, { onDelete: "cascade" }),
+    token: text("token").notNull(), // stable across versions; public URL segment
+    version: integer("version").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    contentHash: text("content_hash").notNull(),
+    prevHash: text("prev_hash"), // chains to the prior version's content_hash
+    changelog: text("changelog"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique("passports_token_version_uq").on(t.token, t.version)],
+);

@@ -44,7 +44,7 @@ export default async function Home() {
           <h2 className="text-sm font-semibold">No assessments yet</h2>
           <p className="mx-auto mt-1 max-w-md text-sm text-neutral-500">
             Create an assessment from a bill of materials and available evidence, or seed the
-            anonymised demo pack with <code className="rounded bg-neutral-100 px-1 dark:bg-neutral-800">npm run seed:demo</code>.
+            three demonstration packs with <code className="rounded bg-neutral-100 px-1 dark:bg-neutral-800">npm run seed:demo-suite</code>.
           </p>
           <Link
             href="/assessments/new"
@@ -68,7 +68,14 @@ export default async function Home() {
             <tbody>
               {items.map((a) => (
                 <tr key={a.id} className="border-b border-neutral-100 last:border-0 dark:border-neutral-800/60">
-                  <td className="px-4 py-3 font-medium">{a.packName}</td>
+                  <td className="px-4 py-3 font-medium">
+                    {a.packName}
+                    {a.demo && (
+                      <span className="ml-2 rounded-full border border-purple-300 bg-purple-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-purple-800 dark:border-purple-800 dark:bg-purple-950/50 dark:text-purple-200">
+                        Demo
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <StatusBadge corpusVersion={a.corpusVersion} />
                   </td>

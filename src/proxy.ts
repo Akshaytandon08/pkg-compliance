@@ -26,7 +26,11 @@ export function proxy(req: NextRequest) {
   });
 }
 
-// Gate everything except Next's static assets and the favicon.
+// Gate everything except Next's static assets and the favicon — AND the public
+// passport tier (/passport/<token>), which is DELIBERATELY ungated: it is the
+// public disclosure layer, addressed by an unguessable token and carrying no
+// evidence or per-checkpoint detail. Everything else, including the passport
+// AUTHORING endpoint (POST /api/assessments/[id]/passport), stays behind the gate.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|passport/).*)"],
 };

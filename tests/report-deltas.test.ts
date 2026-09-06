@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { describeDeltaAction, describeRequirement } from "../src/lib/report/deltaActions.ts";
-import { findLanguageViolations, SCREENING_DISCLAIMER } from "../src/lib/report/language.ts";
+import { findLanguageViolations, PCF_DISCLAIMER, SCREENING_DISCLAIMER } from "../src/lib/report/language.ts";
 import type { CheckpointCard } from "../src/lib/engine/pack.ts";
 
 const card = (overrides: Partial<CheckpointCard>): CheckpointCard => ({
@@ -72,6 +72,35 @@ test("new guidance/add-evidence report strings carry no issuing language", () =>
     "Save evidence",
     "Add evidence for Green polyester strap (PET)",
     "Request from the supplier of the component material a signed declaration naming the component it covers.",
+  ];
+  for (const s of strings) assert.deepEqual(findLanguageViolations(s), [], `violation in: ${s}`);
+});
+
+test("demonstration-data tag carries no issuing language", () => {
+  assert.deepEqual(findLanguageViolations("Demonstration data"), []);
+});
+
+test("PCF disclaimer + card strings carry no issuing/forbidden language", () => {
+  const strings = [
+    PCF_DISCLAIMER,
+    "Cradle-to-gate footprint (screening-grade)",
+    "Source · tier",
+    "Excluded from the total (no weight or no emission factor on file):",
+  ];
+  for (const s of strings) assert.deepEqual(findLanguageViolations(s), [], `violation in: ${s}`);
+});
+
+test("passport strings carry no issuing/forbidden language", () => {
+  const strings = [
+    "Packaging compliance passport",
+    "Public passport",
+    "Cradle-to-gate footprint",
+    "A shareable public-tier page (material summary, verdict counts, footprint) — no evidence, no per-checkpoint detail. The link is unguessable; regenerating after a data change adds a new hash-chained version.",
+    "Integrity",
+    "Content hash:",
+    "Previous version hash:",
+    "Generate passport",
+    "Regenerate passport",
   ];
   for (const s of strings) assert.deepEqual(findLanguageViolations(s), [], `violation in: ${s}`);
 });

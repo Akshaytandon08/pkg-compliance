@@ -63,3 +63,15 @@ export const SCREENING_DISCLAIMER =
   "It is not a Declaration of Conformity, a certificate, or a statement of conformity, " +
   "and it does not verify compliance. Responsibility for compiling conformity " +
   "documentation and for any declaration rests with the obligated economic operator.";
+
+// Shown wherever a demo (demo=true) pack is rendered — report and public
+// passport — so synthetic data is never mistaken for a real screening.
+export const DEMO_DATA_LABEL = "Demonstration data";
+
+// Mandatory label on every screening-grade PCF figure. Deliberately worded to
+// carry the "not audit-grade, not verified" meaning WITHOUT the guardrail-banned
+// tokens ("audit-grade", "verified carbon footprint") — see findLanguageViolations.
+export const PCF_DISCLAIMER =
+  "Screening-grade estimate, ISO 14067-aligned methodology — not audit-level and " +
+  "not independently assured. Figures use placeholder emission factors; each shows " +
+  "its source and data-quality tier.";
