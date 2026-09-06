@@ -10,6 +10,7 @@ import { buildObligationCalendar } from "@/lib/report/obligations";
 import { describeDeltaAction, describeRequirement } from "@/lib/report/deltaActions";
 import { PCF_DISCLAIMER, SCREENING_DISCLAIMER } from "@/lib/report/language";
 import { StatusChip, toChipStatus } from "@/app/_components/StatusChip";
+import { Breadcrumbs } from "@/app/_components/Breadcrumbs";
 import { AddEvidenceForm } from "./AddEvidenceForm";
 import { GeneratePassport } from "./GeneratePassport";
 
@@ -217,13 +218,15 @@ function CaveatCard({ card }: { card: CheckpointCard }) {
   );
 }
 
-function Count({ n, label }: { n: number; label: string }) {
-  return (
-    <div className="rounded-md border border-neutral-200 bg-white px-3 py-2 text-center dark:border-neutral-800 dark:bg-neutral-900">
-      <div className="text-lg font-semibold">{n}</div>
-      <div className="text-xs text-neutral-500">{label}</div>
-    </div>
+function Count({ n, label, href }: { n: number; label: string; href?: string }) {
+  const cls = "block rounded-md border border-n50 bg-card px-3 py-2 text-center";
+  const body = (
+    <>
+      <div className="text-lg font-semibold text-n800">{n}</div>
+      <div className="text-xs text-n500">{label}</div>
+    </>
   );
+  return href ? <a href={href} className={`${cls} hover:border-n300`}>{body}</a> : <div className={cls}>{body}</div>;
 }
 
 // 3 significant figures, screening-grade — never implies precision we don't have.
@@ -328,48 +331,80 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
     assessment.context.inbound_transport,
   );
 
+  const sections = [
+    { id: "summary", label: "Summary" },
+    ...(report.caveats.length > 0 ? [{ id: "caveats", label: "Pending & caveats" }] : []),
+    { id: "components", label: "Components" },
+    ...(report.packagingUnit.length > 0 ? [{ id: "packaging-unit", label: "Packaging unit" }] : []),
+    ...(report.organisation.length > 0 ? [{ id: "organisation", label: "Organisation" }] : []),
+    { id: "footprint", label: "Footprint" },
+    { id: "passport", label: "Passport" },
+    ...(obligations.length > 0 ? [{ id: "calendar", label: "Calendar" }] : []),
+  ];
+
   return (
     <div className="space-y-6">
+      <Breadcrumbs
+        items={[
+          { label: "Assessments", href: "/" },
+          { label: assessment.packName },
+          { label: "Report" },
+        ]}
+      />
+
       {/* Persistent screening-only header */}
-      <div className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+      <div id="summary" className="scroll-mt-4 rounded-lg border border-n50 bg-card p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-xl font-semibold tracking-tight">{assessment.packName}</h1>
-            <p className="text-sm text-neutral-500">Qualification screening report</p>
+            <h1 className="text-xl font-semibold tracking-tight text-n800">{assessment.packName}</h1>
+            <p className="text-sm text-n500">Qualification screening report</p>
           </div>
           <div className="flex items-center gap-2">
             {assessment.demo && <StatusChip status="demo" />}
             <StatusChip status={toChipStatus(report.overall.verdict)} />
           </div>
         </div>
-        <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-neutral-500">
-          <div>Corpus version: <span className="font-medium text-neutral-700 dark:text-neutral-300">{report.corpusVersion}</span></div>
-          <div>As of: <span className="font-medium text-neutral-700 dark:text-neutral-300">{report.asOf}</span></div>
+        <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-n500">
+          <div>Corpus version: <span className="font-medium text-n700">{report.corpusVersion}</span></div>
+          <div>As of: <span className="font-medium text-n700">{report.asOf}</span></div>
           <div>Assessment #{assessment.id}</div>
         </dl>
-        <p className="mt-3 border-t border-neutral-100 pt-3 text-xs leading-relaxed text-neutral-500 dark:border-neutral-800">
+        <p className="mt-3 border-t border-n50 pt-3 text-xs leading-relaxed text-n500">
           {SCREENING_DISCLAIMER}
         </p>
       </div>
 
-      {/* Counts */}
+      {/* Sticky in-page section index */}
+      <nav className="sticky top-0 z-10 -mx-6 flex gap-4 overflow-x-auto border-b border-n50 bg-page/90 px-6 py-2 text-xs text-n600 backdrop-blur">
+        {sections.map((s) => (
+          <a key={s.id} href={`#${s.id}`} className="whitespace-nowrap hover:text-n900">
+            {s.label}
+          </a>
+        ))}
+      </nav>
+
+      {/* Counts — anchor to their sections */}
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-        <Count n={report.counts.qualified} label="Qualified" />
-        <Count n={report.counts.conditional} label="Conditional" />
-        <Count n={report.counts.gap} label="Gap" />
-        <Count n={report.counts.not_applicable} label="N/A" />
-        <Count n={report.counts.caveat} label="Caveats" />
+        <Count n={report.counts.qualified} label="Qualified" href="#components" />
+        <Count n={report.counts.conditional} label="Conditional" href="#components" />
+        <Count n={report.counts.gap} label="Gap" href="#components" />
+        <Count n={report.counts.not_applicable} label="N/A" href="#components" />
+        <Count n={report.counts.caveat} label="Caveats" href={report.caveats.length > 0 ? "#caveats" : "#components"} />
       </div>
 
       {/* Screening-grade cradle-to-gate footprint (Stack D) */}
-      <FootprintCard footprint={footprint} />
+      <div id="footprint" className="scroll-mt-14">
+        <FootprintCard footprint={footprint} />
+      </div>
 
       {/* Public passport (Stack C) */}
-      <GeneratePassport assessmentId={assessment.id} />
+      <div id="passport" className="scroll-mt-14">
+        <GeneratePassport assessmentId={assessment.id} />
+      </div>
 
       {/* Caveats — visibly distinct, not errors */}
       {report.caveats.length > 0 && (
-        <section>
+        <section id="caveats" className="scroll-mt-14">
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-500">
             Pending &amp; caveats ({report.caveats.length})
           </h2>
@@ -387,7 +422,7 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
       )}
 
       {/* Component verdicts */}
-      <section>
+      <section id="components" className="scroll-mt-14">
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-500">Components</h2>
         <div className="space-y-4">
           {report.componentSections.map((s) => (
@@ -421,7 +456,7 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
       </section>
 
       {report.packagingUnit.length > 0 && (
-        <section>
+        <section id="packaging-unit" className="scroll-mt-14">
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-500">Packaging unit</h2>
           <div className="grid gap-2">
             {report.packagingUnit.map((card, i) => (
@@ -432,7 +467,7 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
       )}
 
       {report.organisation.length > 0 && (
-        <section>
+        <section id="organisation" className="scroll-mt-14">
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-500">Organisation</h2>
           <div className="grid gap-2">
             {report.organisation.map((card, i) => (
@@ -450,7 +485,7 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
       )}
 
       {obligations.length > 0 && (
-        <section>
+        <section id="calendar" className="scroll-mt-14">
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-500">
             Compliance calendar ({obligations.length})
           </h2>

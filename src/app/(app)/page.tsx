@@ -41,11 +41,11 @@ export default async function Home() {
       </div>
 
       {items.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-10 text-center dark:border-neutral-700 dark:bg-neutral-900">
-          <h2 className="text-sm font-semibold">No assessments yet</h2>
-          <p className="mx-auto mt-1 max-w-md text-sm text-neutral-500">
-            Create an assessment from a bill of materials and available evidence, or seed the
-            three demonstration packs with <code className="rounded bg-neutral-100 px-1 dark:bg-neutral-800">npm run seed:demo-suite</code>.
+        <div className="rounded-lg border border-dashed border-n300 bg-card p-10 text-center">
+          <h2 className="text-sm font-semibold text-n800">Start your first screening</h2>
+          <p className="mx-auto mt-1 max-w-md text-sm text-n500">
+            Create an assessment from a pack&apos;s bill of materials and its available evidence. To
+            walk through the tool first, seed three demonstration packs with <code className="rounded bg-n50 px-1">npm run seed:demo-suite</code>.
           </p>
           <Link
             href="/assessments/new"

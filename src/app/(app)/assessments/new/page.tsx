@@ -12,6 +12,7 @@ import {
   RISK_ANNOTATIONS,
   SPEC_DEFINED_BY,
 } from "@/lib/vocab";
+import { Breadcrumbs } from "@/app/_components/Breadcrumbs";
 
 const input =
   "w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm shadow-sm focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900";
@@ -191,6 +192,7 @@ export default function NewAssessmentPage() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumbs items={[{ label: "Assessments", href: "/" }, { label: "New assessment" }]} />
       <div>
         <h1 className="text-xl font-semibold tracking-tight">New assessment</h1>
         <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">
