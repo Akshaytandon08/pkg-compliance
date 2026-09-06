@@ -26,11 +26,13 @@ export function proxy(req: NextRequest) {
   });
 }
 
-// Gate everything except Next's static assets and the favicon — AND the public
-// passport tier (/passport/<token>), which is DELIBERATELY ungated: it is the
-// public disclosure layer, addressed by an unguessable token and carrying no
-// evidence or per-checkpoint detail. Everything else, including the passport
-// AUTHORING endpoint (POST /api/assessments/[id]/passport), stays behind the gate.
+// The gate matcher MUST be a static string literal here — Next statically parses
+// `config.matcher` at build time and rejects an imported/computed value. The
+// SAME pattern and its bypass reasoning live in src/lib/access-gate.ts (kept
+// next-free so it is unit-testable, tests/passport-auth.test.ts); keep the two in
+// sync. Bypassed: _next/static, _next/image, favicon.ico, and the public
+// passport/ tier. Everything else — app routes and the passport authoring API —
+// stays gated.
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico|passport/).*)"],
 };
