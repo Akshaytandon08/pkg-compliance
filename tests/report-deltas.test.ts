@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { describeDeltaAction, describeRequirement } from "../src/lib/report/deltaActions.ts";
-import { findLanguageViolations, SCREENING_DISCLAIMER } from "../src/lib/report/language.ts";
+import { findLanguageViolations, PCF_DISCLAIMER, SCREENING_DISCLAIMER } from "../src/lib/report/language.ts";
 import type { CheckpointCard } from "../src/lib/engine/pack.ts";
 
 const card = (overrides: Partial<CheckpointCard>): CheckpointCard => ({
@@ -78,6 +78,16 @@ test("new guidance/add-evidence report strings carry no issuing language", () =>
 
 test("demonstration-data tag carries no issuing language", () => {
   assert.deepEqual(findLanguageViolations("Demonstration data"), []);
+});
+
+test("PCF disclaimer + card strings carry no issuing/forbidden language", () => {
+  const strings = [
+    PCF_DISCLAIMER,
+    "Cradle-to-gate footprint (screening-grade)",
+    "Source · tier",
+    "Excluded from the total (no weight or no emission factor on file):",
+  ];
+  for (const s of strings) assert.deepEqual(findLanguageViolations(s), [], `violation in: ${s}`);
 });
 
 test("obligation-calendar report strings carry no issuing language", () => {

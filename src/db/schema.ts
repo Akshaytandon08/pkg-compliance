@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  doublePrecision,
   foreignKey,
   integer,
   jsonb,
@@ -242,6 +243,9 @@ export type AssessmentContextRecord = {
   persona: string;
   declared_reusable: boolean;
   legal_role_facts: LegalRoleFacts;
+  // Optional inbound (supplier → point of placing) transport leg for the
+  // screening-grade PCF. Absent = the footprint reports material production only.
+  inbound_transport?: { mode: string; km: number } | null;
 };
 
 export const assessments = pgTable("assessments", {
@@ -293,4 +297,29 @@ export const assessmentEvidence = pgTable("assessment_evidence", {
   scopeComponents: text("scope_components").array(),
   scopeMaterials: text("scope_materials").array(),
   scopeParameters: text("scope_parameters").array(),
+});
+
+// --- Emission factors (Sprint 3 / Stack D, screening-grade PCF) -----------
+// Reference data for the cradle-to-gate footprint: one factor per
+// (material, process). Material-production rows carry a per-kg factor; transport
+// rows a per-kg·km factor (unit column disambiguates). Every row records its
+// source, year, geography and data-quality tier so each figure on the report can
+// show its provenance. Seed rows are marked data_quality 'SEED-ESTIMATE' — a
+// clearly-labelled placeholder, never dressed up as an authoritative source.
+export const emissionFactors = pgTable("emission_factors", {
+  id: serial("id").primaryKey(),
+  // Material vocab (corrugated|plastic|wood|metal) for production rows, or
+  // 'transport' for a transport-mode row.
+  material: text("material").notNull(),
+  // 'production' for a material row; the mode (road|sea|air) for transport.
+  process: text("process").notNull(),
+  // Numeric factor; unit given by `unit` (never mix units in one column).
+  factor: doublePrecision("factor").notNull(),
+  unit: text("unit").notNull(), // 'kgCO2e/kg' | 'kgCO2e/kg.km'
+  source: text("source").notNull(),
+  year: integer("year").notNull(),
+  geography: text("geography").notNull(),
+  // Provenance tier: 'SEED-ESTIMATE' (placeholder) | 'secondary' | 'primary'.
+  dataQuality: text("data_quality").notNull(),
+  notes: text("notes"),
 });
