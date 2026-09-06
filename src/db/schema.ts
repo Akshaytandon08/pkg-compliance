@@ -11,6 +11,7 @@ import {
   serial,
   text,
   timestamp,
+  unique,
 } from "drizzle-orm/pg-core";
 
 // Checkpoints are versioned DATA, not code (brief §5). Every corpus change is a
@@ -323,3 +324,29 @@ export const emissionFactors = pgTable("emission_factors", {
   dataQuality: text("data_quality").notNull(),
   notes: text("notes"),
 });
+
+// --- Passports (Sprint 3 / Stack C, public tier) --------------------------
+// A shareable public snapshot of an assessment's PUBLIC tier (pack name, material
+// summary, verdict counts, corpus version, PCF summary — never per-checkpoint
+// detail or evidence). Addressed by an unguessable `token` (NOT the assessment
+// id), stable across versions so a printed QR keeps working. Each regeneration
+// after a data change appends a new version, chained by prev_hash → a simple
+// tamper-evident hash-chain (no blockchain). `content_hash` is over the DATA
+// payload only (not the timestamp), so regenerating unchanged data is a no-op.
+export const passports = pgTable(
+  "passports",
+  {
+    id: serial("id").primaryKey(),
+    assessmentId: integer("assessment_id")
+      .notNull()
+      .references(() => assessments.id, { onDelete: "cascade" }),
+    token: text("token").notNull(), // stable across versions; public URL segment
+    version: integer("version").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    contentHash: text("content_hash").notNull(),
+    prevHash: text("prev_hash"), // chains to the prior version's content_hash
+    changelog: text("changelog"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique("passports_token_version_uq").on(t.token, t.version)],
+);

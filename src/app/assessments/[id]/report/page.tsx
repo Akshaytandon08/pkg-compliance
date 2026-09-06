@@ -10,6 +10,7 @@ import { buildObligationCalendar } from "@/lib/report/obligations";
 import { describeDeltaAction, describeRequirement } from "@/lib/report/deltaActions";
 import { DEMO_DATA_LABEL, PCF_DISCLAIMER, SCREENING_DISCLAIMER } from "@/lib/report/language";
 import { AddEvidenceForm } from "./AddEvidenceForm";
+import { GeneratePassport } from "./GeneratePassport";
 
 function evidenceTypesOf(card: CheckpointCard): string[] {
   return [...new Set((card.evidenceRequirements.allOf ?? []).flatMap((c) => c.anyOf))];
@@ -386,6 +387,9 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
 
       {/* Screening-grade cradle-to-gate footprint (Stack D) */}
       <FootprintCard footprint={footprint} />
+
+      {/* Public passport (Stack C) */}
+      <GeneratePassport assessmentId={assessment.id} />
 
       {/* Caveats — visibly distinct, not errors */}
       {report.caveats.length > 0 && (

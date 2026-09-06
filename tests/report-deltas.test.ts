@@ -90,6 +90,21 @@ test("PCF disclaimer + card strings carry no issuing/forbidden language", () => 
   for (const s of strings) assert.deepEqual(findLanguageViolations(s), [], `violation in: ${s}`);
 });
 
+test("passport strings carry no issuing/forbidden language", () => {
+  const strings = [
+    "Packaging compliance passport",
+    "Public passport",
+    "Cradle-to-gate footprint",
+    "A shareable public-tier page (material summary, verdict counts, footprint) — no evidence, no per-checkpoint detail. The link is unguessable; regenerating after a data change adds a new hash-chained version.",
+    "Integrity",
+    "Content hash:",
+    "Previous version hash:",
+    "Generate passport",
+    "Regenerate passport",
+  ];
+  for (const s of strings) assert.deepEqual(findLanguageViolations(s), [], `violation in: ${s}`);
+});
+
 test("obligation-calendar report strings carry no issuing language", () => {
   const strings = [
     "Compliance calendar",
