@@ -7,13 +7,36 @@ import { loadEmissionFactors } from "./factors.ts";
 import { evaluatePack } from "../lib/engine/pack.ts";
 import { computePackFootprint } from "../lib/engine/pcf.ts";
 
-// The PUBLIC tier of an assessment — the only thing a passport ever exposes.
-// Pack name (the title), an aggregate material summary, verdict COUNTS (never
-// per-checkpoint detail), corpus version, and a PCF summary. No evidence, no
-// component names, no client identifiers beyond the pack title. Counts come from
-// the pinned in-force corpus, so nothing from a draft/contested checkpoint can
-// appear here.
+// The PUBLIC tier of an assessment (disclosure model v2). The rule set is public
+// law, so the passport now shows WHICH rules are met, per checkpoint: id, the
+// plain-language requirement, the verdict, a reason category, and the primary
+// legal citation. Counts come from the pinned in-force corpus, so nothing from a
+// draft/contested checkpoint appears.
+//
+// STAYS GATED (report only, never here): evidence document references,
+// supplier/sourced-from identities, assessor risk-annotation rationale, component
+// weights and full BOM composition, delta-action wording. The material summary is
+// aggregate only ("corrugated ×3"); per-checkpoint rows are aggregated across
+// components so no component identity leaks.
+export type PassportReasonCategory =
+  | "Evidence complete"
+  | "Evidence pending"
+  | "Test required"
+  | "Design non-compliant"
+  | "Not applicable";
+
+export type PassportCheckpoint = {
+  checkpointId: string;
+  version: number;
+  requirement: string; // plain-language requirement text (public law)
+  verdict: "qualified" | "conditional" | "gap" | "not_applicable";
+  reasonCategory: PassportReasonCategory;
+  citationText: string;
+  citationUrl: string | null;
+};
+
 export type PassportPayload = {
+  disclosureModel: "v2";
   packName: string;
   corpusVersion: string;
   asOf: string;
@@ -21,8 +44,29 @@ export type PassportPayload = {
   materialComposition: { material: string; componentCount: number }[];
   counts: { qualified: number; conditional: number; gap: number; not_applicable: number; caveat: number };
   overallVerdict: string;
+  checkpoints: PassportCheckpoint[];
   pcf: { totalKgCo2e: number; unit: string; resolvedComponents: number; unresolvedComponents: number };
 };
+
+const VERDICT_RANK: Record<string, number> = { not_applicable: 0, qualified: 1, conditional: 2, gap: 3 };
+
+const REASON_CATEGORY: Record<string, PassportReasonCategory> = {
+  EVIDENCE_COMPLETE: "Evidence complete",
+  EVIDENCE_ABSENT: "Evidence pending",
+  EVIDENCE_INCOMPLETE: "Evidence pending",
+  EVIDENCE_EXPIRED: "Evidence pending",
+  TEST_REQUIRED: "Test required",
+  DESIGN_NONCOMPLIANT: "Design non-compliant",
+  NOT_APPLICABLE_SCOPE: "Not applicable",
+};
+
+// Split "pinpoint. https://…" into display text + primary-source URL.
+function splitCitation(citation: string): { text: string; url: string | null } {
+  const m = citation.match(/https?:\/\/\S+/);
+  const url = m ? m[0].replace(/[.,;]$/, "") : null;
+  const text = citation.replace(/https?:\/\/\S+/, "").replace(/\.?\s*$/, "").trim();
+  return { text, url };
+}
 
 export async function buildPassportPayload(assessment: LoadedAssessment): Promise<PassportPayload> {
   const corpus = await loadCorpusAsOf(assessment.corpusVersion); // in_force only — no drafts
@@ -54,8 +98,46 @@ export async function buildPassportPayload(assessment: LoadedAssessment): Promis
     .map(([material, componentCount]) => ({ material, componentCount }))
     .sort((a, b) => a.material.localeCompare(b.material));
 
+  // Per-checkpoint public detail. A component-subject checkpoint yields one card
+  // per component; aggregate them into a single row (worst verdict) so no
+  // component identity leaks. Caveat cards (no verdict) are omitted.
+  const grouped = new Map<string, { requirement: string; citation: string; version: number; worst: { verdict: string; reasonCode: string } }>();
+  const allCards = [
+    ...report.componentSections.flatMap((s) => s.cards),
+    ...report.packagingUnit,
+    ...report.organisation,
+  ];
+  for (const card of allCards) {
+    const outcome = card.outcome;
+    if (!outcome) continue;
+    const verdict = outcome.disposition === "not_applicable" ? "not_applicable" : outcome.verdict;
+    if (!verdict) continue; // caveat / no verdict — not disclosed as a rule result
+    const key = `${card.checkpointId}@${card.version}`;
+    const existing = grouped.get(key);
+    if (!existing) {
+      grouped.set(key, { requirement: card.requirementText, citation: card.citation, version: card.version, worst: { verdict, reasonCode: outcome.reasonCode } });
+    } else if (VERDICT_RANK[verdict] > VERDICT_RANK[existing.worst.verdict]) {
+      existing.worst = { verdict, reasonCode: outcome.reasonCode };
+    }
+  }
+  const checkpoints: PassportCheckpoint[] = [...grouped.entries()]
+    .map(([key, g]) => {
+      const { text, url } = splitCitation(g.citation);
+      return {
+        checkpointId: key.split("@")[0],
+        version: g.version,
+        requirement: g.requirement,
+        verdict: g.worst.verdict as PassportCheckpoint["verdict"],
+        reasonCategory: REASON_CATEGORY[g.worst.reasonCode] ?? "Evidence pending",
+        citationText: text,
+        citationUrl: url,
+      };
+    })
+    .sort((a, b) => VERDICT_RANK[b.verdict] - VERDICT_RANK[a.verdict] || a.checkpointId.localeCompare(b.checkpointId));
+
   const resolved = footprint.components.filter((c) => c.kgCo2e != null).length;
   return {
+    disclosureModel: "v2",
     packName: assessment.packName,
     corpusVersion: assessment.corpusVersion,
     asOf: assessment.asOf,
@@ -63,6 +145,7 @@ export async function buildPassportPayload(assessment: LoadedAssessment): Promis
     materialComposition,
     counts: report.counts,
     overallVerdict: report.overall.verdict,
+    checkpoints,
     pcf: {
       // Rounded to 3 sig figs so float noise never perturbs the content hash.
       totalKgCo2e: Number(footprint.totalKgCo2e.toPrecision(3)),
@@ -88,6 +171,11 @@ export function passportContentHash(payload: PassportPayload): string {
 }
 
 function describeChange(prev: PassportPayload, next: PassportPayload): string {
+  // A disclosure-model change is the headline when it happens (e.g. v1 → v2,
+  // which adds per-checkpoint detail).
+  if (prev.disclosureModel !== next.disclosureModel) {
+    return `Disclosure model ${next.disclosureModel} — per-checkpoint detail added.`;
+  }
   const bits: string[] = [];
   const c1 = prev.counts, c2 = next.counts;
   if (c1.qualified !== c2.qualified || c1.conditional !== c2.conditional || c1.gap !== c2.gap)

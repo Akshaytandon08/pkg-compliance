@@ -65,13 +65,15 @@ after(async () => {
 
 test("content hash is order-independent (canonical)", dbRequired, () => {
   const a = {
+    disclosureModel: "v2" as const,
     packName: "P", corpusVersion: "batch-1", asOf: "2026-08-12", demo: true,
     materialComposition: [{ material: "corrugated", componentCount: 1 }],
     counts: { qualified: 1, conditional: 0, gap: 0, not_applicable: 0, caveat: 0 },
     overallVerdict: "qualified",
+    checkpoints: [],
     pcf: { totalKgCo2e: 1.23, unit: "kg CO2e", resolvedComponents: 1, unresolvedComponents: 0 },
   };
-  const b = { pcf: a.pcf, overallVerdict: a.overallVerdict, counts: a.counts, materialComposition: a.materialComposition, demo: a.demo, asOf: a.asOf, corpusVersion: a.corpusVersion, packName: a.packName };
+  const b = { pcf: a.pcf, checkpoints: a.checkpoints, overallVerdict: a.overallVerdict, counts: a.counts, materialComposition: a.materialComposition, demo: a.demo, asOf: a.asOf, corpusVersion: a.corpusVersion, packName: a.packName, disclosureModel: a.disclosureModel };
   assert.equal(P!.passportContentHash(a), P!.passportContentHash(b));
 });
 
@@ -109,12 +111,24 @@ test("generate → v1 (unguessable token), idempotent, new hash-chained version 
   assert.equal(loaded!.prevHash, r1.contentHash, "prev_hash chains to the prior content hash");
   assert.ok(loaded!.changelog && loaded!.changelog.length > 0);
 
-  // Public payload carries no evidence / per-checkpoint / component-name detail.
-  const keys = Object.keys(loaded!.payload);
-  for (const forbidden of ["components", "evidence", "checkpoints", "cards", "documents"]) {
+  // Disclosure model v2: per-checkpoint detail is present...
+  const payload = loaded!.payload;
+  assert.equal(payload.disclosureModel, "v2");
+  assert.ok(Array.isArray(payload.checkpoints) && payload.checkpoints.length > 0, "checkpoints present");
+  for (const c of payload.checkpoints) {
+    assert.ok(c.checkpointId && c.requirement && c.verdict && c.reasonCategory, "checkpoint fields present");
+    assert.ok(["qualified", "conditional", "gap", "not_applicable"].includes(c.verdict));
+  }
+  // ...but NO gated field leaks. The seeded component is "Outer carton" and its
+  // evidence reference is "PASSPORT-TEST-sd"; neither may appear anywhere.
+  const blob = JSON.stringify(payload);
+  for (const secret of ["Outer carton", "PASSPORT-TEST-sd", "weightGrams", "riskRationale", "sourcedFrom"]) {
+    assert.ok(!blob.includes(secret), `payload must not leak "${secret}"`);
+  }
+  const keys = Object.keys(payload);
+  for (const forbidden of ["components", "evidence", "cards", "documents", "delta"]) {
     assert.ok(!keys.includes(forbidden), `payload must not expose "${forbidden}"`);
   }
-  assert.ok(keys.includes("counts") && keys.includes("materialComposition"));
 });
 
 test("unknown token resolves to null", dbRequired, async () => {

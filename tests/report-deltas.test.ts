@@ -101,6 +101,16 @@ test("passport strings carry no issuing/forbidden language", () => {
     "Previous version hash:",
     "Generate passport",
     "Regenerate passport",
+    // Disclosure model v2 (Commit B)
+    "Checkpoints",
+    "Every applicable rule with its verdict and primary legal citation. Evidence, supplier and component detail are not shown here.",
+    "primary source ↗",
+    "Evidence complete",
+    "Evidence pending",
+    "Test required",
+    "Design non-compliant",
+    "Not applicable",
+    "Disclosure model v2 — per-checkpoint detail added.",
   ];
   for (const s of strings) assert.deepEqual(findLanguageViolations(s), [], `violation in: ${s}`);
 });
