@@ -86,3 +86,18 @@ Brief §5 defines `threshold` as one structured object. PFAS (§6 facts ledger) 
 Fixtures use `<GEOGRAPHY>-<INSTRUMENT>-<slug>` — `EU-PPWR-heavy-metals`, `EU-EPR-producer-registration`, `INTL-ISPM15-heat-treatment`.
 
 Article numbers are deliberately **excluded** from IDs and live only in `citation`. Reasons: several article references are on the §6 re-verify list, so encoding them in IDs guarantees churn when verification corrects one; and duplicating the citation into the ID creates two sources of truth that can disagree. Cost: IDs are not self-citing, so a reader must join to `citation`.
+
+## 10. Validation-report controls (Batch 2 EU) — RESOLVED, implemented
+
+The Batch 2 EU validation report (§5) surfaced structured content that did not fit the existing columns without being flattened into `notes`/`requirement_text` (where it can't be rendered or queried). Added as **separate fields** (migration `0022`), all in the immutability trigger's frozen set; the approval gate is unchanged.
+
+Checkpoint-level:
+- **`later_of_condition`** (text) — the "…or N months after act X, whichever is later" phase-in clause; not a fixed `trigger_date`.
+- **`exemptions`** (JSONB `Exemption[]` = `{scope, basis_pinpoint}`) — scoped carve-outs, each separately citable, so the report can flag "subject to exemptions".
+- **`future_law_watch`** (text) — proposed/pending legislation to monitor; **never** treated as in force.
+- **`source_corroborating`** (URL) — a secondary corroborating source; **must not** be the primary `citation`.
+- **`confidence`** (enum `H|M|L`) — analyst confidence, **distinct from `status`** (a row can be in_force yet M, or draft yet H).
+
+Organisation-level (Stack B registration):
+- **`official_register`**, **`register_operator`**, **`producer_responsibility_organisation`** — THREE separate columns. A PRO (CITEO, CONAI…) is never a register; a DB CHECK (`checkpoints_register_not_pro`) plus a corpus test refuse a PRO value in `official_register`.
+- **`registration_threshold`** vs **`contribution_threshold`** (text, optional) — kept separate (the NL lesson): the threshold to *register* and the threshold to *contribute/report* can differ.
