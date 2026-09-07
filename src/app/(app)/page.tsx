@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { listAssessments } from "@/db/assessments";
+import { StatusChip } from "@/app/_components/StatusChip";
 
 // Reads live data — render on demand, never prerender a build-time snapshot.
 export const dynamic = "force-dynamic";
@@ -33,22 +34,22 @@ export default async function Home() {
         </div>
         <Link
           href="/assessments/new"
-          className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+          className="rounded-md bg-p600 px-3 py-1.5 text-sm font-medium text-white hover:bg-p700"
         >
           New assessment
         </Link>
       </div>
 
       {items.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-10 text-center dark:border-neutral-700 dark:bg-neutral-900">
-          <h2 className="text-sm font-semibold">No assessments yet</h2>
-          <p className="mx-auto mt-1 max-w-md text-sm text-neutral-500">
-            Create an assessment from a bill of materials and available evidence, or seed the
-            three demonstration packs with <code className="rounded bg-neutral-100 px-1 dark:bg-neutral-800">npm run seed:demo-suite</code>.
+        <div className="rounded-lg border border-dashed border-n300 bg-card p-10 text-center">
+          <h2 className="text-sm font-semibold text-n800">Start your first screening</h2>
+          <p className="mx-auto mt-1 max-w-md text-sm text-n500">
+            Create an assessment from a pack&apos;s bill of materials and its available evidence. To
+            walk through the tool first, seed three demonstration packs with <code className="rounded bg-n50 px-1">npm run seed:demo-suite</code>.
           </p>
           <Link
             href="/assessments/new"
-            className="mt-4 inline-block rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900"
+            className="mt-4 inline-block rounded-md bg-p600 px-3 py-1.5 text-sm font-medium text-white hover:bg-p700"
           >
             New assessment
           </Link>
@@ -71,9 +72,7 @@ export default async function Home() {
                   <td className="px-4 py-3 font-medium">
                     {a.packName}
                     {a.demo && (
-                      <span className="ml-2 rounded-full border border-purple-300 bg-purple-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-purple-800 dark:border-purple-800 dark:bg-purple-950/50 dark:text-purple-200">
-                        Demo
-                      </span>
+                      <span className="ml-2 inline-block align-middle"><StatusChip status="demo" label="Demo" /></span>
                     )}
                   </td>
                   <td className="px-4 py-3">

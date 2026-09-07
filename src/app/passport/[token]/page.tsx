@@ -1,28 +1,34 @@
 import { notFound } from "next/navigation";
 import { getPassportByToken } from "@/db/passport";
-import { DEMO_DATA_LABEL, PCF_DISCLAIMER, SCREENING_DISCLAIMER } from "@/lib/report/language";
+import { PCF_DISCLAIMER, SCREENING_DISCLAIMER } from "@/lib/report/language";
+import { StatusChip, toChipStatus } from "@/app/_components/StatusChip";
 
 // Public tier — reached without the access gate (see src/proxy.ts). Renders only
 // the passport payload, which by construction carries no evidence, no
 // per-checkpoint detail, and nothing from a draft/contested checkpoint.
 export const dynamic = "force-dynamic";
 
-const VERDICT_STYLE: Record<string, string> = {
-  qualified: "bg-emerald-100 text-emerald-800",
-  conditional: "bg-amber-100 text-amber-800",
-  gap: "bg-red-100 text-red-800",
-  pending: "bg-neutral-100 text-neutral-600",
-  not_applicable: "bg-neutral-100 text-neutral-600",
-};
-
-function Count({ n, label }: { n: number; label: string }) {
-  return (
-    <div className="rounded-md border border-neutral-200 bg-white px-3 py-2 text-center">
+function Count({ n, label, href }: { n: number; label: string; href?: string }) {
+  const body = (
+    <>
       <div className="text-lg font-semibold">{n}</div>
       <div className="text-xs text-neutral-500">{label}</div>
-    </div>
+    </>
+  );
+  const cls = "block rounded-md border border-neutral-200 bg-white px-3 py-2 text-center";
+  return href ? (
+    <a href={href} className={`${cls} hover:border-neutral-400`}>{body}</a>
+  ) : (
+    <div className={cls}>{body}</div>
   );
 }
+
+const VERDICT_GROUPS: { verdict: string; label: string }[] = [
+  { verdict: "qualified", label: "Qualified" },
+  { verdict: "conditional", label: "Conditional" },
+  { verdict: "gap", label: "Gap" },
+  { verdict: "not_applicable", label: "Not applicable" },
+];
 
 export default async function PassportPage({ params }: PageProps<"/passport/[token]">) {
   const { token } = await params;
@@ -31,6 +37,8 @@ export default async function PassportPage({ params }: PageProps<"/passport/[tok
 
   const p = passport.payload;
   const composition = p.materialComposition.map((m) => `${m.material} ×${m.componentCount}`).join(", ");
+  // A passport minted before disclosure model v2 has no checkpoints array.
+  const checkpoints = p.checkpoints ?? [];
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
@@ -41,14 +49,8 @@ export default async function PassportPage({ params }: PageProps<"/passport/[tok
             <h1 className="mt-0.5 text-xl font-semibold tracking-tight">{p.packName}</h1>
           </div>
           <div className="flex items-center gap-2">
-            {p.demo && (
-              <span className="rounded-full border border-purple-300 bg-purple-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-purple-800">
-                {DEMO_DATA_LABEL}
-              </span>
-            )}
-            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${VERDICT_STYLE[p.overallVerdict] ?? VERDICT_STYLE.not_applicable}`}>
-              {p.overallVerdict.replace(/_/g, " ")}
-            </span>
+            {p.demo && <StatusChip status="demo" />}
+            <StatusChip status={toChipStatus(p.overallVerdict)} />
           </div>
         </div>
         <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-neutral-500">
@@ -62,11 +64,60 @@ export default async function PassportPage({ params }: PageProps<"/passport/[tok
       </div>
 
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-        <Count n={p.counts.qualified} label="Qualified" />
-        <Count n={p.counts.conditional} label="Conditional" />
-        <Count n={p.counts.gap} label="Gap" />
-        <Count n={p.counts.not_applicable} label="N/A" />
+        <Count n={p.counts.qualified} label="Qualified" href="#cp-qualified" />
+        <Count n={p.counts.conditional} label="Conditional" href="#cp-conditional" />
+        <Count n={p.counts.gap} label="Gap" href="#cp-gap" />
+        <Count n={p.counts.not_applicable} label="N/A" href="#cp-not_applicable" />
         <Count n={p.counts.caveat} label="Caveats" />
+      </div>
+
+      {/* Per-checkpoint public detail (disclosure model v2). The rule set is
+          public law: showing which rules are met removes doubt. */}
+      <div className="rounded-lg border border-neutral-200 bg-white p-5">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Checkpoints</h2>
+        <p className="mt-1 text-xs text-neutral-500">
+          Every applicable rule with its verdict and primary legal citation. Evidence, supplier and
+          component detail are not shown here.
+        </p>
+        <div className="mt-3 space-y-5">
+          {VERDICT_GROUPS.map(({ verdict, label }) => {
+            const rows = checkpoints.filter((c) => c.verdict === verdict);
+            if (rows.length === 0) return <div key={verdict} id={`cp-${verdict}`} className="scroll-mt-4" />;
+            return (
+              <div key={verdict} id={`cp-${verdict}`} className="scroll-mt-4">
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+                  {label} ({rows.length})
+                </h3>
+                <ul className="space-y-2">
+                  {rows.map((c) => (
+                    <li key={`${c.checkpointId}-${c.version}`} className="rounded-md border border-neutral-100 p-3">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <p className="font-mono text-xs text-neutral-500">{c.checkpointId}@{c.version}</p>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-neutral-500">{c.reasonCategory}</span>
+                          <StatusChip status={toChipStatus(c.verdict)} label={c.verdict.replace(/_/g, " ")} />
+                        </div>
+                      </div>
+                      <p className="mt-1 text-sm text-neutral-700">{c.requirement}</p>
+                      <p className="mt-1 text-xs text-neutral-500">
+                        {c.citationText}
+                        {c.citationUrl && (
+                          <>
+                            {" "}
+                            <a href={c.citationUrl} target="_blank" rel="noreferrer" className="text-sky-700 hover:underline">
+                              primary source ↗
+                            </a>
+                          </>
+                        )}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
+        <p className="mt-4 border-t border-neutral-100 pt-3 text-xs text-neutral-400">Corpus version {p.corpusVersion}.</p>
       </div>
 
       <div className="rounded-lg border border-neutral-200 bg-white p-5">

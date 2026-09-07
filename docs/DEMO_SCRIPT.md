@@ -62,13 +62,18 @@ special case.
 **5 — The public passport.** Back on any report (the carton reads best), open the
 **Public passport** card and click **Generate passport**. A QR appears with an
 unguessable public link. Open it (or scan the QR): the `/passport/<token>` page is
-the **public tier** — pack name, material summary, verdict counts and the
-footprint total, with a "Demonstration data" tag — and shows a **content hash**
-and version. It carries *no* evidence and *no* per-checkpoint detail. Note two
-things: the passport URL works **without the login** (it is the public disclosure
-layer; everything else stays behind the access gate), and if you regenerate after
-changing the pack, it appends a **new hash-chained version** — the prior hash is
-recorded, so tampering is evident.
+the **public tier** — pack name, aggregate material summary, verdict counts and
+the footprint total, with a "Demonstration data" tag. The verdict count cards are
+anchors: click **Qualified** to jump to the checkpoints that passed. The
+**Checkpoints** section is the point to land on — every applicable rule with its
+id, plain-language requirement, verdict, reason category and a link to the primary
+law. The rule set is public law, so showing which rules are met removes doubt.
+What is **not** here (report only, behind the gate): evidence documents, supplier
+and sourced-from identities, the risk-annotation rationale, component weights and
+the full BOM, and the delta-action wording. Note two things: the passport URL
+works **without the login** (public disclosure layer; everything else stays gated),
+and regenerating after a data change appends a **new hash-chained version** — the
+prior hash is recorded, so tampering is evident.
 
 Close on: every verdict is deterministic (no LLM decides pass/fail), every
 checkpoint cites primary law, the footprint is a labelled screening estimate, and

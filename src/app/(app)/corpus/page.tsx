@@ -1,4 +1,5 @@
 import { loadCorpus } from "@/db/assessments";
+import { Breadcrumbs } from "@/app/_components/Breadcrumbs";
 import type { ProductionCheckpoint } from "@/lib/engine/pack";
 
 // Reads live corpus — render on demand, never prerender a build-time snapshot.
@@ -113,6 +114,7 @@ export default async function CorpusPage() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumbs items={[{ label: "Corpus" }]} />
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Corpus</h1>
         <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">
