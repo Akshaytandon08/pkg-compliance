@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getPassportByToken } from "@/db/passport";
 import { PCF_DISCLAIMER, SCREENING_DISCLAIMER } from "@/lib/report/language";
 import { StatusChip, toChipStatus } from "@/app/_components/StatusChip";
+import { Wordmark } from "@/app/_components/Wordmark";
 
 // Public tier — reached without the access gate (see src/proxy.ts). Renders only
 // the passport payload, which by construction carries no evidence, no
@@ -42,16 +43,18 @@ export default async function PassportPage({ params }: PageProps<"/passport/[tok
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
+      {/* Minimal public shell — full-colour logo on white, no app navigation. */}
+      <div className="flex items-center justify-between">
+        <Wordmark />
+        {p.demo && <StatusChip status="demo" />}
+      </div>
       <div className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Packaging compliance passport</p>
             <h1 className="mt-0.5 text-xl font-semibold tracking-tight">{p.packName}</h1>
           </div>
-          <div className="flex items-center gap-2">
-            {p.demo && <StatusChip status="demo" />}
-            <StatusChip status={toChipStatus(p.overallVerdict)} />
-          </div>
+          <StatusChip status={toChipStatus(p.overallVerdict)} />
         </div>
         <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-neutral-500">
           <div>Materials: <span className="font-medium text-neutral-700">{composition || "—"}</span></div>
