@@ -162,6 +162,13 @@
       "when": 1788789850488,
       "tag": "0022_validation-report-controls",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1788789851488,
+      "tag": "0023_batch2-eu-validated",
+      "breakpoints": true
     }
   ]
 }
