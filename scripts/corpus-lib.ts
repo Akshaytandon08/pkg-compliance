@@ -59,6 +59,7 @@ const DEFAULT_PRIMARY_DOMAINS = [
   "cpcb.nic.in",
   "cpcb.gov.in", // CPCB EPR portal (eprplastic.cpcb.gov.in)
   "moef.gov.in", // India Ministry of Environment, Forest and Climate Change
+  "pib.gov.in", // Government of India — official gazette text of G.S.R. 571(E) (PWM thickness/SUP)
   // National legislative gazettes/codes — the primary citation for the Batch 2
   // EU Member-State layer (validation report).
   "legifrance.gouv.fr", // France
