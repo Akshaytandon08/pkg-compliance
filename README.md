@@ -28,6 +28,13 @@ Postgres runs on host port **5433** (5432 is taken by `asset-directory-db` local
 - `npm test` — golden fixtures, verdict rule table, output-language guardrail; database tests skip when no DB is reachable
 - `npm run db:generate` — generate a migration after editing `src/db/schema.ts`
 
+### Continuous integration
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push to `main` and every pull request: `npm ci` → **from-zero migration chain** against a Postgres 16 service container (`npm run db:migrate` on an empty DB — a broken or out-of-order migration fails here) → `npm run check` (with the DB reachable, so the DB-integration tests run) → `next build`. It never invokes corpus approval tooling.
+
+**Require the check on `main` (owner, GitHub UI — one-time):**
+`GitHub repo → Settings → Branches → Branch protection rules → Add branch protection rule` → Branch name pattern `main` → tick **Require status checks to pass before merging** (and optionally *Require branches to be up to date before merging*) → in the status-checks search box add **`build-test`** (the CI job) → **Create / Save changes**. On newer GitHub the equivalent lives under `Settings → Rules → Rulesets`. This setting can only be applied by a repository admin in the UI; it is not something the repo can enable for itself.
+
 Corpus (checkpoint) changes require regulatory-owner sign-off. This is enforced, not requested: checkpoints insert as `draft`, and only an approval record in `checkpoint_approvals` permits `in_force` — the evaluator refuses to produce a verdict from anything else. See [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) and [docs/SCHEMA_DELTAS.md](docs/SCHEMA_DELTAS.md).
 
 ## UI, brand & navigation
