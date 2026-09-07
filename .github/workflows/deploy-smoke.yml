@@ -1,0 +1,25 @@
+name: Post-deploy smoke
+
+# Fires when a deployment reports a status (Vercel posts these to GitHub). We act
+# only on a SUCCESSFUL PRODUCTION deployment, then smoke-test /api/health against
+# the production alias and fail on anything but {status:ok, database:connected}.
+on:
+  deployment_status:
+
+jobs:
+  smoke:
+    if: >-
+      github.event.deployment_status.state == 'success' &&
+      github.event.deployment_status.environment == 'Production'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24 # native TS stripping for node scripts/smoke.ts
+      # Prefer the stable production alias (repo variable PRODUCTION_URL); fall
+      # back to the deployment's own URL. The target must be publicly reachable
+      # (Vercel Deployment Protection off, or a bypass) or /api/health returns an
+      # interstitial page and the smoke fails — which is the point.
+      - name: Smoke /api/health (production)
+        run: node scripts/smoke.ts "${{ vars.PRODUCTION_URL || github.event.deployment_status.environment_url }}"

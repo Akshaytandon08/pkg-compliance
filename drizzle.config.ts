@@ -1,4 +1,5 @@
 import { defineConfig } from "drizzle-kit";
+import { resolveDatabaseUrl } from "./src/db/database-url.ts";
 
 try {
   process.loadEnvFile(".env");
@@ -11,6 +12,8 @@ export default defineConfig({
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? "",
+    // Same resolver as the runtime: on a Vercel preview build this migrates the
+    // PREVIEW database, never production.
+    url: resolveDatabaseUrl(),
   },
 });
