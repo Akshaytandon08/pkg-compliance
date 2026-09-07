@@ -37,6 +37,9 @@ const checkpoint = (status: ProductionCheckpoint["status"]): ProductionCheckpoin
   sunsetDate: null,
   testMethod: null,
   notes: null,
+  confidence: null,
+  laterOfCondition: null,
+  exemptions: null,
 });
 
 const run = (status: ProductionCheckpoint["status"]) =>

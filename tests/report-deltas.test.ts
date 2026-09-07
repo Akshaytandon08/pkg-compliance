@@ -15,6 +15,9 @@ const card = (overrides: Partial<CheckpointCard>): CheckpointCard => ({
   testMethod: null,
   evidenceRequirements: { allOf: [{ anyOf: ["conformity_declaration"] }] },
   outcome: { disposition: "verdict", verdict: "conditional", risk: "low", reasonCode: "EVIDENCE_ABSENT", evidenceState: "absent" },
+  confidence: null,
+  laterOfCondition: null,
+  exemptions: null,
   ...overrides,
 });
 
@@ -111,6 +114,20 @@ test("passport strings carry no issuing/forbidden language", () => {
     "Design non-compliant",
     "Not applicable",
     "Disclosure model v2 — per-checkpoint detail added.",
+  ];
+  for (const s of strings) assert.deepEqual(findLanguageViolations(s), [], `violation in: ${s}`);
+});
+
+test("validation-report field strings carry no issuing language", () => {
+  const strings = [
+    "Confidence", "High", "Medium", "Low", "Phase-in",
+    "Subject to exemptions (7):",
+    "Subject to exemptions",
+    "Recycled content that would conflict with food-contact or health-and-safety requirements",
+    "Plastic parts each representing less than 5% of the total weight of the packaging unit",
+    "national transposition status per Member State (Directive (EU) 2024/825)",
+    "SYDEREP - ADEME producer register (unique identifier, IDU)",
+    "packaging-specific RENAP endpoint status (D.M. 144/2024 implementation)",
   ];
   for (const s of strings) assert.deepEqual(findLanguageViolations(s), [], `violation in: ${s}`);
 });

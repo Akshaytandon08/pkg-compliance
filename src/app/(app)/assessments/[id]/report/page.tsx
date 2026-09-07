@@ -170,7 +170,29 @@ function VerdictCard({
           <dt className="font-medium">Citation</dt>
           <dd className="truncate">{card.citation.split(". http")[0]}</dd>
         </div>
+        {card.confidence && (
+          <div className="flex gap-2">
+            <dt className="font-medium">Confidence</dt>
+            <dd>{card.confidence === "H" ? "High" : card.confidence === "M" ? "Medium" : "Low"}</dd>
+          </div>
+        )}
+        {card.laterOfCondition && (
+          <div className="flex gap-2">
+            <dt className="font-medium">Phase-in</dt>
+            <dd>{card.laterOfCondition}</dd>
+          </div>
+        )}
       </dl>
+      {card.exemptions && card.exemptions.length > 0 && (
+        <div className="mt-2 rounded bg-sky-50 px-3 py-2 text-xs text-sky-900 dark:bg-sky-950/30 dark:text-sky-200">
+          <span className="font-semibold">Subject to exemptions ({card.exemptions.length}):</span>
+          <ul className="ml-4 mt-1 list-disc">
+            {card.exemptions.map((e, i) => (
+              <li key={i}>{e.scope} <span className="text-sky-700 dark:text-sky-300">({e.basis_pinpoint})</span></li>
+            ))}
+          </ul>
+        </div>
+      )}
       {outcome.reasonCode === "TEST_REQUIRED" && rationale && (
         <p className="mt-2 rounded bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
           <span className="font-semibold">Assessor rationale (at risk): </span>

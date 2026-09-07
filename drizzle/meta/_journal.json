@@ -169,6 +169,20 @@
       "when": 1788789851488,
       "tag": "0023_batch2-eu-validated",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1788789852488,
+      "tag": "0024_green-claims-transposition-watch",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1788789853488,
+      "tag": "0025_nl-operator-verpact",
+      "breakpoints": true
     }
   ]
 }

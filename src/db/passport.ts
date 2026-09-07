@@ -33,6 +33,10 @@ export type PassportCheckpoint = {
   reasonCategory: PassportReasonCategory;
   citationText: string;
   citationUrl: string | null;
+  // Public tier: confidence + citation only. Exemptions are flagged, never
+  // detailed (the carve-out detail stays on the gated report).
+  confidence: "H" | "M" | "L" | null;
+  subjectToExemptions: boolean;
 };
 
 export type PassportPayload = {
@@ -101,7 +105,7 @@ export async function buildPassportPayload(assessment: LoadedAssessment): Promis
   // Per-checkpoint public detail. A component-subject checkpoint yields one card
   // per component; aggregate them into a single row (worst verdict) so no
   // component identity leaks. Caveat cards (no verdict) are omitted.
-  const grouped = new Map<string, { requirement: string; citation: string; version: number; worst: { verdict: string; reasonCode: string } }>();
+  const grouped = new Map<string, { requirement: string; citation: string; version: number; worst: { verdict: string; reasonCode: string }; confidence: "H" | "M" | "L" | null; subjectToExemptions: boolean }>();
   const allCards = [
     ...report.componentSections.flatMap((s) => s.cards),
     ...report.packagingUnit,
@@ -115,7 +119,14 @@ export async function buildPassportPayload(assessment: LoadedAssessment): Promis
     const key = `${card.checkpointId}@${card.version}`;
     const existing = grouped.get(key);
     if (!existing) {
-      grouped.set(key, { requirement: card.requirementText, citation: card.citation, version: card.version, worst: { verdict, reasonCode: outcome.reasonCode } });
+      grouped.set(key, {
+        requirement: card.requirementText,
+        citation: card.citation,
+        version: card.version,
+        worst: { verdict, reasonCode: outcome.reasonCode },
+        confidence: card.confidence,
+        subjectToExemptions: !!(card.exemptions && card.exemptions.length > 0),
+      });
     } else if (VERDICT_RANK[verdict] > VERDICT_RANK[existing.worst.verdict]) {
       existing.worst = { verdict, reasonCode: outcome.reasonCode };
     }
@@ -131,6 +142,8 @@ export async function buildPassportPayload(assessment: LoadedAssessment): Promis
         reasonCategory: REASON_CATEGORY[g.worst.reasonCode] ?? "Evidence pending",
         citationText: text,
         citationUrl: url,
+        confidence: g.confidence,
+        subjectToExemptions: g.subjectToExemptions,
       };
     })
     .sort((a, b) => VERDICT_RANK[b.verdict] - VERDICT_RANK[a.verdict] || a.checkpointId.localeCompare(b.checkpointId));

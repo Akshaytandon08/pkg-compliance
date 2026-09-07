@@ -141,6 +141,14 @@ Live regulation moves; these are tracked so a checkpoint is not approved against
 - [x] **Commission PPWR FAQ, 2nd edition (DG ENV, Aug 2026).** Ingested — amendments applied to Batch 1 (migration 0009): heavy-metals/soc/PFAS test methods, DoC one-per-unit + MS language, no-transitional-stock softening + Article 71 pinpoint, tech-doc manufacturer-holds-file, FAQ role-derivation rules. FAQ recorded as interpretive only (notes), registered in [docs/regulatory-sources.md](docs/regulatory-sources.md). Rows stay draft; each still needs primary confirmation at approval.
 - [ ] **Authorised-representative suspension proposal (Commission, Dec 2025).** Would suspend the AR obligation to 2035 for EU-based companies only; pending, and does **not** affect non-EU producers (persona 2a). Affects `EU-EPR-producer-registration`. Track status; do not weaken the AR requirement for non-EU producers on the strength of a pending proposal.
 
+### `future_law_watch` items from the Batch 2 EU validation (draft rows; never treated as in force)
+
+These are recorded in the `future_law_watch` column and surface in `corpus:review`:
+
+- [ ] **IT — packaging-specific RENAP endpoint status (D.M. 144/2024 implementation).** `EU-MS-IT-epr-registration`. The RENAP register framework (art. 178-ter + D.M. 144/2024) is being stood up; confirm the packaging-specific registration endpoint before this row is approved.
+- [ ] **PL — proposed PPWR/EPR reform, not enacted.** `EU-MS-PL-epr-registration`. Poland's EPR/packaging reform is in draft; the current legal basis is the 2013 Act (Dz.U. 2026 poz. 619 consolidated). Do not encode the proposal until enacted.
+- [ ] **EU — green-claims national transposition status per Member State (Directive (EU) 2024/825).** `EU-green-claims-substantiation`. Enforcement is via national transposition from 27 Sep 2026; track each Member State's transposition before relying on the row in a given market.
+
 ## Deployment (pilot)
 
 Prepared (Commit "Deploy readiness"); execution needs a Vercel account + a managed Postgres instance.

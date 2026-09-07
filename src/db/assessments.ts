@@ -260,6 +260,9 @@ function toProductionCheckpoint(c: typeof checkpoints.$inferSelect): ProductionC
     sunsetDate: c.sunsetDate,
     testMethod: c.testMethod,
     notes: c.notes,
+    confidence: c.confidence,
+    laterOfCondition: c.laterOfCondition,
+    exemptions: c.exemptions,
   };
 }
 

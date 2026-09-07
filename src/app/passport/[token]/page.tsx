@@ -113,6 +113,10 @@ export default async function PassportPage({ params }: PageProps<"/passport/[tok
                           </>
                         )}
                       </p>
+                      <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-neutral-400">
+                        {c.confidence && <span>Confidence: {c.confidence === "H" ? "High" : c.confidence === "M" ? "Medium" : "Low"}</span>}
+                        {c.subjectToExemptions && <span>Subject to exemptions</span>}
+                      </div>
                     </li>
                   ))}
                 </ul>

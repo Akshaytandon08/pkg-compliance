@@ -4,7 +4,7 @@
 
 import { evaluability } from "../corpus/evaluability.ts";
 import type { CheckpointStatus } from "../corpus/evaluability.ts";
-import type { Threshold, EvidenceRequirement, Recurrence } from "../../db/schema.ts";
+import type { Threshold, EvidenceRequirement, Recurrence, Exemption } from "../../db/schema.ts";
 import {
   evaluateCheckpoint,
   type AssessmentContext,
@@ -32,6 +32,10 @@ export type ProductionCheckpoint = {
   sunsetDate: string | null;
   testMethod: string | null;
   notes: string | null;
+  // Validation-report controls (rendered on the report where present).
+  confidence: "H" | "M" | "L" | null;
+  laterOfCondition: string | null;
+  exemptions: Exemption[] | null;
 };
 
 export type ComponentInput = {
@@ -62,6 +66,9 @@ export type CheckpointCard = {
   componentName?: string;
   outcome: CheckpointOutcome | null; // null when the card is a caveat
   caveat?: CaveatInfo;
+  confidence: "H" | "M" | "L" | null;
+  laterOfCondition: string | null;
+  exemptions: Exemption[] | null;
 };
 
 export type PackReport = {
@@ -168,6 +175,9 @@ export function evaluatePack(input: EvaluatePackInput): PackReport {
     citation: cp.citation,
     testMethod: cp.testMethod,
     evidenceRequirements: cp.evidenceRequirements,
+    confidence: cp.confidence,
+    laterOfCondition: cp.laterOfCondition,
+    exemptions: cp.exemptions,
   });
 
   const tally = (outcome: CheckpointOutcome) => {
