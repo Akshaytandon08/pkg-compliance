@@ -28,6 +28,13 @@ Postgres runs on host port **5433** (5432 is taken by `asset-directory-db` local
 - `npm test` — golden fixtures, verdict rule table, output-language guardrail; database tests skip when no DB is reachable
 - `npm run db:generate` — generate a migration after editing `src/db/schema.ts`
 
+### Continuous integration
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push to `main` and every pull request: `npm ci` → **from-zero migration chain** against a Postgres 16 service container (`npm run db:migrate` on an empty DB — a broken or out-of-order migration fails here) → `npm run check` (with the DB reachable, so the DB-integration tests run) → `next build`. It never invokes corpus approval tooling.
+
+**Require the check on `main` (owner, GitHub UI — one-time):**
+`GitHub repo → Settings → Branches → Branch protection rules → Add branch protection rule` → Branch name pattern `main` → tick **Require status checks to pass before merging** (and optionally *Require branches to be up to date before merging*) → in the status-checks search box add **`build-test`** (the CI job) → **Create / Save changes**. On newer GitHub the equivalent lives under `Settings → Rules → Rulesets`. This setting can only be applied by a repository admin in the UI; it is not something the repo can enable for itself.
+
 Corpus (checkpoint) changes require regulatory-owner sign-off. This is enforced, not requested: checkpoints insert as `draft`, and only an approval record in `checkpoint_approvals` permits `in_force` — the evaluator refuses to produce a verdict from anything else. See [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) and [docs/SCHEMA_DELTAS.md](docs/SCHEMA_DELTAS.md).
 
 ## UI, brand & navigation
@@ -44,11 +51,16 @@ Target: **Vercel + managed Postgres** (Vercel Postgres, Neon, or Supabase — an
 
 **Environment variables** (set in the hosting dashboard):
 
-| Var | Purpose |
-|---|---|
-| `DATABASE_URL` | Managed Postgres connection string (Postgres 16). |
-| `BASIC_AUTH_USER`, `BASIC_AUTH_PASSWORD` | **Access gate.** When both are set, every route requires HTTP Basic Auth (`src/proxy.ts`) — client BOM data must not sit on an open URL. Leave unset only for local dev. **Exception:** the public passport tier `/passport/<token>` is deliberately ungated (see below). |
-| `ANTHROPIC_API_KEY` | Reserved for the extraction pipeline (not yet used). |
+| Var | Vercel scope | Purpose |
+|---|---|---|
+| `DATABASE_URL` | Production (+ Development) | Managed Postgres connection string (Postgres 16) — the **production** database. |
+| `PREVIEW_DATABASE_URL` | **Preview** | A **separate** Postgres 16 database for preview deployments. When `VERCEL_ENV=preview` (set automatically by Vercel), both migrations (`vercel-build`) and runtime use this instead of `DATABASE_URL`, so previews never read or migrate production (`src/db/database-url.ts`). If unset on a preview, the app warns and falls back to `DATABASE_URL` — set this to keep previews isolated. |
+| `BASIC_AUTH_USER`, `BASIC_AUTH_PASSWORD` | Production + Preview | **Access gate.** When both are set, every route requires HTTP Basic Auth (`src/proxy.ts`) — client BOM data must not sit on an open URL. Leave unset only for local dev. **Exception:** the public passport tier `/passport/<token>` is deliberately ungated (see below). |
+| `ANTHROPIC_API_KEY` | — | Reserved for the extraction pipeline (not yet used). |
+
+**Env-var mapping (Vercel → Settings → Environment Variables):** add `DATABASE_URL` scoped to *Production* (and *Development*), and `PREVIEW_DATABASE_URL` scoped to *Preview*. `VERCEL_ENV` is provided by Vercel automatically — no need to set it.
+
+**Post-deploy smoke.** [`.github/workflows/deploy-smoke.yml`](.github/workflows/deploy-smoke.yml) runs on a successful **Production** `deployment_status` and hits `/api/health` (`scripts/smoke.ts` / `npm run smoke -- <origin>`), failing on anything but `{status:"ok",database:"connected"}`. Set the repo variable **`PRODUCTION_URL`** (`Settings → Secrets and variables → Actions → Variables`) to the stable production alias; it falls back to the deployment's own URL. The target must be **publicly reachable** — if Vercel *Deployment Protection* is on, `/api/health` returns an auth interstitial and the smoke (correctly) fails, so turn protection off or add a bypass for the production alias.
 
 **Migrations are wired into deploy:** the `vercel-build` script runs `drizzle-kit migrate && next build`, so the hosted DB is migrated on every deployment. (Set the platform Build Command to `npm run vercel-build` if it is not auto-detected.)
 

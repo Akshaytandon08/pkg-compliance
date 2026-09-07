@@ -59,11 +59,42 @@ const DEFAULT_PRIMARY_DOMAINS = [
   "cpcb.nic.in",
   "cpcb.gov.in", // CPCB EPR portal (eprplastic.cpcb.gov.in)
   "moef.gov.in", // India Ministry of Environment, Forest and Climate Change
-  "legifrance.gouv.fr", // France — official legal texts (Batch 2 MS layer)
+  "pib.gov.in", // Government of India — official gazette text of G.S.R. 571(E) (PWM thickness/SUP)
+  // National legislative gazettes/codes — the primary citation for the Batch 2
+  // EU Member-State layer (validation report).
+  "legifrance.gouv.fr", // France
+  "gesetze-im-internet.de", // Germany
+  "boe.es", // Spain — Boletín Oficial del Estado
+  "gazzettaufficiale.it", // Italy — Gazzetta Ufficiale
+  "wetten.overheid.nl", // Netherlands — consolidated legislation
+  "officielebekendmakingen.nl", // Netherlands — official publications
+  "isap.sejm.gov.pl", // Poland — Internetowy System Aktów Prawnych
   // IPPC/FAO — primary source for ISPM standards (multi-regime checkpoints).
   "ippc.int",
   "fao.org",
 ];
+
+// Official register / PRO / guidance domains. These CORROBORATE a checkpoint but
+// are NOT legislation, so they may only ever be `source_corroborating` — never
+// the primary `citation`. Enforced by tests/db/citation-domains.
+const CORROBORATING_ONLY_DOMAINS = [
+  "verpackungsregister.org", // DE — LUCID/ZSVR
+  "ademe.fr", // FR — ADEME/SYDEREP
+  "miteco.gob.es", // ES — MITECO/RPP
+  "renap.gov.it", // IT — RENAP
+  "verpact.nl", // NL — Stichting Verpact
+  "bdo.mos.gov.pl", // PL — BDO
+];
+
+const hostMatches = (url: string, domains: string[]): boolean => {
+  let host: string;
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return domains.some((d) => host === d || host.endsWith(`.${d}`));
+};
 
 export function primaryDomains(): string[] {
   const extra = (process.env.CORPUS_PRIMARY_SOURCE_DOMAINS ?? "")
@@ -74,13 +105,12 @@ export function primaryDomains(): string[] {
 }
 
 export function isPrimarySourceUrl(url: string): boolean {
-  let host: string;
-  try {
-    host = new URL(url).hostname.toLowerCase();
-  } catch {
-    return false;
-  }
-  return primaryDomains().some((d) => host === d || host.endsWith(`.${d}`));
+  return hostMatches(url, primaryDomains());
+}
+
+/** A corroborating-only host (official register/PRO/guidance) — never a citation. */
+export function isCorroboratingOnlyUrl(url: string): boolean {
+  return hostMatches(url, CORROBORATING_ONLY_DOMAINS);
 }
 
 // --- Human-readable renderers for the review pass -------------------------

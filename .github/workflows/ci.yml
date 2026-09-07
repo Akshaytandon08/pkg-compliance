@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+
+    # Postgres 16 service — the same major as production. Used both to run the
+    # migration chain from zero and to let the DB-integration tests actually
+    # execute (they skip when no database is reachable).
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: pkg_compliance
+          POSTGRES_PASSWORD: pkg_compliance
+          POSTGRES_DB: pkg_compliance
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pkg_compliance"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # CI service maps 5432 (local dev uses 5433 to avoid a clash).
+      DATABASE_URL: postgres://pkg_compliance:pkg_compliance@localhost:5432/pkg_compliance
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24 # native TS stripping (node --test / node scripts/*.ts)
+          cache: npm
+
+      - run: npm ci
+
+      # From-zero migration chain test: apply EVERY migration in order against an
+      # empty Postgres 16. A broken or out-of-order migration fails the build.
+      - name: Migrate from zero (migration chain)
+        run: npm run db:migrate
+
+      # Lint + language tripwire + typegen + tsc + tests. With the migrated DB
+      # reachable, the DB-integration tests run rather than skip. Corpus approval
+      # tooling is NOT invoked — CI never approves/verifies/rejects.
+      - run: npm run check
+
+      - run: npm run build

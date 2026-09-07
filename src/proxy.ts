@@ -34,5 +34,5 @@ export function proxy(req: NextRequest) {
 // passport/ tier. Everything else — app routes and the passport authoring API —
 // stays gated.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|passport/).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|brand/|passport/).*)"],
 };

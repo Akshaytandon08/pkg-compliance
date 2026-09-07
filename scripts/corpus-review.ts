@@ -103,6 +103,14 @@ try {
     console.log(`    Applies:     ${renderAppliesWhen(r.appliesWhen)}`);
     console.log(`    Citation:    ${pinpoint || "(pinpoint blank — to be pinned at approval)"}`);
     console.log(`    Source:      ${url || "(none)"}`);
+    console.log(`    Confidence:  ${r.confidence ?? "— (not set)"}`);
+    if (r.laterOfCondition) console.log(`    Phase-in:    ${oneLiner(r.laterOfCondition, 180)}`);
+    if (r.exemptions && r.exemptions.length > 0)
+      console.log(`    Exemptions:  ${r.exemptions.length} — ${r.exemptions.map((e) => e.scope).join("; ").slice(0, 160)}`);
+    if (r.officialRegister)
+      console.log(`    Register:    ${r.officialRegister} (operator ${r.registerOperator ?? "—"}; PRO ${r.producerResponsibilityOrganisation ?? "—"})`);
+    if (r.sourceCorroborating) console.log(`    Corroborate: ${r.sourceCorroborating}`);
+    if (r.futureLawWatch) console.log(`    Watch:       ${oneLiner(r.futureLawWatch, 180)}`);
     if (r.notes) console.log(`    Notes:       ${oneLiner(r.notes, 200)}`);
   }
   console.log("");

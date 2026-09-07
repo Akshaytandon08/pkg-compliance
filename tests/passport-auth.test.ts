@@ -17,6 +17,9 @@ test("the public passport and its framework subresources are NOT gated", () => {
     "/_next/static/chunks/styles.css",
     "/_next/image",
     "/favicon.ico",
+    // Public brand assets — the logo the passport renders (no user data).
+    "/brand/fitsol-logo-full-colour.svg",
+    "/brand/fitsol-logo-white.svg",
   ]) {
     assert.equal(gated(path), false, `${path} must be bypassed (public / framework asset)`);
   }

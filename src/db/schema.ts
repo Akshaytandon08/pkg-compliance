@@ -1,5 +1,6 @@
 import {
   boolean,
+  check,
   date,
   doublePrecision,
   foreignKey,
@@ -13,6 +14,7 @@ import {
   timestamp,
   unique,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 // Checkpoints are versioned DATA, not code (brief §5). Every corpus change is a
 // migration-versioned commit approved by the regulatory owner.
@@ -38,6 +40,12 @@ export const checkpointSubjectEnum = pgEnum("checkpoint_subject", [
 // `draft` is the insert state. The ONLY path to `in_force` is an approval
 // record by the regulatory owner (enforced by DB trigger, see migration 0001).
 // The evaluator refuses to produce verdicts from anything not `in_force`.
+// Analyst/validation confidence in a checkpoint's encoding — DISTINCT from
+// `status` (which is the approval lifecycle). H|M|L. A row can be in_force yet
+// carry M confidence, or draft yet H. Set from the validation report, not the
+// approval gate.
+export const checkpointConfidenceEnum = pgEnum("checkpoint_confidence", ["H", "M", "L"]);
+
 export const checkpointStatusEnum = pgEnum("checkpoint_status", [
   "draft",
   "in_force",
@@ -84,6 +92,15 @@ export type Recurrence = {
   due?: string;
 };
 
+// A scoped exemption/exclusion from a requirement, with its own pinpoint (kept
+// separate from requirement_text so the report can flag "subject to exemptions"
+// and the analyst can cite each carve-out). New delta from the Batch 2 EU
+// validation report §5 — see docs/SCHEMA_DELTAS.md #10.
+export type Exemption = {
+  scope: string; // what is exempted / excluded
+  basis_pinpoint: string; // the article/paragraph granting it
+};
+
 export const checkpoints = pgTable(
   "checkpoints",
   {
@@ -127,8 +144,41 @@ export const checkpoints = pgTable(
     notes: text("notes"),
     // food_contact_only was collapsed into `applies_when` ({"food_contact":
     // true}) — a single applicability mechanism instead of a special-case flag.
+
+    // --- Batch 2 EU validation report §5 controls (SCHEMA_DELTAS #10) --------
+    // "...or N months after act X, whichever is later" phase-in clause, kept as
+    // its own field because it is not a fixed trigger_date.
+    laterOfCondition: text("later_of_condition"),
+    // Scoped carve-outs, each with its own pinpoint (Exemption[]).
+    exemptions: jsonb("exemptions").$type<Exemption[] | null>(),
+    // Proposed/pending legislation to monitor — NEVER treated as in force.
+    futureLawWatch: text("future_law_watch"),
+    // A secondary corroborating source URL (an official register/PRO/guidance
+    // page). MUST NOT be used as the primary `citation`.
+    sourceCorroborating: text("source_corroborating"),
+    // Analyst confidence, distinct from the approval status.
+    confidence: checkpointConfidenceEnum("confidence"),
+    // --- Organisation-level Stack B registration fields ---------------------
+    // The official statutory register (e.g. LUCID, SYDEREP), the body operating
+    // it (e.g. ZSVR, ADEME), and — SEPARATELY — the producer responsibility
+    // organisation / éco-organisme (e.g. CITEO, CONAI). A PRO is never a register:
+    // the CHECK below refuses the same value in official_register and PRO.
+    officialRegister: text("official_register"),
+    registerOperator: text("register_operator"),
+    producerResponsibilityOrganisation: text("producer_responsibility_organisation"),
+    // Kept separate (the NL lesson): a threshold to REGISTER vs a threshold to
+    // CONTRIBUTE/report can differ; conflating them mis-scopes obligations.
+    registrationThreshold: text("registration_threshold"),
+    contributionThreshold: text("contribution_threshold"),
   },
-  (t) => [primaryKey({ columns: [t.id, t.version] })],
+  (t) => [
+    primaryKey({ columns: [t.id, t.version] }),
+    // A PRO value must never be stored as the official register.
+    check(
+      "checkpoints_register_not_pro",
+      sql`${t.officialRegister} IS NULL OR ${t.producerResponsibilityOrganisation} IS NULL OR ${t.officialRegister} <> ${t.producerResponsibilityOrganisation}`,
+    ),
+  ],
 );
 
 // Approved corpus releases. Reports record the corpus version used, so any

@@ -29,6 +29,9 @@ const base: Omit<ProductionCheckpoint, "id" | "appliesWhen" | "recurrence"> = {
   sunsetDate: null,
   testMethod: null,
   notes: null,
+  confidence: null,
+  laterOfCondition: null,
+  exemptions: null,
 };
 
 const cp = (over: Partial<ProductionCheckpoint>): ProductionCheckpoint => ({ ...base, id: "x", appliesWhen: null, recurrence: null, ...over });
