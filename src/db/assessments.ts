@@ -168,6 +168,9 @@ export async function getAssessment(id: number): Promise<LoadedAssessment | null
           materials: e.scopeMaterials ?? undefined,
           parameters: e.scopeParameters ?? undefined,
         },
+        source: e.source === "extracted" ? "extracted" : "manual",
+        sourceDocumentId: e.documentId,
+        reference: e.reference,
       })),
     });
   }

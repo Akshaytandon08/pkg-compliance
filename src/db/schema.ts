@@ -376,6 +376,13 @@ export const assessmentEvidence = pgTable("assessment_evidence", {
   scopeComponents: text("scope_components").array(),
   scopeMaterials: text("scope_materials").array(),
   scopeParameters: text("scope_parameters").array(),
+  // Provenance (Sprint 4 / C2). 'manual' = a human typed it; 'extracted' = it was
+  // materialised from a confirmed extracted claim. When extracted, document_id and
+  // extracted_claim_id point back to the source file + claim so the report can link
+  // to the provenance. This is GATED-report only — the passport is unchanged.
+  source: text("source").notNull().default("manual"),
+  documentId: integer("document_id").references(() => evidenceDocuments.id, { onDelete: "set null" }),
+  extractedClaimId: integer("extracted_claim_id"),
 });
 
 // --- Evidence documents (Sprint 4 / A1, stored files) ---------------------

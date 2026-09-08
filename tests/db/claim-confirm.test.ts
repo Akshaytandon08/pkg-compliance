@@ -72,10 +72,14 @@ test("confirmClaim marks the claim confirmed and inserts a scoped evidence row",
     assert.equal(claim.status, "confirmed");
     assert.equal(claim.confirmed_by, "Tester");
 
-    const ev = await s`select evidence_type, scope_components from assessment_evidence where component_id = ${componentId}`;
+    const ev = await s`select evidence_type, scope_components, source, document_id, extracted_claim_id from assessment_evidence where component_id = ${componentId}`;
     assert.equal(ev.length, 1);
     assert.equal(ev[0].evidence_type, "supplier_declaration");
     assert.deepEqual(ev[0].scope_components, ["Film wrap"]);
+    // C2 provenance: materialised evidence is tagged extracted and links back.
+    assert.equal(ev[0].source, "extracted");
+    assert.ok(ev[0].document_id, "evidence links to the source document");
+    assert.equal(ev[0].extracted_claim_id, claimId);
   } finally {
     await cleanup(s, assessmentId);
   }

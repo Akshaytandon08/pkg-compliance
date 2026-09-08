@@ -96,6 +96,7 @@ async function loadClaim(claimId: number) {
   const [row] = await db
     .select({
       claim: extractedClaims,
+      documentId: evidenceDocuments.id,
       documentComponentId: evidenceDocuments.componentId,
       assessmentId: evidenceDocuments.assessmentId,
     })
@@ -136,7 +137,14 @@ export async function confirmClaim(
       .set({ status: "confirmed", confirmedBy: by, confirmedAt: new Date() })
       .where(eq(extractedClaims.id, claimId));
     if (component && evidence) {
-      await tx.insert(assessmentEvidence).values({ componentId: component.id, ...evidence });
+      await tx.insert(assessmentEvidence).values({
+        componentId: component.id,
+        ...evidence,
+        // C2 provenance: this evidence came from a confirmed extracted claim.
+        source: "extracted",
+        documentId: row.documentId,
+        extractedClaimId: claimId,
+      });
     }
   });
 
