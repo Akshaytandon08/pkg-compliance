@@ -4,7 +4,11 @@ import { db } from "@/db";
 import { getAssessment, loadCorpusAsOf } from "@/db/assessments";
 import { loadEmissionFactors } from "@/db/factors";
 import { listClaimsForAssessment } from "@/db/claims";
+import { doCDraftEligibility } from "@/db/generate-doc-draft";
+import { listDrafts } from "@/db/doc-drafts";
+import { languageOptionsFor } from "@/lib/doc-export/languages";
 import { signDownload, downloadPath } from "@/lib/storage";
+import { DoCDraftPanel } from "./DoCDraftPanel";
 import { computePackFootprint } from "@/lib/engine/pcf";
 import { getAllGuidance, guidanceKey, type GuidanceRow } from "@/db/guidance";
 import { evaluatePack, type CheckpointCard, type ComponentInput } from "@/lib/engine/pack";
@@ -421,6 +425,19 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
     }
   }
 
+  // Draft EU declaration of conformity — eligibility (button state) + existing drafts.
+  const docEligibility = (await doCDraftEligibility(assessment.id)) ?? { eligible: false, blockers: ["Assessment not found."] };
+  const docDrafts = (await listDrafts(assessment.id)).map((d) => ({
+    id: d.id,
+    version: d.version,
+    language: d.language,
+    status: d.status,
+    docxFilename: d.docxFilename,
+    pdfFilename: d.pdfFilename,
+    createdAt: d.createdAt.toISOString(),
+  }));
+  const docLanguageOptions = languageOptionsFor(assessment.context.destination_member_states);
+
   const hasVerdicts = report.overall.evaluatedCount > 0;
   const bomMaterials = [...new Set(assessment.components.map((c) => c.material))];
   const obligations = buildObligationCalendar(corpus, assessment.context, bomMaterials, assessment.asOf);
@@ -497,6 +514,15 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
       <div id="footprint" className="scroll-mt-14">
         <FootprintCard footprint={footprint} />
       </div>
+
+      {/* Draft EU declaration of conformity (data-assembly aid, gated) */}
+      <DoCDraftPanel
+        assessmentId={assessment.id}
+        eligible={docEligibility.eligible}
+        blockers={docEligibility.blockers}
+        languageOptions={docLanguageOptions}
+        drafts={docDrafts}
+      />
 
       {/* Public passport (Stack C) */}
       <div id="passport" className="scroll-mt-14">

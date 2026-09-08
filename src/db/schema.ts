@@ -635,3 +635,41 @@ export const docTemplates = pgTable(
   },
   (t) => [primaryKey({ columns: [t.templateId, t.version] })],
 );
+
+// --- Generated DoC drafts (Sprint 4b / DoC drafting) ----------------------
+// A generated DRAFT declaration-of-conformity artefact, linked to the assessment
+// and the corpus version it was built from. The status is DELIBERATELY constrained
+// to 'draft' | 'superseded' — never 'issued': this system's output is never an
+// issued declaration (HARD RULE). Regenerating after evidence changes appends a new
+// version with a changelog; the prior version is marked 'superseded' (kept). The
+// docx (the document the manufacturer signs) and a pdf preview are stored via the
+// object-storage adapter; the plain-language filenames are stored for download.
+export const docDraftStatusEnum = pgEnum("doc_draft_status", ["draft", "superseded"]);
+
+export const documentDrafts = pgTable(
+  "document_drafts",
+  {
+    id: serial("id").primaryKey(),
+    assessmentId: integer("assessment_id")
+      .notNull()
+      .references(() => assessments.id, { onDelete: "cascade" }),
+    templateId: text("template_id").notNull(),
+    templateVersion: integer("template_version").notNull(),
+    corpusVersion: text("corpus_version").notNull(),
+    version: integer("version").notNull(), // draft version, increments on regenerate
+    language: text("language").notNull(), // "en", "de", …
+    status: docDraftStatusEnum("status").notNull().default("draft"),
+    changelog: text("changelog"),
+    docxStorageKey: text("docx_storage_key").notNull(),
+    pdfStorageKey: text("pdf_storage_key").notNull(),
+    docxFilename: text("docx_filename").notNull(),
+    pdfFilename: text("pdf_filename").notNull(),
+    storageBackend: text("storage_backend").notNull(),
+    createdBy: text("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  // status is a pgEnum limited to 'draft' | 'superseded' — 'issued' is not a
+  // representable value, so the HARD RULE ("no state records a DoC as issued") is
+  // enforced structurally by the type itself (a CHECK against 'issued' is not even
+  // expressible, since the literal is not a valid enum member).
+);
