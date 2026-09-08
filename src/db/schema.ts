@@ -54,6 +54,26 @@ export const checkpointStatusEnum = pgEnum("checkpoint_status", [
   "superseded",
 ]);
 
+// --- Extraction status vocab (Sprint 4 / A2) ------------------------------
+export const extractionRunStatusEnum = pgEnum("extraction_run_status", [
+  "pending", // created, not yet started
+  "running",
+  "succeeded",
+  "failed", // provider/transport error
+  "refused", // model declined / returned unusable output; NEVER a guessed value
+]);
+
+// A claim's lifecycle. It starts `pending` (extracted, not yet human-confirmed —
+// it may NOT affect a verdict), moves to `confirmed` or `rejected` by a human, or
+// is entered directly by a human as `manual`. A confirmed claim is immutable; a
+// correction is a NEW claim linked back via supersedes_id.
+export const extractedClaimStatusEnum = pgEnum("extracted_claim_status", [
+  "pending",
+  "confirmed",
+  "rejected",
+  "manual",
+]);
+
 // Array-valued fields use text[]; allowed values are validated at seed time so
 // vocabulary growth (new materials, roles) never requires an enum migration.
 // The vocabularies live in a client-safe module (no Drizzle) and are re-exported
@@ -385,6 +405,73 @@ export const evidenceDocuments = pgTable("evidence_documents", {
   source: text("source").notNull(),
   uploadedBy: text("uploaded_by"),
   uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Where in a source document an extracted value was read. `page` is 1-based;
+// `span` is a [start,end] char offset into the page text layer; `bbox` is a
+// [x0,y0,x1,y1] box (0..1 of page dimensions) for a scanned/vision extraction.
+export type ClaimProvenance = {
+  page: number;
+  span?: [number, number];
+  bbox?: [number, number, number, number];
+};
+
+// --- Extraction runs + extracted claims (Sprint 4 / A2) -------------------
+// One extraction_run = one call of one model at one prompt version over one
+// document. `model` and `prompt_version` are PINNED here so a run is reproducible
+// and the harness can attribute accuracy to a (model, prompt) pair. Tokens/cost/
+// latency are recorded per run. A run that the model refuses (unusable output)
+// is `refused`, never fabricated into claims.
+export const extractionRuns = pgTable("extraction_runs", {
+  id: serial("id").primaryKey(),
+  documentId: integer("document_id")
+    .notNull()
+    .references(() => evidenceDocuments.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull(), // 'anthropic' (interface allows others)
+  model: text("model").notNull(), // e.g. 'claude-sonnet-5' — pinned, not implied
+  promptVersion: text("prompt_version").notNull(),
+  docClass: text("doc_class"), // supplier_declaration | lab_test_report | ...
+  status: extractionRunStatusEnum("status").notNull().default("pending"),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+  latencyMs: integer("latency_ms"),
+  inputTokens: integer("input_tokens"),
+  outputTokens: integer("output_tokens"),
+  costUsd: doublePrecision("cost_usd"),
+  error: text("error"), // populated on failed/refused; never logged with secrets
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// One extracted claim = one structured value the model read out of a document,
+// with provenance. A claim is EVIDENCE, not a verdict: the deterministic engine
+// judges it and a human confirms it before it can affect a verdict. `confidence`
+// is the model's 0..1 self-score; a below-threshold claim is surfaced for
+// escalation, never silently trusted. Once `confirmed`, a claim is immutable
+// (DB trigger); a correction inserts a NEW claim pointing back via supersedes_id.
+export const extractedClaims = pgTable("extracted_claims", {
+  id: serial("id").primaryKey(),
+  runId: integer("run_id")
+    .notNull()
+    .references(() => extractionRuns.id, { onDelete: "cascade" }),
+  claimType: text("claim_type").notNull(), // e.g. 'recycled_content' | 'heat_treatment'
+  parameter: text("parameter"),
+  value: text("value"),
+  unit: text("unit"),
+  testMethod: text("test_method"),
+  issuer: text("issuer"),
+  accreditationRef: text("accreditation_ref"),
+  issueDate: date("issue_date"),
+  expiry: date("expiry"),
+  scopeText: text("scope_text"),
+  confidence: doublePrecision("confidence"), // 0..1 model self-score; NULL for manual
+  // { page, span?: [start,end], bbox?: [x0,y0,x1,y1] } — where in the document
+  // this value was read. NULL only for a manual entry (labelled as such).
+  provenance: jsonb("provenance").$type<ClaimProvenance>(),
+  status: extractedClaimStatusEnum("status").notNull().default("pending"),
+  supersedesId: integer("supersedes_id"), // the claim this one corrects (kept)
+  confirmedBy: text("confirmed_by"),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 // --- Emission factors (Sprint 3 / Stack D, screening-grade PCF) -----------
