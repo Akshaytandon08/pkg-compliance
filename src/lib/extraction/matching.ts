@@ -34,6 +34,34 @@ export interface MatchComponent {
   material: string;
 }
 
+// Map a confirmed/extracted claim to the evidence-row shape the evaluator reads,
+// scoped to a component. A claim_type with no evidence_type (issuer, scope
+// metadata) yields null — it cannot become evidence. Pure; used by the B3 confirm
+// path (src/db/claims.ts).
+export interface ClaimEvidenceShape {
+  evidenceType: string;
+  reference: string;
+  expiryDate: string | null;
+  scopeComponents: string[];
+  scopeMaterials: string[];
+  scopeParameters: string[];
+}
+export function claimToNewEvidence(
+  claim: { claimType: string; parameter: string | null; expiry: string | null },
+  component: { name: string; material: string },
+): ClaimEvidenceShape | null {
+  const evidenceType = EVIDENCE_TYPE_BY_CLAIM[claim.claimType];
+  if (!evidenceType) return null;
+  return {
+    evidenceType,
+    reference: `extracted:${claim.claimType}`,
+    expiryDate: claim.expiry ?? null,
+    scopeComponents: [component.name],
+    scopeMaterials: [component.material],
+    scopeParameters: claim.parameter ? [claim.parameter] : [],
+  };
+}
+
 export interface MatchCheckpoint {
   id: string;
   // 'component' checkpoints are scoped per component; 'pack'/'organisation' are not.

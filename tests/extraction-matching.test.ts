@@ -6,6 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   proposeEvidenceAttachments,
+  claimToNewEvidence,
   EVIDENCE_TYPE_BY_CLAIM,
   type MatchCheckpoint,
   type MatchComponent,
@@ -101,6 +102,22 @@ test("a metadata-only claim (issuer) implies no evidence_type and no proposal", 
     asOf: "2026-09-08",
   });
   assert.equal(proposals.length, 0);
+});
+
+test("claimToNewEvidence maps a claim to a scoped evidence row, or null for metadata", () => {
+  const ev = claimToNewEvidence(
+    { claimType: "recycled_content", parameter: "recycled_content", expiry: "2027-01-01" },
+    { name: "Film wrap", material: "plastic" },
+  );
+  assert.equal(ev?.evidenceType, "supplier_declaration");
+  assert.deepEqual(ev?.scopeComponents, ["Film wrap"]);
+  assert.deepEqual(ev?.scopeMaterials, ["plastic"]);
+  assert.equal(ev?.expiryDate, "2027-01-01");
+  // A metadata claim carries no evidence_type → not evidence.
+  assert.equal(
+    claimToNewEvidence({ claimType: "issuer_identity", parameter: null, expiry: null }, { name: "x", material: "plastic" }),
+    null,
+  );
 });
 
 test("with no document component, scope is resolved by material mentioned in the claim", () => {
