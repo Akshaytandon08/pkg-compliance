@@ -42,8 +42,12 @@ export type DocBlock =
   | { type: "spacer" };
 
 export interface DraftDocument {
-  // Watermark stamped on every page + repeated in the footer.
+  // Footer/header banner line, repeated on every page (the DRAFT statement for a
+  // DoC; the request disclaimer for a request template).
   watermark: string;
+  // Optional large diagonal page watermark (DoC drafts only, e.g. "DRAFT — NOT
+  // SIGNED"). Absent for request templates, which are letters the user sends out.
+  diagonalWatermark?: string;
   brand: BrandTokens;
   blocks: DocBlock[];
   // Metadata used by the .docx core properties + PDF info (never the filename ids).

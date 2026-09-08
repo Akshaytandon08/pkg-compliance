@@ -122,18 +122,21 @@ function TemplateLinks({
   if (!hasSupplier && !hasLab) return null;
   const base = `/api/assessments/${assessmentId}/template?component=${componentId}&checkpoint=${encodeURIComponent(card.checkpointId)}&version=${card.version}`;
   const link = "rounded border border-neutral-300 px-2.5 py-1 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800";
+  const preview = "text-neutral-500 underline hover:text-neutral-700";
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
       <span className="text-neutral-500">Request templates:</span>
       {hasSupplier && (
-        <a href={`${base}&kind=supplier_declaration`} className={link}>
-          ↓ Supplier declaration request
-        </a>
+        <span className="inline-flex items-center gap-1.5">
+          <a href={`${base}&kind=supplier_declaration&format=docx`} className={link}>↓ Supplier declaration request (.docx)</a>
+          <a href={`${base}&kind=supplier_declaration&format=pdf`} target="_blank" rel="noreferrer" className={preview}>preview</a>
+        </span>
       )}
       {hasLab && (
-        <a href={`${base}&kind=lab_test`} className={link}>
-          ↓ Lab test request
-        </a>
+        <span className="inline-flex items-center gap-1.5">
+          <a href={`${base}&kind=lab_test&format=docx`} className={link}>↓ Lab test request (.docx)</a>
+          <a href={`${base}&kind=lab_test&format=pdf`} target="_blank" rel="noreferrer" className={preview}>preview</a>
+        </span>
       )}
     </div>
   );

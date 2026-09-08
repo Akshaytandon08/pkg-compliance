@@ -144,17 +144,19 @@ function renderField(doc: PDFKit.PDFDocument, label: string, brand: DraftDocumen
   doc.moveDown(0.25);
 }
 
-function stampWatermark(doc: PDFKit.PDFDocument, watermark: string, brand: DraftDocument["brand"]) {
+function stampWatermark(doc: PDFKit.PDFDocument, model: DraftDocument) {
   const { width, height } = doc.page;
+  if (model.diagonalWatermark) {
+    doc.save();
+    doc.rotate(-45, { origin: [width / 2, height / 2] });
+    doc.fillColor(hex(model.brand.green)).fillOpacity(0.07).font("Helvetica-Bold").fontSize(46);
+    doc.text(model.diagonalWatermark, 0, height / 2 - 30, { width, align: "center" });
+    doc.restore();
+  }
+  // Footer line (always).
   doc.save();
-  doc.rotate(-45, { origin: [width / 2, height / 2] });
-  doc.fillColor(hex(brand.green)).fillOpacity(0.07).font("Helvetica-Bold").fontSize(46);
-  doc.text("DRAFT — NOT SIGNED", 0, height / 2 - 30, { width, align: "center" });
-  doc.restore();
-  // Footer watermark line.
-  doc.save();
-  doc.fillOpacity(1).font("Helvetica-Bold").fontSize(7).fillColor(hex(brand.teal));
-  doc.text(watermark, doc.page.margins.left, height - doc.page.margins.bottom + 12, { width: CONTENT_WIDTH, align: "center" });
+  doc.fillOpacity(1).font("Helvetica-Bold").fontSize(7).fillColor(hex(model.brand.teal));
+  doc.text(model.watermark, doc.page.margins.left, height - doc.page.margins.bottom + 12, { width: CONTENT_WIDTH, align: "center" });
   doc.restore();
 }
 
@@ -172,7 +174,7 @@ export function renderPdf(model: DraftDocument): Promise<Buffer> {
     const range = doc.bufferedPageRange();
     for (let i = range.start; i < range.start + range.count; i++) {
       doc.switchToPage(i);
-      stampWatermark(doc, model.watermark, model.brand);
+      stampWatermark(doc, model);
     }
     doc.flushPages();
     doc.end();

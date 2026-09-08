@@ -27,11 +27,8 @@ next-env.d.ts
 # Local evidence-document store (Sprint 4 / A1 dev + tests)
 .evidence-store/
 
-<<<<<<< HEAD
 # Harness run outputs (large, regenerated)
 eval/extraction/results/
 
-=======
->>>>>>> f1e6cbc (COMMIT 2 — gated DoC draft generator: .docx + PDF, watermarked, brand-styled)
 # Local DoC draft samples (demonstration)
 .doc-sample/

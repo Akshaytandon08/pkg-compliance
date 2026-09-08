@@ -162,6 +162,7 @@ export function buildDoCDraft(input: DoCDraftInputs): DraftDocument {
 
   return {
     watermark: DRAFT_WATERMARK,
+    diagonalWatermark: "DRAFT — NOT SIGNED",
     brand: FITSOL_BRAND,
     blocks,
     title: `Draft — ${template.title} — ${input.packName}`,

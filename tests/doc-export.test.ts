@@ -89,3 +89,22 @@ test("first-person issuing language in the produced docx FAILS the guardrail", a
   const violations = findLanguageViolations(text);
   assert.ok(violations.length > 0, "system issuing-claim in the docx must be caught");
 });
+
+// --- retrofitted request templates (COMMIT 3) ----------------------------
+test("request templates build a .docx, carry the disclaimer, and pass the guardrail", async () => {
+  const { buildRequestModel } = await import("../src/lib/doc-export/request-doc.ts");
+  const input = {
+    packName: "Retail carton", asOf: "2026-09-08",
+    component: { name: "Outer box", material: "corrugated", composition: "Kraft" },
+    checkpoint: { id: "EU-PPWR-heavy-metals", requirementText: "Sum of heavy metals below 100 ppm", thresholds: [{ parameter: "Pb+Cd+Hg+CrVI", operator: "<" as const, value: 100, unit: "ppm" }], testMethod: "EN 13695-1", citation: "Regulation (EU) 2025/40, Article 5. https://x" },
+  };
+  for (const kind of ["supplier_declaration", "lab_test"] as const) {
+    const model = buildRequestModel(kind, input);
+    // A request is a letter it sends out — no diagonal DRAFT watermark.
+    assert.equal(model.diagonalWatermark, undefined);
+    const text = await docxToText(await renderDocx(model));
+    assert.match(text, /not issued by this tool/);
+    assert.match(text, /Pb\+Cd\+Hg\+CrVI/);
+    assert.deepEqual(findLanguageViolations(text), [], `${kind} request must pass the guardrail`);
+  }
+});

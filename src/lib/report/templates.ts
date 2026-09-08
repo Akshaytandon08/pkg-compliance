@@ -20,7 +20,7 @@ export type TemplateInput = {
 
 export type TemplateKind = "supplier_declaration" | "lab_test";
 
-const DISCLAIMER =
+export const DISCLAIMER =
   "This is a request template you send out. It asks the recipient to issue the document. " +
   "It is a drafting aid only — it is not a declaration of conformity, not a certificate, and it is not issued by this tool.";
 
