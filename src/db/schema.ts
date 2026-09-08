@@ -201,6 +201,11 @@ export const checkpoints = pgTable(
     // CONTRIBUTE/report can differ; conflating them mis-scopes obligations.
     registrationThreshold: text("registration_threshold"),
     contributionThreshold: text("contribution_threshold"),
+    // Whether the official register offers a PUBLIC lookup/search (so a producer's
+    // registration can be verified), and the URL of that lookup. NULL = not yet
+    // confirmed against the official register page (a review TODO). Sprint 4b / C1.
+    registerPublicLookup: boolean("register_public_lookup"),
+    registerLookupUrl: text("register_lookup_url"),
   },
   (t) => [
     primaryKey({ columns: [t.id, t.version] }),
