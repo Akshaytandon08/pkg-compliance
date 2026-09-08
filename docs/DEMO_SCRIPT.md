@@ -26,17 +26,25 @@ verdicts.
 - *Demo — corrugated export carton* — a clean, well-evidenced pack.
 - *Demo — food-contact laminate pouch* — food contact triggers PFAS.
 
-**2 — A qualified pack (green).** Open **Demo — corrugated export carton**.
-Non-food, no wood, and every component carries a supplier declaration, so the
-component checkpoints resolve **qualified** (≈9 qualified vs ≈6 conditional). The
-conditional rows are the *pack-level* obligations that evidence cannot close from
-a BOM alone — the Declaration of Conformity, technical documentation, operator
-identification and producer registration. Point out that PFAS shows as **N/A**
-here: it is a non-food pack. Scroll to the **Cradle-to-gate footprint
-(screening-grade)** card — a per-component mass × emission-factor estimate with a
-pack total, each figure showing its factor source and data-quality tier. Stress
-the label: a screening estimate on placeholder factors, not audit-level and not
-independently assured; no LLM touches the number.
+**2 — A qualified pack (green), and a DRAFT declaration of conformity.** Open
+**Demo — corrugated export carton**. Non-food, no wood; every component carries a
+supplier declaration AND the pack carries its pack-level evidence (technical file,
+operator marking, EPR registration), so it resolves **14 qualified · 1 conditional ·
+3 N/A**. The single conditional row is the **Declaration of Conformity itself** —
+expected, since that is the document the next step drafts; technical documentation,
+operator identification and producer registration now qualify because the pack-level
+obligations evaluate against the pack's documents, not an empty set. PFAS shows
+**N/A** (non-food). Scroll to the **Draft EU declaration of conformity** card: because
+this pack is eligible (the user is the manufacturer — branded, own-spec — and every
+other requirement is qualified) the **Generate draft** button is enabled. Generate it
+and open the **PDF preview** — a Fitsol-branded, watermarked DRAFT with the verbatim
+Annex VIII structure, a materials table, article-by-article conformity, and blank
+"to complete by the manufacturer" fields; download the **.docx** the manufacturer
+signs. Stress: it **drafts, it never issues** — not a declaration until signed.
+Then the **Cradle-to-gate footprint (screening-grade)** card — a per-component
+mass × emission-factor estimate with a pack total, each figure showing its factor
+source and data-quality tier; a screening estimate on placeholder factors, not
+audit-level and not independently assured, no LLM touches the number.
 
 **3 — The gap → guidance → template → evidence loop.** Open **Client A —
 traction-cell (demo)**. It is mostly conditional — the pack is blocked by missing
@@ -46,8 +54,10 @@ evidence, not by chemistry. Walk one card end to end:
   `TEST_REQUIRED` conditional with the rationale shown.
 - Expand **"How to obtain this evidence"** — the approved guidance for the
   evidence type (what a compliant document must contain, what to watch for).
-- Use **"Request templates"** to download the lab-test request — a drafting aid
-  the user sends to their lab, never a system-issued document.
+- Use **"Request templates"** to download the lab-test request as a **.docx**
+  (with a **PDF preview** alongside) — a Fitsol-branded drafting aid the user sends
+  to their lab, never a system-issued document. (Every document export is .docx +
+  PDF; markdown is internal only.)
 - In **"Add evidence"**, add a `lab_test` (or `test_report`) for the strap and
   save. The report re-evaluates in place and the strap flips **conditional →
   qualified**, with no code change and no corpus change.
@@ -63,8 +73,12 @@ special case.
 **Public passport** card and click **Generate passport**. A QR appears with an
 unguessable public link. Open it (or scan the QR): the `/passport/<token>` page is
 the **public tier** — pack name, aggregate material summary, verdict counts and
-the footprint total, with a "Demonstration data" tag. The verdict count cards are
-anchors: click **Qualified** to jump to the checkpoints that passed. The
+the footprint total, with a "Demonstration data" tag. (The carton's counts show the
+pack-level obligations — technical documentation, operator identification, producer
+registration — as **qualified**: these now evaluate against the pack's documents
+rather than an empty set, so evidenced unit/organisation obligations resolve.) The
+verdict count cards are anchors: click **Qualified** to jump to the checkpoints that
+passed. The
 **Checkpoints** section is the point to land on — every applicable rule with its
 id, plain-language requirement, verdict, reason category and a link to the primary
 law. The rule set is public law, so showing which rules are met removes doubt.

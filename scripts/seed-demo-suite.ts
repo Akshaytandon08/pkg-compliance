@@ -91,11 +91,15 @@ const packs: NewAssessment[] = [
     ],
   },
 
-  // 2. Corrugated export carton — non-food, no wood, every component carries a
-  //    supplier declaration, so the component checkpoints resolve qualified.
+  // 2. Corrugated export carton — non-food, no wood, EU manufacturer. Every
+  //    component carries a supplier declaration (component checkpoints qualify) AND
+  //    the packaging-unit / organisation obligations are evidenced (technical file,
+  //    operator marking, EPR registration), so this pack is eligible for a DRAFT EU
+  //    declaration of conformity. The DoC itself is the artefact being drafted, so
+  //    it is not pre-required (see eligibility.ts DOC_ITSELF_CHECKPOINT).
   {
     packName: CARTON,
-    description: "Corrugated transit carton, OEM shipping own goods; complete supplier evidence.",
+    description: "Corrugated transit carton, OEM shipping own goods; complete supplier + unit-level evidence.",
     asOf: "2026-08-12",
     demo: true,
     context: {
@@ -119,7 +123,29 @@ const packs: NewAssessment[] = [
         composition: "Kraft linerboard + fluting, water-based flexo print",
         weightGrams: 900,
         sourcedFrom: "DE",
-        evidence: [supplierDeclaration("Outer carton (B-flute corrugated)", "corrugated")],
+        evidence: [
+          supplierDeclaration("Outer carton (B-flute corrugated)", "corrugated"),
+          // Packaging-unit / organisation obligations (subject != component, so the
+          // evaluator matches these regardless of component scope).
+          {
+            evidenceType: "technical_file",
+            reference: `${SD} — technical documentation (Annex VII) held by the manufacturer for the carton`,
+            scopeComponents: ["Outer carton (B-flute corrugated)"],
+            scopeMaterials: ["corrugated"],
+          },
+          {
+            evidenceType: "marking",
+            reference: `${SD} — operator identification marking (EU manufacturer name + address on pack)`,
+            scopeComponents: ["Outer carton (B-flute corrugated)"],
+            scopeMaterials: ["corrugated"],
+          },
+          {
+            evidenceType: "registration",
+            reference: `${SD} — EPR producer registration (DE packaging register)`,
+            scopeComponents: ["Outer carton (B-flute corrugated)"],
+            scopeMaterials: ["corrugated"],
+          },
+        ],
       },
       {
         line: "2",

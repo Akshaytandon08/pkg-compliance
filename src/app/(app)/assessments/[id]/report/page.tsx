@@ -4,7 +4,11 @@ import { db } from "@/db";
 import { getAssessment, loadCorpusAsOf } from "@/db/assessments";
 import { loadEmissionFactors } from "@/db/factors";
 import { listClaimsForAssessment } from "@/db/claims";
+import { doCDraftEligibility } from "@/db/generate-doc-draft";
+import { listDrafts } from "@/db/doc-drafts";
+import { languageOptionsFor } from "@/lib/doc-export/languages";
 import { signDownload, downloadPath } from "@/lib/storage";
+import { DoCDraftPanel } from "./DoCDraftPanel";
 import { computePackFootprint } from "@/lib/engine/pcf";
 import { getAllGuidance, guidanceKey, type GuidanceRow } from "@/db/guidance";
 import { evaluatePack, type CheckpointCard, type ComponentInput } from "@/lib/engine/pack";
@@ -118,18 +122,21 @@ function TemplateLinks({
   if (!hasSupplier && !hasLab) return null;
   const base = `/api/assessments/${assessmentId}/template?component=${componentId}&checkpoint=${encodeURIComponent(card.checkpointId)}&version=${card.version}`;
   const link = "rounded border border-neutral-300 px-2.5 py-1 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800";
+  const preview = "text-neutral-500 underline hover:text-neutral-700";
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
       <span className="text-neutral-500">Request templates:</span>
       {hasSupplier && (
-        <a href={`${base}&kind=supplier_declaration`} className={link}>
-          ↓ Supplier declaration request
-        </a>
+        <span className="inline-flex items-center gap-1.5">
+          <a href={`${base}&kind=supplier_declaration&format=docx`} className={link}>↓ Supplier declaration request (.docx)</a>
+          <a href={`${base}&kind=supplier_declaration&format=pdf`} target="_blank" rel="noreferrer" className={preview}>preview</a>
+        </span>
       )}
       {hasLab && (
-        <a href={`${base}&kind=lab_test`} className={link}>
-          ↓ Lab test request
-        </a>
+        <span className="inline-flex items-center gap-1.5">
+          <a href={`${base}&kind=lab_test&format=docx`} className={link}>↓ Lab test request (.docx)</a>
+          <a href={`${base}&kind=lab_test&format=pdf`} target="_blank" rel="noreferrer" className={preview}>preview</a>
+        </span>
       )}
     </div>
   );
@@ -421,6 +428,19 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
     }
   }
 
+  // Draft EU declaration of conformity — eligibility (button state) + existing drafts.
+  const docEligibility = (await doCDraftEligibility(assessment.id)) ?? { eligible: false, blockers: ["Assessment not found."] };
+  const docDrafts = (await listDrafts(assessment.id)).map((d) => ({
+    id: d.id,
+    version: d.version,
+    language: d.language,
+    status: d.status,
+    docxFilename: d.docxFilename,
+    pdfFilename: d.pdfFilename,
+    createdAt: d.createdAt.toISOString(),
+  }));
+  const docLanguageOptions = languageOptionsFor(assessment.context.destination_member_states);
+
   const hasVerdicts = report.overall.evaluatedCount > 0;
   const bomMaterials = [...new Set(assessment.components.map((c) => c.material))];
   const obligations = buildObligationCalendar(corpus, assessment.context, bomMaterials, assessment.asOf);
@@ -497,6 +517,15 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
       <div id="footprint" className="scroll-mt-14">
         <FootprintCard footprint={footprint} />
       </div>
+
+      {/* Draft EU declaration of conformity (data-assembly aid, gated) */}
+      <DoCDraftPanel
+        assessmentId={assessment.id}
+        eligible={docEligibility.eligible}
+        blockers={docEligibility.blockers}
+        languageOptions={docLanguageOptions}
+        drafts={docDrafts}
+      />
 
       {/* Public passport (Stack C) */}
       <div id="passport" className="scroll-mt-14">

@@ -164,6 +164,12 @@ export function evaluatePack(input: EvaluatePackInput): PackReport {
 
   const componentSections = components.map((component) => ({ component, cards: [] as CheckpointCard[] }));
   const sectionByLine = new Map(componentSections.map((s) => [s.component.line, s]));
+  // Packaging-unit and organisation obligations (technical documentation, operator
+  // marking, EPR registration) are held at the pack/organisation level, not per
+  // component. Their evidence can sit on any component, so they are evaluated
+  // against the pack's aggregate documents. (deriveEvidenceState treats a non-
+  // component subject as unscoped, so any matching document type covers it.)
+  const packDocuments = components.flatMap((c) => c.documents);
   const packagingUnit: CheckpointCard[] = [];
   const organisation: CheckpointCard[] = [];
   const caveats: CheckpointCard[] = [];
@@ -234,7 +240,7 @@ export function evaluatePack(input: EvaluatePackInput): PackReport {
         appliesWhen: cp.appliesWhen,
         evidenceRequirements: cp.evidenceRequirements,
         designAssessment: "no_inherent_risk",
-        documents: [],
+        documents: packDocuments,
         context,
         bomMaterials,
         asOf,

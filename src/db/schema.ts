@@ -313,6 +313,15 @@ export type LegalRoleFacts = {
   packaging_branded?: boolean;
   custom_vs_standardised?: "custom" | "standardised";
   spec_defined_by?: "user" | "customer" | "supplier";
+  // Whether the packaging manufacturer is established outside the EU. Under
+  // Reg 2025/40 a non-EU party is still the manufacturer (Art 3(1)(13)) and draws
+  // up the DoC (Art 15); establishment affects only importer verification (Art 18)
+  // and any authorised-representative requirement — it is NOT an eligibility gate.
+  manufacturer_is_non_eu?: boolean;
+  // The assessing user declares they act for the manufacturer (e.g. draw up the DoC
+  // on the manufacturer's behalf). Lets a derived manufacturer that is another named
+  // party still be eligible, with a note recorded on the draft.
+  acts_for_manufacturer?: boolean;
   [key: string]: unknown;
 };
 
@@ -591,4 +600,85 @@ export const passports = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [unique("passports_token_version_uq").on(t.token, t.version)],
+);
+
+// --- Document templates (Sprint 4b / DoC drafting) ------------------------
+// Corpus-governed encodings of a legal document structure (e.g. PPWR Annex VIII,
+// the EU declaration of conformity). Each element carries the VERBATIM fixed
+// legal text and a flag for whether the manufacturer completes a field there, so
+// a generated draft can render the fixed text exactly and highlight what the
+// signer must fill. Held to the same discipline as the corpus: seeded `draft`,
+// promoted to `approved` ONLY by a human via corpus:approve (doc-template mode)
+// after confirming the encoding matches the primary Annex text. The draft
+// generator refuses any template that is not `approved`.
+export type DocTemplateElement = {
+  // "header" | "1".."8" | "signature" | "footnote" — position in the Annex.
+  ref: string;
+  // Verbatim fixed legal text for this element (never paraphrased).
+  fixedText: string;
+  // True when the manufacturer completes a field within/after this element.
+  fillable: boolean;
+  // Short label for the editable-field highlight in the generated draft.
+  fillLabel?: string;
+};
+
+export type DocTemplateStatus = "draft" | "approved";
+
+export const docTemplates = pgTable(
+  "doc_templates",
+  {
+    templateId: text("template_id").notNull(), // e.g. "EU-DoC-AnnexVIII"
+    version: integer("version").notNull(),
+    title: text("title").notNull(),
+    sourceCitation: text("source_citation").notNull(), // e.g. "Regulation (EU) 2025/40, Annex VIII"
+    sourceUrl: text("source_url").notNull(), // the EUR-Lex URL it was encoded from
+    elements: jsonb("elements").$type<DocTemplateElement[]>().notNull(),
+    status: text("status").$type<DocTemplateStatus>().notNull().default("draft"),
+    approvedBy: text("approved_by"),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    corpusVersion: text("corpus_version"),
+    // Post-approval human verification (corpus:verify --doc-template), optional.
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    verifiedBy: text("verified_by"),
+    notes: text("notes"),
+  },
+  (t) => [primaryKey({ columns: [t.templateId, t.version] })],
+);
+
+// --- Generated DoC drafts (Sprint 4b / DoC drafting) ----------------------
+// A generated DRAFT declaration-of-conformity artefact, linked to the assessment
+// and the corpus version it was built from. The status is DELIBERATELY constrained
+// to 'draft' | 'superseded' — never 'issued': this system's output is never an
+// issued declaration (HARD RULE). Regenerating after evidence changes appends a new
+// version with a changelog; the prior version is marked 'superseded' (kept). The
+// docx (the document the manufacturer signs) and a pdf preview are stored via the
+// object-storage adapter; the plain-language filenames are stored for download.
+export const docDraftStatusEnum = pgEnum("doc_draft_status", ["draft", "superseded"]);
+
+export const documentDrafts = pgTable(
+  "document_drafts",
+  {
+    id: serial("id").primaryKey(),
+    assessmentId: integer("assessment_id")
+      .notNull()
+      .references(() => assessments.id, { onDelete: "cascade" }),
+    templateId: text("template_id").notNull(),
+    templateVersion: integer("template_version").notNull(),
+    corpusVersion: text("corpus_version").notNull(),
+    version: integer("version").notNull(), // draft version, increments on regenerate
+    language: text("language").notNull(), // "en", "de", …
+    status: docDraftStatusEnum("status").notNull().default("draft"),
+    changelog: text("changelog"),
+    docxStorageKey: text("docx_storage_key").notNull(),
+    pdfStorageKey: text("pdf_storage_key").notNull(),
+    docxFilename: text("docx_filename").notNull(),
+    pdfFilename: text("pdf_filename").notNull(),
+    storageBackend: text("storage_backend").notNull(),
+    createdBy: text("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  // status is a pgEnum limited to 'draft' | 'superseded' — 'issued' is not a
+  // representable value, so the HARD RULE ("no state records a DoC as issued") is
+  // enforced structurally by the type itself (a CHECK against 'issued' is not even
+  // expressible, since the literal is not a valid enum member).
 );

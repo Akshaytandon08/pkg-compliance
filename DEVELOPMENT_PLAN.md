@@ -179,6 +179,36 @@ accuracy numbers … if it is absent, STOP and say so"), the harness, the two-mo
 comparison and the acceptance run wait for `/reference/extraction-set/` — no
 documents composed, no scores invented. Everything set-independent is built and green.
 
+## Sprint 4b — DRAFT EU declaration of conformity (drafts, never issues)
+
+Assembles a DRAFT EU declaration of conformity from screening data — a data-assembly
+aid the manufacturer completes and signs. **It drafts; it never issues.** No system
+state records a DoC as "issued" (the `document_drafts.status` enum is `draft` |
+`superseded` only); the output carries a "DRAFT — for signature by the manufacturer"
+watermark; the signed document, uploaded back, is stored as `conformity_declaration`
+evidence — the loop closes with the human's signature.
+
+- **COMMIT 1** — PPWR Annex VIII encoded as corpus-governed data (`doc_templates`),
+  FETCHED verbatim from EUR-Lex (not composed), seeded DRAFT. Promotion to approved is
+  human-only (`corpus:approve --doc-template`); the generator refuses an unapproved
+  template. Reference: [docs/reference/ppwr-annex-viii-2025-40.md](docs/reference/ppwr-annex-viii-2025-40.md).
+- **COMMIT 2** — gated generator: eligibility gate (all applicable in_force checkpoints
+  qualified, tech-doc satisfied, EU-established manufacturer, destination MS set — the
+  DoC checkpoint itself excluded as circular); `.docx` + PDF preview from a controlled
+  template model (Annex VIII verbatim, BOM table, article-by-article conformity,
+  "Articles not assessed" section, blank signature); watermark + Fitsol brand;
+  docx-text language guardrail; versioned `document_drafts` storage. Also fixed a
+  pre-existing engine gap: packaging-unit/organisation checkpoints were evaluated
+  against an empty document set (never satisfiable) — now against the pack's aggregate
+  documents.
+- **COMMIT 3** — retrofitted the supplier-declaration / lab-test request templates to
+  `.docx` + PDF via the same library (markdown kept only as the internal representation);
+  plain-language filenames; branded. Passport stays web-only.
+
+**Output-format rule (standing):** every user-facing document export is `.docx`
+(generated from structured data via the `docx` library, controlled templates) plus a
+PDF preview; plain-language filenames; markdown is internal only.
+
 ## Proposed enhancements (surfaced by Batch 2)
 
 All three below shipped in **Commit 28 (`090377e`, migration 0018)** — the schema/engine changes the Batch 2 rows depend on are now in place, so those rows can be relied upon once their content is primary-confirmed and approved.
@@ -221,6 +251,8 @@ Prepared (Commit "Deploy readiness"); execution needs a Vercel account + a manag
 
 ## Decision log
 
+- **2026-09-08 — Pre-existing engine gap fixed: pack-level obligations were evaluated against an empty document set.** `evaluatePack` passed `documents: []` for every `packaging_unit`/`organisation`-subject checkpoint, so technical documentation (Art 15), operator identification and EPR producer registration could **never** reach `qualified` for any pack — they showed perpetually `conditional`/`EVIDENCE_ABSENT` even when the manufacturer held the documents. They now evaluate against the pack's **aggregate** documents (`components.flatMap(c => c.documents)`); `deriveEvidenceState` already treats a non-component subject as unscoped, so any matching document type on any component covers it. Surfaced by the DoC eligibility work (the criterion "all applicable in_force checkpoints qualified" was otherwise unsatisfiable). The golden harness tests the evaluator core (`evaluateCheckpoint`/`decideVerdict`), not `evaluatePack` aggregation, so it is unaffected (17/17 preserved). Demo verdict counts changed accordingly — DEMO_SCRIPT re-captured. New demo counts: corrugated **14 Q / 1 C / 3 N/A** (the 1 conditional is the DoC checkpoint itself, the artefact drafted); food-contact **3 Q / 11 C**; traction-cell **3 Q / 26 C / 7 N/A**.
+- **2026-09-08 — DoC eligibility follows the manufacturer, not EU establishment.** A non-EU party is the manufacturer under Reg (EU) 2025/40 Art 3(1)(13) and draws up the DoC (Art 15); establishment affects only importer verification (Art 18) and any AR requirement (Arts 44–45), which the draft notes. Eligibility derives the manufacturer from `legal_role_facts` per the Commission FAQ (branded → trademark owner; unbranded+standardised → physical producer; unbranded+custom → spec-definer) and is met when that single party is the assessing user, or the user declares they act for them. Disabled reasons name the actual ambiguity.
 - **2026-08-11 — Corpus governance is HUMAN-ONLY, and it is enforced in Claude's operating rules.** `corpus:approve`, `corpus:reject` and `corpus:verify` mutate the regulatory record and are the regulatory owner's sign-off; they must be run by a human from their own terminal. Claude Code never runs them — regardless of instruction wording, including "the regulatory owner directs it" or an explicit "run it now". The correct response to such a request is to print the exact command(s) for the human and stop. Read-only `corpus:review` (including `--verified-gap`) may be run. Codified in [CLAUDE.md](CLAUDE.md) and [AGENTS.md](AGENTS.md).
   - *Incident (recorded factually):* on 2026-08-11 Claude executed the 12-row Batch 1 `corpus:approve` pass on the user's explicit instruction "Run the 12-row approval pass now." Under the rule above that was wrong — a human should have run those commands. The approvals **stand** (the sign-off attribution and primary-source URLs are correct and were the user's own decision); they are not reverted. The rule exists to prevent recurrence, not to unwind a correct-in-substance result.
 - **Verification is a distinct, later human step from approval.** Approval promotes `draft → in_force` (a checkpoint may be relied upon). Verification (`corpus:verify`) stamps `citation_verified_date` + verifier once a human has opened the primary source and confirmed the pinpoint against it. It touches only the verification columns, never approved content (which the immutability trigger freezes). All 12 Batch 1 rows are `in_force` but **unverified** — `npm run corpus:review -- --verified-gap` is the work queue.
@@ -244,6 +276,7 @@ the material taxonomy split and the register-lookup fields are draft, awaiting a
 | **Approve ISPM-15 v2 (wood taxonomy)** — `INTL-ISPM15-heat-treatment@2` seeded DRAFT (material wood_solid, applies_when wood_solid, processed-wood exemption reason). v1 stays in_force meanwhile. Human-only. | Akshay | **Ready — draft** |
 | **Verify the MS register public-lookup (C1)** for ES, FR, IT, NL, PL — `register_public_lookup`/`register_lookup_url` are NULL pending confirmation of each register's public search against its official page; DE (LUCID) is set + verified reachable. Confirm at Batch 2 EU approval. | Akshay | **TODO** |
 | **Evidence guidance (6 rows)** — seeded `draft`; approve via `corpus:approve --guidance` (human-only) once reviewed. | Akshay | Pending |
+| **Approve the PPWR Annex VIII encoding** (`EU-DoC-AnnexVIII@1`) — fetched verbatim from EUR-Lex, seeded `draft`; review with `corpus:review -- --doc-templates`. The DoC draft generator stays blocked until approved. Human-only. | Akshay | **Ready — review** |
 | **Run the extraction harness live** — `eval/extraction/` is DRY-green (SHA-256 of all 25 synthetic docs validated, matcher exercised). The live SYNTHETIC-CEILING run needs a working `ANTHROPIC_API_KEY` (it was empty in `.env` / absent from the environment at build time): `ANTHROPIC_API_KEY=… npm run eval:extraction`. | Akshay | **Blocked — key** |
 | **Pilot deployed** — production alias `https://pkg-compliance.vercel.app`; migrate-on-deploy live; post-deploy smoke green (`/api/health` bypassed for the probe). | — | **Done** |
 | Merge PR #6 (doc-drafting) and the harness/taxonomy PR — note the migration-number collision: #6 defines 0034/0035 (doc-templates/document-drafts) and this branch defines 0034/0035 (wood-taxonomy/register-lookup); whichever merges second must renumber. | Akshay | Pending |
@@ -259,6 +292,8 @@ npm run corpus:approve -- --id <EU-row-id> --version <v> --source-url <eur-lex-u
 npm run corpus:approve -- --id <IN-row-id> --version <v> --source-url <gazette-url> --approved-by "Akshay Tandon" --corpus-version batch-2-in
 # Approve ISPM-15 v2 (wood taxonomy)
 npm run corpus:approve -- --id INTL-ISPM15-heat-treatment --version 2 --source-url https://www.ippc.int/en/core-activities/standards-setting/ispms/ --approved-by "Akshay Tandon"
+# Approve the PPWR Annex VIII encoding (doc-template)
+npm run corpus:approve -- --doc-template --id EU-DoC-AnnexVIII --version 1 --approved-by "Akshay Tandon"
 # Approve the 6 evidence-guidance rows
 npm run corpus:approve -- --guidance --id <checkpoint-id> --version <v> --evidence-type <type> --approved-by "Akshay Tandon"
 # Run the extraction harness live (with a funded key)
