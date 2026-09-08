@@ -155,6 +155,30 @@ confidence escalates; provider-agnostic; corpus discipline unchanged).
 
 **Non-goals:** auth/roles/multi-tenancy; US/Gulf corpus; PCF upgrades; a second provider adapter (interface only); auto-approval of any claim.
 
+**Status (branch `sprint-4-extraction`, one green commit per item):**
+
+| Item | Status |
+|---|---|
+| A1 storage (adapter + signed gated download) | **Done** (`evidence_documents`, local FS adapter, HMAC signed URLs) |
+| A2 extraction data model + confirmed-claim immutability trigger | **Done** |
+| A3 `ExtractionProvider` + Anthropic adapter + 4 versioned prompts | **Done** (strict tool-use structured output; refused-not-fabricated) |
+| A4 harness scoring (per-field accuracy, usable rate, **both models**) | **BLOCKED** — needs `/reference/extraction-set/` (20 PII-scrubbed docs + expected claims); not present |
+| A5 deterministic claim → checkpoint matching | **Done** (reuses `deriveEvidenceState`; proposals are pending-confirmation) |
+| B1 `evidence_requests` + generated message (no silent mail) | **Done** |
+| B2 public `/evidence/[token]` intake (sniff, size/rate limit, scan hook) | **Done** (verified end-to-end in preview) |
+| B3 gated confirm / reject / edit-and-confirm + provenance viewer | **Done** (re-evaluates via evidence materialisation) |
+| B4 activity feed (requests, receipts, confirms, verdict changes) | **Done** |
+| C1 in-app notifications + digest behind env flag | **Done** |
+| C2 report evidence column (extracted/manual/pending + provenance) | **Done** (passport unchanged) |
+| C3 demo docs + DEMO_SCRIPT flow | **BLOCKED** — needs the synthetic/real sample docs from the set |
+| C4 acceptance run + report | **BLOCKED** — the ≥90% / 0-silent-error gate scores against the set |
+
+The three blocked items are the acceptance-critical, ground-truth-dependent ones.
+Per CLAUDE.md ("never fabricate the extraction test set, its expected claims, or
+accuracy numbers … if it is absent, STOP and say so"), the harness, the two-model
+comparison and the acceptance run wait for `/reference/extraction-set/` — no
+documents composed, no scores invented. Everything set-independent is built and green.
+
 ## Proposed enhancements (surfaced by Batch 2)
 
 All three below shipped in **Commit 28 (`090377e`, migration 0018)** — the schema/engine changes the Batch 2 rows depend on are now in place, so those rows can be relied upon once their content is primary-confirmed and approved.
