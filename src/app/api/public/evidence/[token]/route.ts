@@ -7,6 +7,7 @@ import { sniffContentType, validateUpload } from "@/lib/evidence-intake/validate
 import { scanForViruses } from "@/lib/evidence-intake/scan";
 import { intakeRateLimiter } from "@/lib/evidence-intake/rate-limit";
 import { isRequestExpired } from "@/lib/evidence-requests/message";
+import { logActivity } from "@/db/activity";
 
 // PUBLIC, token-scoped evidence upload (bypasses the access gate — the token is
 // the authorisation). A supplier with no account uploads a PDF/JPG/PNG here. The
@@ -96,6 +97,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     evidenceRequestId: req.id,
   });
   await db.update(evidenceRequests).set({ status: "fulfilled" }).where(eq(evidenceRequests.id, req.id));
+
+  await logActivity(req.assessmentId, {
+    kind: "document_received",
+    actor: "supplier (magic-link)",
+    summary: `Document received: ${file.name || "upload"}`,
+    meta: { requestId: req.id, checkpointId: req.checkpointId, contentType: sniffed },
+  });
 
   return Response.json({ ok: true }, { status: 201 });
 }

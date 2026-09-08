@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAssessment } from "@/db/assessments";
 import { listClaimsForAssessment } from "@/db/claims";
+import { listActivity } from "@/db/activity";
 import { signDownload, downloadPath } from "@/lib/storage";
 import { ClaimReview } from "./ClaimReview";
 
@@ -20,6 +21,7 @@ export default async function ClaimReviewPage({ params }: PageProps<"/assessment
   if (!assessment) notFound();
 
   const claims = await listClaimsForAssessment(assessmentId);
+  const activity = await listActivity(assessmentId);
   // Sign a short-lived source link per distinct document, server-side.
   const withSource = claims.map((c) => {
     const signed = signDownload(c.documentId);
@@ -52,6 +54,25 @@ export default async function ClaimReviewPage({ params }: PageProps<"/assessment
           components={assessment.components.map((c) => ({ id: c.id, name: c.name, material: c.material }))}
         />
       )}
+
+      <section>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Activity</h2>
+        {activity.length === 0 ? (
+          <p className="mt-2 text-sm text-neutral-500">No activity yet.</p>
+        ) : (
+          <ol className="mt-2 space-y-2 border-l border-neutral-200 pl-4">
+            {activity.map((e) => (
+              <li key={e.id} className="relative">
+                <span className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-neutral-300" />
+                <p className="text-sm text-neutral-700">{e.summary}</p>
+                <p className="text-xs text-neutral-400">
+                  {e.at.toISOString().replace("T", " ").slice(0, 16)} · {e.actor}
+                </p>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
     </div>
   );
 }

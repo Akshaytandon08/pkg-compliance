@@ -508,6 +508,25 @@ export const extractedClaims = pgTable("extracted_claims", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// --- Assessment activity feed (Sprint 4 / B4) -----------------------------
+// An append-only audit trail per assessment: evidence requests sent, documents
+// received, claims confirmed/rejected/edited, and verdict changes. Every row is
+// timestamped and attributed. Rows are facts about what happened — never edited
+// or deleted; a correction is a new row.
+export const assessmentActivity = pgTable("assessment_activity", {
+  id: serial("id").primaryKey(),
+  assessmentId: integer("assessment_id")
+    .notNull()
+    .references(() => assessments.id, { onDelete: "cascade" }),
+  at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  actor: text("actor").notNull(), // who/what caused it: 'Assessor', 'supplier (magic-link)', ...
+  // request_created | document_received | claim_confirmed | claim_rejected |
+  // claim_edited | verdict_changed
+  kind: text("kind").notNull(),
+  summary: text("summary").notNull(), // one-line human-readable description
+  meta: jsonb("meta").$type<Record<string, unknown>>(), // structured detail (ids, from/to counts)
+});
+
 // --- Emission factors (Sprint 3 / Stack D, screening-grade PCF) -----------
 // Reference data for the cradle-to-gate footprint: one factor per
 // (material, process). Material-production rows carry a per-kg factor; transport
