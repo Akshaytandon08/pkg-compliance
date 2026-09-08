@@ -1,12 +1,16 @@
 import type { PackReport, CheckpointCard } from "../engine/pack.ts";
 import type { AssessmentContextRecord } from "../../db/schema.ts";
+import { userMayDrawUp } from "./manufacturer.ts";
 
 // Eligibility for a DRAFT EU declaration of conformity. The draft is only offered
 // when the screening actually supports it: every applicable in_force checkpoint is
 // qualified, the technical-documentation checkpoint is satisfied, the manufacturer
-// role is unambiguous, and destination Member States are set. Any failure returns
-// a SPECIFIC blocking reason — the button is rendered disabled with the reason,
-// never silently hidden. Pure.
+// derivation points to a single party that is the assessing user (or the user
+// declares they act for that manufacturer), and destination Member States are set.
+// EU establishment is NOT a gate — a non-EU party is still the manufacturer and still
+// draws up the DoC (Art 15); it only adds a note (Arts 18, 44–45). Any failure
+// returns a SPECIFIC blocking reason — the button is rendered disabled with the
+// reason, never silently hidden. Pure.
 
 export const TECH_DOC_CHECKPOINT = "EU-PPWR-technical-documentation";
 // The declaration-of-conformity checkpoint is the obligation this draft FULFILS.
@@ -38,18 +42,12 @@ export function assessDoCEligibility(context: AssessmentContextRecord, report: P
     blockers.push("Destination Member States are not set for this assessment.");
   }
 
-  // 2. Manufacturer role must be unambiguous. An EU-established manufacturer is the
-  //    unambiguous declarant. When the manufacturer is non-EU (or the fact is not
-  //    recorded), the EU declarant chain (manufacturer / authorised representative /
-  //    importer) is not unambiguous from this screening.
-  const nonEu = context.legal_role_facts?.manufacturer_is_non_eu;
-  if (nonEu === true) {
-    blockers.push(
-      "The manufacturer is not EU-established, so the party obligated to draw up the EU declaration " +
-        "(manufacturer, authorised representative or importer) is not unambiguous from this screening.",
-    );
-  } else if (nonEu === undefined) {
-    blockers.push("The manufacturer's establishment (EU / non-EU) is not recorded, so the declarant is not established.");
+  // 2. The manufacturer derivation (FAQ rules) must point to a single party that is
+  //    the assessing user, OR the user must have declared they act for that
+  //    manufacturer. The blocker names the actual ambiguity — never "not EU-established".
+  const { ok: mayDrawUp, derivation } = userMayDrawUp(context.legal_role_facts);
+  if (!mayDrawUp) {
+    blockers.push(`The manufacturer is not your organisation: ${derivation.reason ?? derivation.basis} You can only draw up the declaration as the manufacturer, or by declaring you act for them.`);
   }
 
   // 3 & 4. Every applicable in_force checkpoint must be qualified, and the

@@ -34,11 +34,14 @@ after(async () => {
   if (shared) await shared.end({ timeout: 5 });
 });
 
-test("Annex VIII is seeded as a DRAFT doc_template with 11 verbatim elements", dbRequired, async () => {
+test("Annex VIII exists with 11 verbatim elements (seeded draft; may be human-approved)", dbRequired, async () => {
   const { loadDocTemplate } = await import("../../src/db/doc-templates.ts");
   const t = await loadDocTemplate("EU-DoC-AnnexVIII");
   assert.ok(t, "template must exist");
-  assert.equal(t.status, "draft", "seeded draft — never auto-approved");
+  // The migration seeds it 'draft'; a human may promote it to 'approved' via
+  // corpus:approve (never Claude). Either is valid — status is not auto-set to
+  // anything else.
+  assert.ok(["draft", "approved"].includes(t.status), `status was ${t.status}`);
   assert.equal(t.elements.length, 11);
   assert.match(t.sourceCitation, /2025\/40.*Annex VIII/);
 
@@ -69,10 +72,14 @@ test("the encoding matches the fetched EUR-Lex reference verbatim", dbRequired, 
   }
 });
 
-test("generation is blocked until approval — no approved version exists yet", dbRequired, async () => {
+test("the approved-only loader never returns a non-approved template", dbRequired, async () => {
   const { loadApprovedDocTemplate } = await import("../../src/db/doc-templates.ts");
+  // Whatever the live approval state, loadApprovedDocTemplate must only ever return
+  // an 'approved' record (generation can never run against a draft encoding) …
   const approved = await loadApprovedDocTemplate("EU-DoC-AnnexVIII");
-  assert.equal(approved, null, "draft template must not be loadable for generation");
+  if (approved) assert.equal(approved.status, "approved");
+  // … and a template that does not exist yields null (generation blocked).
+  assert.equal(await loadApprovedDocTemplate("EU-DoC-DoesNotExist"), null);
 });
 
 test("the verbatim Annex text passes the speaker-based language guardrail", dbRequired, async () => {

@@ -152,6 +152,14 @@ export function buildDoCDraft(input: DoCDraftInputs): DraftDocument {
   const foot = el(template, "footnote");
   if (foot) blocks.push({ type: "paragraph", muted: true, text: foot.fixedText });
 
+  // A non-EU manufacturer still draws up the DoC; note the importer/AR consequences.
+  if (context.legal_role_facts?.manufacturer_is_non_eu === true) {
+    blocks.push({
+      type: "notice",
+      text: "As a non-EU manufacturer you draw up this declaration; your EU importer must verify it exists (Art 18), and an authorised representative may be required (Arts 44–45).",
+    });
+  }
+
   // Non-English versions carry a translation-to-verify notice.
   if (input.language.toLowerCase() !== "en") {
     blocks.push({

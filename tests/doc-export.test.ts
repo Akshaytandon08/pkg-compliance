@@ -38,21 +38,39 @@ function report(cards: CheckpointCard[]): PackReport {
     overall: { verdict: "qualified", evaluatedCount: cards.length },
   } as unknown as PackReport;
 }
+// A branded, own-spec pack → the user is the manufacturer (FAQ: branded → trademark owner).
 const euCtx: AssessmentContextRecord = {
   destination_markets: ["EU"], destination_member_states: ["DE"], food_contact: false, persona: "2b",
-  declared_reusable: false, legal_role_facts: { manufacturer_is_non_eu: false },
+  declared_reusable: false, legal_role_facts: { packaging_branded: true, custom_vs_standardised: "standardised", spec_defined_by: "user", manufacturer_is_non_eu: false },
 };
 
-test("an EU manufacturer with all requirements qualified + tech-doc is eligible", () => {
+test("a user who is the manufacturer with all requirements qualified + tech-doc is eligible", () => {
   const e = assessDoCEligibility(euCtx, report([card("EU-PPWR-technical-documentation", "qualified"), card("EU-PPWR-heavy-metals", "qualified")]));
   assert.equal(e.eligible, true, e.blockers.join(" "));
 });
 
-test("a non-EU manufacturer is blocked with a specific reason", () => {
-  const ctx = { ...euCtx, legal_role_facts: { manufacturer_is_non_eu: true } };
+test("A1: a NON-EU, branded, own-spec manufacturer with all requirements qualified IS eligible", () => {
+  const ctx = { ...euCtx, legal_role_facts: { ...euCtx.legal_role_facts, manufacturer_is_non_eu: true } };
+  const e = assessDoCEligibility(ctx, report([card("EU-PPWR-technical-documentation", "qualified"), card("EU-PPWR-heavy-metals", "qualified")]));
+  assert.equal(e.eligible, true, `non-EU must not block; got: ${e.blockers.join(" ")}`);
+  // And no blocker mentions EU establishment.
+  assert.ok(!e.blockers.some((b) => /EU-established|non-EU/i.test(b)));
+});
+
+test("an unbranded custom pack whose customer defined the spec is blocked, naming the customer", () => {
+  const ctx = { ...euCtx, legal_role_facts: { packaging_branded: false, custom_vs_standardised: "custom" as const, spec_defined_by: "customer" as const } };
   const e = assessDoCEligibility(ctx, report([card("EU-PPWR-technical-documentation", "qualified")]));
   assert.equal(e.eligible, false);
-  assert.ok(e.blockers.some((b) => /not EU-established/.test(b)));
+  assert.ok(e.blockers.some((b) => /specification defined by your customer, who is therefore the manufacturer/i.test(b)), e.blockers.join(" "));
+  assert.ok(!e.blockers.some((b) => /EU-established/i.test(b)));
+});
+
+test("the user declaring they act for the manufacturer unblocks the role gate", () => {
+  const base = { packaging_branded: false, custom_vs_standardised: "custom" as const, spec_defined_by: "customer" as const };
+  const blocked = assessDoCEligibility({ ...euCtx, legal_role_facts: base }, report([card("EU-PPWR-technical-documentation", "qualified")]));
+  assert.equal(blocked.eligible, false);
+  const declared = assessDoCEligibility({ ...euCtx, legal_role_facts: { ...base, acts_for_manufacturer: true } }, report([card("EU-PPWR-technical-documentation", "qualified")]));
+  assert.equal(declared.eligible, true, declared.blockers.join(" "));
 });
 
 test("a gap and a missing tech-doc each block with their own reason", () => {
@@ -67,6 +85,22 @@ test("a gap and a missing tech-doc each block with their own reason", () => {
 test("empty destination Member States block", () => {
   const e = assessDoCEligibility({ ...euCtx, destination_member_states: [] }, report([card("EU-PPWR-technical-documentation", "qualified")]));
   assert.ok(e.blockers.some((b) => /Member States are not set/i.test(b)));
+});
+
+// --- manufacturer derivation (FAQ rules) ---------------------------------
+test("deriveManufacturer follows the FAQ rules", async () => {
+  const { deriveManufacturer } = await import("../src/lib/doc-export/manufacturer.ts");
+  // branded → trademark owner (own spec → user)
+  assert.equal(deriveManufacturer({ packaging_branded: true, spec_defined_by: "user" }).isAssessingUser, true);
+  // branded, customer's trademark → customer
+  assert.equal(deriveManufacturer({ packaging_branded: true, spec_defined_by: "customer" }).party, "customer");
+  // unbranded + standardised → physical producer (not assumed to be the user)
+  assert.equal(deriveManufacturer({ packaging_branded: false, custom_vs_standardised: "standardised" }).party, "physical_producer");
+  // unbranded + custom → spec-definer
+  assert.equal(deriveManufacturer({ packaging_branded: false, custom_vs_standardised: "custom", spec_defined_by: "user" }).isAssessingUser, true);
+  assert.equal(deriveManufacturer({ packaging_branded: false, custom_vs_standardised: "custom", spec_defined_by: "customer" }).party, "customer");
+  // insufficient facts → unknown, not a silent assignment
+  assert.equal(deriveManufacturer({}).party, "unknown");
 });
 
 // --- docx-text guardrail (COMMIT 2.4) ------------------------------------

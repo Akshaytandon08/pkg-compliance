@@ -313,6 +313,15 @@ export type LegalRoleFacts = {
   packaging_branded?: boolean;
   custom_vs_standardised?: "custom" | "standardised";
   spec_defined_by?: "user" | "customer" | "supplier";
+  // Whether the packaging manufacturer is established outside the EU. Under
+  // Reg 2025/40 a non-EU party is still the manufacturer (Art 3(1)(13)) and draws
+  // up the DoC (Art 15); establishment affects only importer verification (Art 18)
+  // and any authorised-representative requirement — it is NOT an eligibility gate.
+  manufacturer_is_non_eu?: boolean;
+  // The assessing user declares they act for the manufacturer (e.g. draw up the DoC
+  // on the manufacturer's behalf). Lets a derived manufacturer that is another named
+  // party still be eligible, with a note recorded on the draft.
+  acts_for_manufacturer?: boolean;
   [key: string]: unknown;
 };
 
