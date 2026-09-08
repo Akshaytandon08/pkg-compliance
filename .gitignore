@@ -23,3 +23,6 @@ next-env.d.ts
 
 # MS Office lock files
 ~$*
+
+# Local evidence-document store (Sprint 4 / A1 dev + tests)
+.evidence-store/

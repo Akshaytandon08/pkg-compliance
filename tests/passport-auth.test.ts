@@ -20,6 +20,9 @@ test("the public passport and its framework subresources are NOT gated", () => {
     // Public brand assets — the logo the passport renders (no user data).
     "/brand/fitsol-logo-full-colour.svg",
     "/brand/fitsol-logo-white.svg",
+    // Public magic-link evidence intake page + its token-scoped public upload API.
+    "/evidence/a2be43bdc4019854c5e036ef2ea0d2d6",
+    "/api/public/evidence/a2be43bdc4019854c5e036ef2ea0d2d6",
   ]) {
     assert.equal(gated(path), false, `${path} must be bypassed (public / framework asset)`);
   }
@@ -33,6 +36,7 @@ test("app routes and the passport authoring API stay gated", () => {
     "/assessments/5/report",
     "/api/assessments/5/passport", // authoring endpoint — gated, not bypassed
     "/api/assessments",
+    "/api/evidence-file/7", // signed download stays gated (defence in depth)
   ]) {
     assert.equal(gated(path), true, `${path} must stay behind the access gate`);
   }

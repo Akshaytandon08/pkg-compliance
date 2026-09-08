@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { getAssessment, loadCorpusAsOf } from "@/db/assessments";
 import { loadEmissionFactors } from "@/db/factors";
+import { listClaimsForAssessment } from "@/db/claims";
+import { signDownload, downloadPath } from "@/lib/storage";
 import { computePackFootprint } from "@/lib/engine/pcf";
 import { getAllGuidance, guidanceKey, type GuidanceRow } from "@/db/guidance";
 import { evaluatePack, type CheckpointCard, type ComponentInput } from "@/lib/engine/pack";
@@ -128,6 +130,65 @@ function TemplateLinks({
         <a href={`${base}&kind=lab_test`} className={link}>
           ↓ Lab test request
         </a>
+      )}
+    </div>
+  );
+}
+
+// C2 — the evidence-on-file column. Each item is tagged by provenance (manual vs
+// extracted-and-confirmed) and, when it came from a stored file, links to that
+// source (signed, short-lived, still gated). A pending count nudges the reviewer
+// to the claim-review surface. This is GATED report only — the passport is unchanged.
+function EvidenceOnFile({
+  documents,
+  sourceLinks,
+  pendingCount,
+  assessmentId,
+}: {
+  documents: ComponentInput["documents"];
+  sourceLinks: Map<number, string>;
+  pendingCount: number;
+  assessmentId: number;
+}) {
+  if (documents.length === 0 && pendingCount === 0) return null;
+  return (
+    <div className="mt-1 mb-2 rounded-md border border-neutral-200 bg-neutral-50/60 px-3 py-2 text-xs dark:border-neutral-800 dark:bg-neutral-900/40">
+      <p className="font-medium text-neutral-600 dark:text-neutral-300">Evidence on file</p>
+      {documents.length > 0 ? (
+        <ul className="mt-1 space-y-1">
+          {documents.map((d, i) => {
+            const extracted = d.source === "extracted";
+            const link = d.sourceDocumentId != null ? sourceLinks.get(d.sourceDocumentId) : undefined;
+            return (
+              <li key={i} className="flex flex-wrap items-center gap-2">
+                <span
+                  className={`rounded-full border px-2 py-0.5 ${
+                    extracted
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300"
+                      : "border-neutral-300 bg-white text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+                  }`}
+                >
+                  {extracted ? "Extracted · confirmed" : "Manual"}
+                </span>
+                <span className="text-neutral-700 dark:text-neutral-300">{d.type}</span>
+                {d.expiryDate && <span className="text-neutral-400">· expires {d.expiryDate}</span>}
+                {link && (
+                  <a href={link} target="_blank" rel="noreferrer" className="text-neutral-500 underline hover:text-neutral-700">
+                    source
+                  </a>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+      {pendingCount > 0 && (
+        <p className="mt-1 text-amber-700 dark:text-amber-300">
+          {pendingCount} extracted claim{pendingCount === 1 ? "" : "s"} awaiting confirmation —{" "}
+          <Link href={`/assessments/${assessmentId}/evidence`} className="underline">
+            review
+          </Link>
+        </p>
       )}
     </div>
   );
@@ -342,6 +403,24 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
     corpusVersion: assessment.corpusVersion,
   });
 
+  // C2 — provenance for the evidence-on-file column. Sign a short-lived source
+  // link per stored file referenced by any evidence item, and count pending
+  // extracted claims per component.
+  const sourceLinks = new Map<number, string>();
+  for (const c of assessment.components) {
+    for (const d of c.documents) {
+      if (d.sourceDocumentId != null && !sourceLinks.has(d.sourceDocumentId)) {
+        sourceLinks.set(d.sourceDocumentId, downloadPath(d.sourceDocumentId, signDownload(d.sourceDocumentId)));
+      }
+    }
+  }
+  const pendingByComponent = new Map<number, number>();
+  for (const claim of await listClaimsForAssessment(assessment.id)) {
+    if (claim.status === "pending" && claim.componentId != null) {
+      pendingByComponent.set(claim.componentId, (pendingByComponent.get(claim.componentId) ?? 0) + 1);
+    }
+  }
+
   const hasVerdicts = report.overall.evaluatedCount > 0;
   const bomMaterials = [...new Set(assessment.components.map((c) => c.material))];
   const obligations = buildObligationCalendar(corpus, assessment.context, bomMaterials, assessment.asOf);
@@ -454,6 +533,12 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
                 <span className="text-neutral-400">· {s.component.material}</span>
               </h3>
               <AnnotationLine component={s.component} />
+              <EvidenceOnFile
+                documents={s.component.documents}
+                sourceLinks={sourceLinks}
+                pendingCount={s.component.id != null ? (pendingByComponent.get(s.component.id) ?? 0) : 0}
+                assessmentId={assessment.id}
+              />
               {s.cards.length > 0 ? (
                 <div className="grid gap-2">
                   {s.cards.map((card, i) => (

@@ -8,6 +8,7 @@ import { Menu, X } from "lucide-react";
 const LINKS = [
   { href: "/", label: "Assessments", match: (p: string) => p === "/" || p.startsWith("/assessments") },
   { href: "/corpus", label: "Corpus", match: (p: string) => p.startsWith("/corpus") },
+  { href: "/notifications", label: "Notifications", match: (p: string) => p.startsWith("/notifications") },
 ];
 
 export function AppNav() {

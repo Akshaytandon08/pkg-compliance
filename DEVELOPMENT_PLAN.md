@@ -129,6 +129,56 @@ Turns each gap/conditional into an actionable "how to obtain this" loop.
 
 **Acceptance:** 3 real client packs end-to-end, ≥1 paying.
 
+## Sprint 4 — "Conviction sprint": document extraction v1 + magic-link evidence intake
+
+Three weeks, three parts, one commit per numbered item (each green on its own). The
+non-negotiable principles are in [CLAUDE.md](CLAUDE.md) (LLM extracts, never
+adjudicates; human-confirmed before it affects a verdict; provenance always; low
+confidence escalates; provider-agnostic; corpus discipline unchanged).
+
+**PART A — Storage + extraction core (week 1).**
+- **A1** Document storage: `evidence_documents` gain a stored file (object storage — Vercel Blob or S3-compatible via env; local-filesystem adapter for dev/tests). Files private, served only through authenticated, signed, short-lived URLs. Never deleted (audit artefacts); superseded versions kept.
+- **A2** Extraction data model: `extraction_runs` (document, provider, model, prompt_version, timings, cost tokens, status) and `extracted_claims` (run, claim_type, parameter, value, unit, test_method, issuer, accreditation_ref, issue_date, expiry, scope_text, confidence, provenance {page, span/bbox}, status pending|confirmed|rejected|manual, confirmed_by/at). Immutable once confirmed; corrections create a new claim linked to the old.
+- **A3** `ExtractionProvider` interface + Anthropic adapter (`ANTHROPIC_API_KEY` from env, never logged). Structured-output prompt for four doc classes: supplier declaration, lab test report, heat-treatment/ISPM certificate, mill declaration. PDF text first; image/scan via the model's vision input when no text layer. Prompt versioned in `/prompts` with a changelog.
+- **A4** Extraction harness: `/eval/extraction/` over the product owner's anonymised real-document set (`/reference/extraction-set/`, 20 docs, PII-scrubbed) with hand-verified expected claims. Score per-field accuracy and a document-level "usable" rate.
+- **A5** Claim → checkpoint matching: deterministic rules mapping claim_type + parameter + component material to checkpoint(s) + evidence_type; scope check (reuse the cert-scope logic); expiry check → a proposed evidence attachment awaiting confirmation.
+
+**PART B — Magic-link evidence intake (week 2).** B1 `evidence_requests` (token-scoped per gap; email/text generated for the user to send; no outbound mail in v1 unless RESEND/SMTP env, then optional per-message send with approval). B2 public `/evidence/[token]` (minimal shell, drop zone; PDF/JPG/PNG only; rate- and size-limited; virus-scan hook stub; Basic Auth bypass for this route + its assets, covered by the dynamic access-gate test). B3 confirmation UI (gated): provenance viewer, Confirm / Reject / Edit-and-confirm, re-evaluate in place; manual entry stays, labelled. B4 activity feed per assessment (requests, receipts, confirms/rejects, verdict changes — timestamped, attributed).
+
+**PART C — Integration, notifications, acceptance (week 3).** C1 in-app notifications (received / awaiting confirmation / expiring within 60 days; email digest behind env flag). C2 report evidence column distinguishes confirmed-extracted / manual / pending, with provenance links; **passport unchanged**. C3 demo suite gains three real-format sample docs (SYNTHETIC-DEMO), DEMO_SCRIPT gains the gap→request→upload→extract→confirm→flip flow. C4 acceptance run + report.
+
+**Acceptance criteria (sprint):**
+- Extraction **≥90% field accuracy** on the 20-doc set; **0 silent wrong values** (every wrong value must have been below threshold and flagged).
+- Harness runs **both** `claude-sonnet-5` (default) and `claude-opus-5` (escalation) over the full set and reports, per model: field accuracy, usable rate, silent-error count, refusal count, median latency, cost per document. Default chosen by the numbers.
+- End-to-end (gap → magic link → upload → extraction → confirm → card flips) **under two minutes per document**.
+- Golden agreement still **17/17**; dynamic access-gate test green; from-zero migration chain clean.
+
+**Non-goals:** auth/roles/multi-tenancy; US/Gulf corpus; PCF upgrades; a second provider adapter (interface only); auto-approval of any claim.
+
+**Status (branch `sprint-4-extraction`, one green commit per item):**
+
+| Item | Status |
+|---|---|
+| A1 storage (adapter + signed gated download) | **Done** (`evidence_documents`, local FS adapter, HMAC signed URLs) |
+| A2 extraction data model + confirmed-claim immutability trigger | **Done** |
+| A3 `ExtractionProvider` + Anthropic adapter + 4 versioned prompts | **Done** (strict tool-use structured output; refused-not-fabricated) |
+| A4 harness scoring (per-field accuracy, usable rate, **both models**) | **BLOCKED** — needs `/reference/extraction-set/` (20 PII-scrubbed docs + expected claims); not present |
+| A5 deterministic claim → checkpoint matching | **Done** (reuses `deriveEvidenceState`; proposals are pending-confirmation) |
+| B1 `evidence_requests` + generated message (no silent mail) | **Done** |
+| B2 public `/evidence/[token]` intake (sniff, size/rate limit, scan hook) | **Done** (verified end-to-end in preview) |
+| B3 gated confirm / reject / edit-and-confirm + provenance viewer | **Done** (re-evaluates via evidence materialisation) |
+| B4 activity feed (requests, receipts, confirms, verdict changes) | **Done** |
+| C1 in-app notifications + digest behind env flag | **Done** |
+| C2 report evidence column (extracted/manual/pending + provenance) | **Done** (passport unchanged) |
+| C3 demo docs + DEMO_SCRIPT flow | **BLOCKED** — needs the synthetic/real sample docs from the set |
+| C4 acceptance run + report | **BLOCKED** — the ≥90% / 0-silent-error gate scores against the set |
+
+The three blocked items are the acceptance-critical, ground-truth-dependent ones.
+Per CLAUDE.md ("never fabricate the extraction test set, its expected claims, or
+accuracy numbers … if it is absent, STOP and say so"), the harness, the two-model
+comparison and the acceptance run wait for `/reference/extraction-set/` — no
+documents composed, no scores invented. Everything set-independent is built and green.
+
 ## Proposed enhancements (surfaced by Batch 2)
 
 All three below shipped in **Commit 28 (`090377e`, migration 0018)** — the schema/engine changes the Batch 2 rows depend on are now in place, so those rows can be relied upon once their content is primary-confirmed and approved.

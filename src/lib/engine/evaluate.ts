@@ -21,6 +21,11 @@ export type EvidenceDocument = {
     materials?: string[];
     parameters?: string[];
   } | null;
+  // Provenance for the gated report (C2) — the evaluator ignores these; they only
+  // drive how the report labels and links an evidence item.
+  source?: "manual" | "extracted";
+  sourceDocumentId?: number | null; // the stored file this evidence came from, if any
+  reference?: string | null;
 };
 
 export type AssessmentContext = {

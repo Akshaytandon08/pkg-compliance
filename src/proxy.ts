@@ -30,9 +30,10 @@ export function proxy(req: NextRequest) {
 // `config.matcher` at build time and rejects an imported/computed value. The
 // SAME pattern and its bypass reasoning live in src/lib/access-gate.ts (kept
 // next-free so it is unit-testable, tests/passport-auth.test.ts); keep the two in
-// sync. Bypassed: _next/static, _next/image, favicon.ico, and the public
-// passport/ tier. Everything else — app routes and the passport authoring API —
+// sync. Bypassed: _next/static, _next/image, favicon.ico, the public brand assets,
+// the public passport/ tier, the public evidence/ intake page, and the public
+// api/public/ namespace. Everything else — app routes and the authoring APIs —
 // stays gated.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|brand/|passport/).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|brand/|passport/|evidence/|api/public/).*)"],
 };
