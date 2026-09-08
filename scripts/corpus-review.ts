@@ -8,6 +8,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { checkpoints, evidenceGuidance } from "../src/db/schema.ts";
 import { listGuidanceByStatus } from "../src/db/guidance.ts";
+import { listDocTemplates } from "../src/db/doc-templates.ts";
 import {
   connect,
   oneLiner,
@@ -26,6 +27,40 @@ const SUBJECT_ORDER: Record<string, number> = {
 
 const args = parseArgs(process.argv.slice(2));
 const { sql, db } = connect();
+
+if (args["doc-templates"] === true) {
+  // Read-only review of document-template encodings (e.g. PPWR Annex VIII), so a
+  // human can confirm the encoded elements match the primary Annex text before
+  // running corpus:approve --doc-template. Fixed legal text is shown verbatim;
+  // fillable elements are marked [FILL].
+  try {
+    const templates = await listDocTemplates(db);
+    console.log(`\nDocument templates — ${templates.length} record(s)\n`);
+    for (const t of templates) {
+      console.log(`${t.templateId}@${t.version}  [${t.status}]  ${t.title}`);
+      console.log(`  Source: ${t.sourceCitation}`);
+      console.log(`  URL:    ${t.sourceUrl}`);
+      if (t.status === "approved") console.log(`  Approved by ${t.approvedBy} (${t.corpusVersion})`);
+      console.log(`  Elements (${t.elements.length}):`);
+      for (const e of t.elements) {
+        const tag = e.fillable ? `[FILL: ${e.fillLabel ?? ""}]` : "[fixed]";
+        console.log(`    (${e.ref}) ${tag}`);
+        for (const line of e.fixedText.split("\n")) console.log(`        ${line}`);
+      }
+      console.log("");
+    }
+    if (templates.some((t) => t.status === "draft")) {
+      console.log(
+        "Draft templates await regulatory-owner approval. When the encoding matches the\n" +
+          "primary Annex text, approve from your own terminal (HUMAN-ONLY):\n" +
+          '  npm run corpus:approve -- --doc-template --id <template-id> --version <v> --approved-by "<name>"\n',
+      );
+    }
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+  process.exit(0);
+}
 
 if (args["verified-gap"] === true) {
   try {

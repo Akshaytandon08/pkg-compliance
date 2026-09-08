@@ -592,3 +592,46 @@ export const passports = pgTable(
   },
   (t) => [unique("passports_token_version_uq").on(t.token, t.version)],
 );
+
+// --- Document templates (Sprint 4b / DoC drafting) ------------------------
+// Corpus-governed encodings of a legal document structure (e.g. PPWR Annex VIII,
+// the EU declaration of conformity). Each element carries the VERBATIM fixed
+// legal text and a flag for whether the manufacturer completes a field there, so
+// a generated draft can render the fixed text exactly and highlight what the
+// signer must fill. Held to the same discipline as the corpus: seeded `draft`,
+// promoted to `approved` ONLY by a human via corpus:approve (doc-template mode)
+// after confirming the encoding matches the primary Annex text. The draft
+// generator refuses any template that is not `approved`.
+export type DocTemplateElement = {
+  // "header" | "1".."8" | "signature" | "footnote" — position in the Annex.
+  ref: string;
+  // Verbatim fixed legal text for this element (never paraphrased).
+  fixedText: string;
+  // True when the manufacturer completes a field within/after this element.
+  fillable: boolean;
+  // Short label for the editable-field highlight in the generated draft.
+  fillLabel?: string;
+};
+
+export type DocTemplateStatus = "draft" | "approved";
+
+export const docTemplates = pgTable(
+  "doc_templates",
+  {
+    templateId: text("template_id").notNull(), // e.g. "EU-DoC-AnnexVIII"
+    version: integer("version").notNull(),
+    title: text("title").notNull(),
+    sourceCitation: text("source_citation").notNull(), // e.g. "Regulation (EU) 2025/40, Annex VIII"
+    sourceUrl: text("source_url").notNull(), // the EUR-Lex URL it was encoded from
+    elements: jsonb("elements").$type<DocTemplateElement[]>().notNull(),
+    status: text("status").$type<DocTemplateStatus>().notNull().default("draft"),
+    approvedBy: text("approved_by"),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    corpusVersion: text("corpus_version"),
+    // Post-approval human verification (corpus:verify --doc-template), optional.
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    verifiedBy: text("verified_by"),
+    notes: text("notes"),
+  },
+  (t) => [primaryKey({ columns: [t.templateId, t.version] })],
+);
