@@ -147,15 +147,20 @@ export function buildClaimToolSchema(docClass: DocClass): Record<string, unknown
             issue_date: { type: "string", format: "date" },
             expiry: { type: "string", format: "date" },
             scope_text: { type: "string" },
-            confidence: { type: "number", minimum: 0, maximum: 1 },
+            // NOTE: Anthropic tool input_schema does not support the JSON-Schema
+            // range/size keywords (minimum/maximum on numbers, minItems/maxItems on
+            // arrays) — including any of them returns a 400. The bounds are stated
+            // in the prompt instead: confidence is 0..1, page is 1-based, span is a
+            // [start,end] pair and bbox is [x0,y0,x1,y1].
+            confidence: { type: "number" },
             provenance: {
               type: "object",
               additionalProperties: false,
               required: ["page"],
               properties: {
-                page: { type: "integer", minimum: 1 },
-                span: { type: "array", items: { type: "integer" }, minItems: 2, maxItems: 2 },
-                bbox: { type: "array", items: { type: "number" }, minItems: 4, maxItems: 4 },
+                page: { type: "integer" },
+                span: { type: "array", items: { type: "integer" } },
+                bbox: { type: "array", items: { type: "number" } },
               },
             },
           },
