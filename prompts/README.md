@@ -39,7 +39,18 @@ Verified against the current Claude API reference (not training memory) on
 - Verify current model strings, structured-output support and pricing against the
   Claude API reference at build time — do not rely on training-data memory.
 
+## Prompt sources
+
+The prompts themselves live as typed modules in
+[`src/lib/extraction/prompts.ts`](../src/lib/extraction/prompts.ts) — one
+`DocClassPrompt` per document class (supplier declaration, lab test report,
+heat-treatment/ISPM-15 certificate, mill declaration). They are kept as code so
+they are imported, type-checked and harness-scored rather than loose text; this
+README is the policy that governs them. Each prompt tells the model to
+**transcribe values with provenance and report low confidence or absence rather
+than guess** — never to decide pass/fail.
+
 ## Prompt versioning
 
-Each prompt file carries a `version` and a changelog. Bumping a version re-runs
-the harness (both models) and records the scores before it ships.
+Each `DocClassPrompt` carries a `version` (semver) and a `changelog`. Bumping a
+version re-runs the harness (both models) and records the scores before it ships.
