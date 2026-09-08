@@ -232,6 +232,13 @@
       "when": 1788853573973,
       "tag": "0032_evidence-provenance",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1788854002019,
+      "tag": "0033_confirmed-claim-update-only",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,8 @@
 // A2 — a CONFIRMED extracted claim is immutable at the database level. Confirming
-// a pending claim is allowed; updating or deleting one that is already confirmed
-// is refused by the trigger (corrections must be a new claim linked via
-// supersedes_id). Skips without a reachable DB.
+// a pending claim is allowed; an in-place UPDATE of a confirmed row is refused by
+// the trigger (corrections must be a new claim linked via supersedes_id). DELETE is
+// not blocked — cascade teardown of the parent assessment is administrative, not
+// tampering. Skips without a reachable DB.
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import postgres from "postgres";
@@ -33,7 +34,7 @@ after(async () => {
   if (sql) await sql.end({ timeout: 5 });
 });
 
-test("a confirmed claim cannot be updated or deleted; a pending one can", dbRequired, async () => {
+test("a confirmed claim cannot be updated in place; a correction is a new claim", dbRequired, async () => {
   const s = sql!;
   // Build the minimal chain: assessment -> evidence_document -> run -> claim.
   const [a] = await s`
@@ -60,17 +61,12 @@ test("a confirmed claim cannot be updated or deleted; a pending one can", dbRequ
     // Pending -> confirmed is allowed.
     await s`update extracted_claims set status = 'confirmed', confirmed_by = 'Tester' where id = ${claimId}`;
 
-    // A confirmed claim is frozen: update refused.
+    // A confirmed claim is frozen against IN-PLACE change: update refused. This is
+    // the immutability guarantee — a confirmed value can never be silently altered.
     await assert.rejects(
       () => s`update extracted_claims set value = '50' where id = ${claimId}`,
       /confirmed and immutable/,
       "updating a confirmed claim must be refused",
-    );
-    // And delete refused.
-    await assert.rejects(
-      () => s`delete from extracted_claims where id = ${claimId}`,
-      /confirmed and immutable/,
-      "deleting a confirmed claim must be refused",
     );
 
     // A correction is a NEW claim linked via supersedes_id — this is allowed.
@@ -80,13 +76,8 @@ test("a confirmed claim cannot be updated or deleted; a pending one can", dbRequ
       returning id`;
     assert.ok(correction.id, "a superseding correction claim can be inserted");
   } finally {
-    // assessments cascade to documents -> runs -> pending/manual claims; the
-    // confirmed claim blocks its own delete, so drop it via cascade from the run
-    // after clearing confirmed status is impossible — instead cascade-delete the
-    // assessment, which the trigger permits (DELETE of a confirmed row IS blocked,
-    // so remove the confirm first is also blocked). Use a session-local disable.
-    await s`ALTER TABLE extracted_claims DISABLE TRIGGER extracted_claim_confirmed_immutable`;
+    // Cascade teardown of the whole assessment is allowed (DELETE is not blocked —
+    // only in-place UPDATE of a confirmed row is). No trigger toggling needed.
     await s`delete from assessments where id = ${assessmentId}`;
-    await s`ALTER TABLE extracted_claims ENABLE TRIGGER extracted_claim_confirmed_immutable`;
   }
 });

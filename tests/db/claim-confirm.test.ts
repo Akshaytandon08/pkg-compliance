@@ -55,9 +55,9 @@ async function seed(s: ReturnType<typeof postgres>, claimType = "recycled_conten
 }
 
 async function cleanup(s: ReturnType<typeof postgres>, assessmentId: number) {
-  await s`ALTER TABLE extracted_claims DISABLE TRIGGER extracted_claim_confirmed_immutable`;
+  // Cascade teardown is allowed (only in-place UPDATE of a confirmed claim is
+  // blocked), so a plain assessment delete cleans everything up.
   await s`delete from assessments where id = ${assessmentId}`;
-  await s`ALTER TABLE extracted_claims ENABLE TRIGGER extracted_claim_confirmed_immutable`;
 }
 
 test("confirmClaim marks the claim confirmed and inserts a scoped evidence row", dbRequired, async () => {
