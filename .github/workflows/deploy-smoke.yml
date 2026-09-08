@@ -17,9 +17,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24 # native TS stripping for node scripts/smoke.ts
-      # Prefer the stable production alias (repo variable PRODUCTION_URL); fall
-      # back to the deployment's own URL. The target must be publicly reachable
-      # (Vercel Deployment Protection off, or a bypass) or /api/health returns an
-      # interstitial page and the smoke fails — which is the point.
-      - name: Smoke /api/health (production)
-        run: node scripts/smoke.ts "${{ vars.PRODUCTION_URL || github.event.deployment_status.environment_url }}"
+      # Probe the STABLE PRODUCTION ALIAS only (repo variable PRODUCTION_URL, e.g.
+      # https://pkg-compliance.vercel.app). NEVER the deployment_status URL: those
+      # are deployment-hash hosts behind Vercel Standard Protection and return
+      # HTTP 401 "Protected deployment". Fail loudly if PRODUCTION_URL is unset
+      # rather than fall back to a URL that cannot be smoked.
+      - name: Require PRODUCTION_URL
+        run: |
+          if [ -z "${{ vars.PRODUCTION_URL }}" ]; then
+            echo "::error title=PRODUCTION_URL not set::Set the PRODUCTION_URL repository variable to the production alias (e.g. https://pkg-compliance.vercel.app). Refusing to smoke the deployment-hash URL, which is behind Vercel Standard Protection (HTTP 401)."
+            exit 1
+          fi
+      - name: Smoke /api/health (production alias)
+        run: node scripts/smoke.ts "${{ vars.PRODUCTION_URL }}"

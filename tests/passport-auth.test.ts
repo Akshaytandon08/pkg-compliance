@@ -23,6 +23,9 @@ test("the public passport and its framework subresources are NOT gated", () => {
     // Public magic-link evidence intake page + its token-scoped public upload API.
     "/evidence/a2be43bdc4019854c5e036ef2ea0d2d6",
     "/api/public/evidence/a2be43bdc4019854c5e036ef2ea0d2d6",
+    // Health probe — returns only {status, database}; the post-deploy smoke must
+    // reach it on the production alias without credentials.
+    "/api/health",
   ]) {
     assert.equal(gated(path), false, `${path} must be bypassed (public / framework asset)`);
   }
@@ -37,6 +40,7 @@ test("app routes and the passport authoring API stay gated", () => {
     "/api/assessments/5/passport", // authoring endpoint — gated, not bypassed
     "/api/assessments",
     "/api/evidence-file/7", // signed download stays gated (defence in depth)
+    "/api/health/secret", // only the exact /api/health path is public; nothing under it
   ]) {
     assert.equal(gated(path), true, `${path} must stay behind the access gate`);
   }
