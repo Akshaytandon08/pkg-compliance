@@ -29,3 +29,6 @@ next-env.d.ts
 
 # Harness run outputs (large, regenerated)
 eval/extraction/results/
+
+# Local DoC draft samples (demonstration)
+.doc-sample/

@@ -10,6 +10,7 @@
 import { decideVerdict } from "./verdict.ts";
 import type { DesignAssessment, EvidenceState, Risk, Verdict } from "./verdict.ts";
 import type { EvidenceRequirement } from "../../db/schema.ts";
+import { expandMaterials, materialMatches } from "../vocab.ts";
 
 export type EvidenceDocument = {
   docId: string;
@@ -83,8 +84,10 @@ export function evaluateApplicability(
 
   for (const [key, expected] of Object.entries(appliesWhen)) {
     // BOM-derived fact (see eval/README): presence of a material in the pack.
+    // Honours the material hierarchy — a `wood` condition is satisfied by a
+    // wood_solid or wood_processed component; a `wood_solid` condition is not.
     if (key === "bom_material_present") {
-      if (typeof expected === "string" && !facts.bomMaterials.includes(expected)) {
+      if (typeof expected === "string" && !expandMaterials(facts.bomMaterials).includes(expected)) {
         return "not_applicable";
       }
       continue;
@@ -140,7 +143,9 @@ export function deriveEvidenceState(
     const s = doc.scope;
     if (!s || (!s.components && !s.materials)) return true; // an unscoped document covers
     if (s.components && s.components.includes(facts.componentName)) return true;
-    if (s.materials && facts.material && s.materials.includes(facts.material)) return true;
+    // Hierarchy-aware: evidence scoped to a parent material ("wood") covers a
+    // subtype component ("wood_solid"), and an exact match covers as before.
+    if (s.materials && facts.material && materialMatches(s.materials, facts.material)) return true;
     return false;
   };
   const notExpired = (doc: EvidenceDocument): boolean =>
@@ -177,6 +182,10 @@ export type CheckpointEvalInput = {
   componentName?: string;
   material?: string;
   asOf: string;
+  // Optional checkpoint-specific explanation shown when the checkpoint is
+  // not_applicable (e.g. the ISPM-15 processed-wood exemption). Falls back to the
+  // generic scope message when absent.
+  notApplicableReason?: string | null;
 };
 
 /** The single place a per-checkpoint outcome is decided. */
@@ -196,7 +205,7 @@ export function evaluateCheckpoint(input: CheckpointEvalInput): CheckpointOutcom
     return {
       disposition: "not_applicable",
       reasonCode: "NOT_APPLICABLE_SCOPE",
-      detail: "Out of scope for this assessment's context.",
+      detail: input.notApplicableReason ?? "Out of scope for this assessment's context.",
     };
   }
 

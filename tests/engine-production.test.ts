@@ -40,6 +40,7 @@ const checkpoint = (status: ProductionCheckpoint["status"]): ProductionCheckpoin
   confidence: null,
   laterOfCondition: null,
   exemptions: null,
+  notApplicableReason: null,
 });
 
 const run = (status: ProductionCheckpoint["status"]) =>

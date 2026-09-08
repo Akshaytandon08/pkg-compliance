@@ -239,6 +239,13 @@
       "when": 1788854002019,
       "tag": "0033_confirmed-claim-update-only",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1788869197543,
+      "tag": "0034_wood-taxonomy",
+      "breakpoints": true
     }
   ]
 }

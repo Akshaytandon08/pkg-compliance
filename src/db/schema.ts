@@ -170,6 +170,9 @@ export const checkpoints = pgTable(
     citationVerifiedDate: date("citation_verified_date"),
     citationVerifiedBy: text("citation_verified_by"),
     notes: text("notes"),
+    // Shown when the checkpoint resolves not_applicable (e.g. the ISPM-15
+    // processed-wood exemption under §2.1). NULL → the generic scope message.
+    notApplicableReason: text("not_applicable_reason"),
     // food_contact_only was collapsed into `applies_when` ({"food_contact":
     // true}) — a single applicability mechanism instead of a special-case flag.
 

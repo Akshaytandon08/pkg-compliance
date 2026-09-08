@@ -12,7 +12,7 @@ const components: NewComponent[] = [
   {
     line: "1",
     name: "Pine wood pallet / crate (heat treated)",
-    material: "wood",
+    material: "wood_solid",
     composition: "Pine, heat treated (ISPM 15 HT)",
     sourcedFrom: "IN",
     evidence: [
@@ -20,7 +20,7 @@ const components: NewComponent[] = [
         evidenceType: "marking",
         reference: "IPPC/HT mark IN-747 HT",
         scopeComponents: ["Pine wood pallet / crate (heat treated)"],
-        scopeMaterials: ["wood"],
+        scopeMaterials: ["wood_solid"],
       },
     ],
   },
