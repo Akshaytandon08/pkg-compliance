@@ -42,7 +42,7 @@
     {
       "line": "1",
       "name": "Pine wood pallet / crate (heat treated)",
-      "material": "wood",
+      "material": "wood_solid",
       "claims": {
         "composition": "Pine, heat treated",
         "ispm15Mark": "IN-747 HT",
@@ -331,7 +331,7 @@
     {
       "ref": "P2",
       "name": "Plywood battery box system (veneer + phenolic adhesive, steel closure strips, clips, corrugated layer pad, liner)",
-      "material": "wood",
+      "material": "wood_processed",
       "detectedIn": "consignment_photo",
       "verdict": "gap",
       "reasonCode": "NOT_IN_BOM",

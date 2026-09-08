@@ -11,6 +11,7 @@ import {
   type CheckpointOutcome,
   type EvidenceDocument,
 } from "./evaluate.ts";
+import { materialMatches } from "../vocab.ts";
 import type { DesignAssessment, Verdict } from "./verdict.ts";
 
 export type CheckpointSubject = "component" | "packaging_unit" | "organisation";
@@ -36,6 +37,7 @@ export type ProductionCheckpoint = {
   confidence: "H" | "M" | "L" | null;
   laterOfCondition: string | null;
   exemptions: Exemption[] | null;
+  notApplicableReason: string | null;
 };
 
 export type ComponentInput = {
@@ -187,7 +189,7 @@ export function evaluatePack(input: EvaluatePackInput): PackReport {
   };
 
   const appliesToComponent = (cp: ProductionCheckpoint, material: string) =>
-    cp.material.includes("all") || cp.material.includes(material);
+    materialMatches(cp.material, material);
 
   for (const cp of checkpoints) {
     const gate = gateForReport(cp, asOf);
@@ -215,6 +217,7 @@ export function evaluatePack(input: EvaluatePackInput): PackReport {
           componentName: component.name,
           material: component.material,
           asOf,
+          notApplicableReason: cp.notApplicableReason,
         });
         const card: CheckpointCard = {
           ...baseCard(cp),
@@ -235,6 +238,7 @@ export function evaluatePack(input: EvaluatePackInput): PackReport {
         context,
         bomMaterials,
         asOf,
+        notApplicableReason: cp.notApplicableReason,
       });
       const card: CheckpointCard = { ...baseCard(cp), outcome };
       if (outcome.disposition === "caveat") caveats.push(card);

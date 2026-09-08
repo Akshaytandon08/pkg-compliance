@@ -170,6 +170,9 @@ export const checkpoints = pgTable(
     citationVerifiedDate: date("citation_verified_date"),
     citationVerifiedBy: text("citation_verified_by"),
     notes: text("notes"),
+    // Shown when the checkpoint resolves not_applicable (e.g. the ISPM-15
+    // processed-wood exemption under §2.1). NULL → the generic scope message.
+    notApplicableReason: text("not_applicable_reason"),
     // food_contact_only was collapsed into `applies_when` ({"food_contact":
     // true}) — a single applicability mechanism instead of a special-case flag.
 
@@ -198,6 +201,11 @@ export const checkpoints = pgTable(
     // CONTRIBUTE/report can differ; conflating them mis-scopes obligations.
     registrationThreshold: text("registration_threshold"),
     contributionThreshold: text("contribution_threshold"),
+    // Whether the official register offers a PUBLIC lookup/search (so a producer's
+    // registration can be verified), and the URL of that lookup. NULL = not yet
+    // confirmed against the official register page (a review TODO). Sprint 4b / C1.
+    registerPublicLookup: boolean("register_public_lookup"),
+    registerLookupUrl: text("register_lookup_url"),
   },
   (t) => [
     primaryKey({ columns: [t.id, t.version] }),

@@ -229,20 +229,41 @@ Prepared (Commit "Deploy readiness"); execution needs a Vercel account + a manag
 
 ## Open items / blockers
 
-Batch 1 is **approved** — 12 checkpoints `in_force` under corpus version `batch-1`, and the report renders real verdicts. The remaining work is a verification pass on those rows, primary-sourcing the Batch 2 numbers before their approval, approving the guidance rows, and pressing the deploy button.
+Batch 1 is **approved** (12 `in_force` under `batch-1`). Sprint 4 (extraction + magic-link
+intake) merged to main (PR #5); the smoke fix merged (PR #7); the DoC generator is a
+stacked branch (PR #6, **open**). The extraction harness (`eval/extraction/`) is in;
+the material taxonomy split and the register-lookup fields are draft, awaiting approval.
+**Branch/PR state as of 2026-09-08:** #5 merged, #6 (doc-drafting) open on main, #7
+(smoke fix) merged; the current harness/taxonomy work is on `sprint-4-harness`.
 
 | Item | Owner | Status |
 |---|---|---|
-| **Verify the 12 Batch 1 rows against primary** (`corpus:verify`) — all 12 are `in_force` but `citation_verified_date` NULL; `corpus:review --verified-gap` is the queue. Confirm each pinpoint on primary, esp. no-transitional-stock Art 71 and ISPM revision + Reg (EU) 2016/2031. Human-only; commands below. | Akshay | **Pending** |
-| **Approve Batch 2 EU (9 rows) under `batch-2-eu`** — validated H, reconciled to primary; independent of India. `corpus:review` shows requirement/thresholds/registers/confidence per row. Human-only. | Akshay | **Ready — validated** |
-| **Approve Batch 2 India (7 rows) under `batch-2-in`** — validated H, verbatim from the CPCB/Gazette report; approve after EU. Human-only. | Akshay | **Ready — validated** |
-| **Evidence guidance (6 rows)** — seeded `draft` for the demo pack; approve via `corpus:approve --guidance` (human-only) once reviewed. | Akshay | Pending |
-| **Deploy the pilot** — readiness done (access gate, migrate-on-deploy, docs); needs a Vercel account + a managed Postgres instance, then the deploy itself. Record the hosted URL in the Deployment table. | Akshay | **Readiness done — button pending** |
-| Remaining [docs/SCHEMA_DELTAS.md](docs/SCHEMA_DELTAS.md) decisions (#4, #5, #9) — #2 and #3 now resolved (Commit 28) | Akshay | Pending |
-| Extraction pipeline (Claude API) — interim: manual per-component risk annotation bridges `designAssessment`; extraction would populate it automatically | — | Sprint 2 remainder |
-| 2 further real client packs for the golden dataset | Akshay | Pending |
-| Kyoto EF access + GreenAlign evidence-flow interface details | Akshay | Pending |
-| Product name | Akshay | TBD — use `pkg-compliance` |
+| **Verify the 12 Batch 1 rows against primary** (`corpus:verify`) — all 12 are `in_force` but `citation_verified_date` NULL; `corpus:review --verified-gap` is the queue. Human-only; commands below. | Akshay | **Pending** |
+| **Approve Batch 2 EU (9 rows) under `batch-2-eu`** — validated H, reconciled to primary. Now also carry the C1 register-public-lookup fields (DE set + verified; ES/FR/IT/NL/PL null → verify below). Human-only. | Akshay | **Ready — validated** |
+| **Approve Batch 2 India (7 rows) under `batch-2-in`** — validated H, verbatim; approve after EU. Human-only. | Akshay | **Ready — validated** |
+| **Approve ISPM-15 v2 (wood taxonomy)** — `INTL-ISPM15-heat-treatment@2` seeded DRAFT (material wood_solid, applies_when wood_solid, processed-wood exemption reason). v1 stays in_force meanwhile. Human-only. | Akshay | **Ready — draft** |
+| **Verify the MS register public-lookup (C1)** for ES, FR, IT, NL, PL — `register_public_lookup`/`register_lookup_url` are NULL pending confirmation of each register's public search against its official page; DE (LUCID) is set + verified reachable. Confirm at Batch 2 EU approval. | Akshay | **TODO** |
+| **Evidence guidance (6 rows)** — seeded `draft`; approve via `corpus:approve --guidance` (human-only) once reviewed. | Akshay | Pending |
+| **Run the extraction harness live** — `eval/extraction/` is DRY-green (SHA-256 of all 25 synthetic docs validated, matcher exercised). The live SYNTHETIC-CEILING run needs a working `ANTHROPIC_API_KEY` (it was empty in `.env` / absent from the environment at build time): `ANTHROPIC_API_KEY=… npm run eval:extraction`. | Akshay | **Blocked — key** |
+| **Pilot deployed** — production alias `https://pkg-compliance.vercel.app`; migrate-on-deploy live; post-deploy smoke green (`/api/health` bypassed for the probe). | — | **Done** |
+| Merge PR #6 (doc-drafting) and the harness/taxonomy PR — note the migration-number collision: #6 defines 0034/0035 (doc-templates/document-drafts) and this branch defines 0034/0035 (wood-taxonomy/register-lookup); whichever merges second must renumber. | Akshay | Pending |
+| Remaining [docs/SCHEMA_DELTAS.md](docs/SCHEMA_DELTAS.md) decisions (#4, #5, #9) | Akshay | Pending |
+| 2 further real client packs for the golden dataset; Kyoto EF access + GreenAlign interface details; product name (`pkg-compliance`) | Akshay | Pending |
+
+### Human-only actions pending — exact commands (never Claude)
+
+```bash
+# Approve Batch 2 EU (repeat per row id; source-url = primary law per row)
+npm run corpus:approve -- --id <EU-row-id> --version <v> --source-url <eur-lex-url> --approved-by "Akshay Tandon" --corpus-version batch-2-eu
+# Approve Batch 2 India (after EU)
+npm run corpus:approve -- --id <IN-row-id> --version <v> --source-url <gazette-url> --approved-by "Akshay Tandon" --corpus-version batch-2-in
+# Approve ISPM-15 v2 (wood taxonomy)
+npm run corpus:approve -- --id INTL-ISPM15-heat-treatment --version 2 --source-url https://www.ippc.int/en/core-activities/standards-setting/ispms/ --approved-by "Akshay Tandon"
+# Approve the 6 evidence-guidance rows
+npm run corpus:approve -- --guidance --id <checkpoint-id> --version <v> --evidence-type <type> --approved-by "Akshay Tandon"
+# Run the extraction harness live (with a funded key)
+ANTHROPIC_API_KEY=… npm run eval:extraction
+```
 
 ### Batch 1 verification pass — ready to paste (human-only)
 

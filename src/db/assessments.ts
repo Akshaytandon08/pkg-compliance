@@ -266,6 +266,7 @@ function toProductionCheckpoint(c: typeof checkpoints.$inferSelect): ProductionC
     confidence: c.confidence,
     laterOfCondition: c.laterOfCondition,
     exemptions: c.exemptions,
+    notApplicableReason: c.notApplicableReason,
   };
 }
 

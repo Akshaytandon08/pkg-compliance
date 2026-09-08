@@ -5,6 +5,8 @@
 // report can show provenance. A component with no weight or no matching factor
 // is left UNRESOLVED (never silently zeroed) and excluded from the total.
 
+import { MATERIAL_PARENT } from "../vocab.ts";
+
 export type EmissionFactor = {
   material: string;
   process: string;
@@ -51,7 +53,12 @@ export type PackFootprint = {
 
 /** Production factor for a material, if one exists. */
 function productionFactor(factors: EmissionFactor[], material: string): EmissionFactor | null {
-  return factors.find((f) => f.material === material && f.process === "production") ?? null;
+  const exact = factors.find((f) => f.material === material && f.process === "production");
+  if (exact) return exact;
+  // Fall back to the parent material's factor (e.g. wood_solid → wood) until
+  // subtype-specific factors exist. Keeps the screening estimate resolved.
+  const parent = MATERIAL_PARENT[material];
+  return parent ? factors.find((f) => f.material === parent && f.process === "production") ?? null : null;
 }
 
 export function computePackFootprint(

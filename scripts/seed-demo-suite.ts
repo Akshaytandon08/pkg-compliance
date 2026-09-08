@@ -57,7 +57,7 @@ const packs: NewAssessment[] = [
       {
         line: "1",
         name: "Pine wood pallet / crate (heat treated)",
-        material: "wood",
+        material: "wood_solid",
         composition: "Pine, heat treated (ISPM 15 HT)",
         weightGrams: 12000,
         sourcedFrom: "IN",
@@ -66,7 +66,7 @@ const packs: NewAssessment[] = [
             evidenceType: "marking",
             reference: `${SD} — IPPC/HT mark IN-747 HT`,
             scopeComponents: ["Pine wood pallet / crate (heat treated)"],
-            scopeMaterials: ["wood"],
+            scopeMaterials: ["wood_solid"],
           },
         ],
       },
