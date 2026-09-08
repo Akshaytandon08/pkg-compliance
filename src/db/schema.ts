@@ -74,6 +74,14 @@ export const extractedClaimStatusEnum = pgEnum("extracted_claim_status", [
   "manual",
 ]);
 
+// --- Evidence request status (Sprint 4 / B1) ------------------------------
+export const evidenceRequestStatusEnum = pgEnum("evidence_request_status", [
+  "open", // link live, awaiting an upload
+  "fulfilled", // at least one document received
+  "cancelled", // withdrawn by the assessor
+  "expired", // past its expires_at
+]);
+
 // Array-valued fields use text[]; allowed values are validated at seed time so
 // vocabulary growth (new materials, roles) never requires an enum migration.
 // The vocabularies live in a client-safe module (no Drizzle) and are re-exported
@@ -404,7 +412,33 @@ export const evidenceDocuments = pgTable("evidence_documents", {
   // Provenance of the upload: 'manual' | 'magic-link' | ... Never guessed.
   source: text("source").notNull(),
   uploadedBy: text("uploaded_by"),
+  // The magic-link request this file was uploaded against (NULL for a manual,
+  // gated-side upload). Set when a supplier uploads via /evidence/[token].
+  evidenceRequestId: integer("evidence_request_id"),
   uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// --- Evidence requests (Sprint 4 / B1, magic-link intake) -----------------
+// One token-scoped request for evidence against a specific gap (checkpoint, and
+// optionally a component). The token is an unguessable public segment for
+// /evidence/[token] — a supplier uploads without an account. v1 does NOT send
+// mail: the assessor gets a generated subject+body to send themselves; a per-message
+// send happens only if RESEND/SMTP is configured and the assessor approves it.
+export const evidenceRequests = pgTable("evidence_requests", {
+  id: serial("id").primaryKey(),
+  assessmentId: integer("assessment_id")
+    .notNull()
+    .references(() => assessments.id, { onDelete: "cascade" }),
+  checkpointId: text("checkpoint_id").notNull(), // the gap this request is for
+  componentId: integer("component_id").references(() => assessmentComponents.id, {
+    onDelete: "set null",
+  }),
+  token: text("token").notNull().unique(), // unguessable; public URL segment
+  status: evidenceRequestStatusEnum("status").notNull().default("open"),
+  note: text("note"), // optional free text shown to the supplier
+  expiresAt: timestamp("expires_at", { withTimezone: true }), // NULL = no expiry
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 // Where in a source document an extracted value was read. `page` is 1-based;
