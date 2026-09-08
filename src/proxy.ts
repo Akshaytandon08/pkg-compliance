@@ -31,9 +31,11 @@ export function proxy(req: NextRequest) {
 // SAME pattern and its bypass reasoning live in src/lib/access-gate.ts (kept
 // next-free so it is unit-testable, tests/passport-auth.test.ts); keep the two in
 // sync. Bypassed: _next/static, _next/image, favicon.ico, the public brand assets,
-// the public passport/ tier, the public evidence/ intake page, and the public
-// api/public/ namespace. Everything else — app routes and the authoring APIs —
-// stays gated.
+// the public passport/ tier, the public evidence/ intake page, the public
+// api/public/ namespace, and the health probe (api/health — only {status,
+// database}, no user data, so the post-deploy smoke reaches it on the production
+// alias; anchored `$` so nothing under it is bypassed). Everything else — app
+// routes and every other API route, including the authoring APIs — stays gated.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|brand/|passport/|evidence/|api/public/).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|brand/|passport/|evidence/|api/public/|api/health$).*)"],
 };
