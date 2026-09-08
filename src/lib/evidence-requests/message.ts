@@ -68,3 +68,13 @@ export function renderRequestMessage(input: RequestMessageInput): RequestMessage
 export function isOutboundMailConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY || process.env.SMTP_URL);
 }
+
+/** True when a request is past its expiry (by status or by expires_at). Lives
+ *  here (not in a component) so the time read stays out of render. */
+export function isRequestExpired(
+  req: { status: string; expiresAt: Date | null },
+  now = Date.now(),
+): boolean {
+  if (req.status === "expired") return true;
+  return req.expiresAt != null && req.expiresAt.getTime() < now;
+}
