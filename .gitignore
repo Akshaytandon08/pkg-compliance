@@ -26,3 +26,6 @@ next-env.d.ts
 
 # Local evidence-document store (Sprint 4 / A1 dev + tests)
 .evidence-store/
+
+# Harness run outputs (large, regenerated)
+eval/extraction/results/

@@ -22,7 +22,8 @@
     "corpus:review": "node scripts/corpus-review.ts",
     "corpus:approve": "node scripts/corpus-approve.ts",
     "corpus:reject": "node scripts/corpus-reject.ts",
-    "corpus:verify": "node scripts/corpus-verify.ts"
+    "corpus:verify": "node scripts/corpus-verify.ts",
+    "eval:extraction": "node --env-file=.env eval/extraction/run.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
