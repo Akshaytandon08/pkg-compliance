@@ -18,8 +18,8 @@
 //   template already stores its source_citation + source_url.
 //
 // All are human-run. Nothing self-approves.
-import { eq } from "drizzle-orm";
-import { corpusVersions } from "../src/db/schema.ts";
+import { and, eq } from "drizzle-orm";
+import { corpusVersions, checkpoints } from "../src/db/schema.ts";
 import { promoteCheckpointToInForce } from "../src/db/corpus.ts";
 import { approveGuidance } from "../src/db/guidance.ts";
 import { approveDocTemplate } from "../src/db/doc-templates.ts";
@@ -95,6 +95,22 @@ const label =
 
 const { sql, db } = connect();
 try {
+  // Validate the TARGET before creating a corpus version. promoteCheckpointToInForce
+  // already refuses a non-draft checkpoint, but it runs AFTER the version insert —
+  // so a bad target used to leave an orphan empty corpus version (the incident
+  // that produced the empty `corpus-2026-09-08`; see the Decision log). Check the
+  // checkpoint exists and is draft first; create no version if it does not.
+  const [target] = await db
+    .select({ status: checkpoints.status })
+    .from(checkpoints)
+    .where(and(eq(checkpoints.id, id), eq(checkpoints.version, version)));
+  if (!target) {
+    throw new Error(`checkpoint ${id}@${version} does not exist — no corpus version created`);
+  }
+  if (target.status !== "draft") {
+    throw new Error(`checkpoint ${id}@${version} is '${target.status}', not 'draft' — no corpus version created`);
+  }
+
   let [cv] = await db.select().from(corpusVersions).where(eq(corpusVersions.label, label));
   if (!cv) {
     [cv] = await db.insert(corpusVersions).values({ label, approvedBy }).returning();

@@ -6,6 +6,17 @@ Correct behaviour when asked to approve/reject/verify: **print the exact command
 
 (Recorded incident: on 2026-08-11 Claude executed the batch-1 `corpus:approve` pass on the user's explicit instruction. That was wrong under this rule. The approvals stand; the rule prevents recurrence. See the plan's Decision log.)
 
+# Migrations — one branch adds, the second renumbers
+
+Drizzle migrations are numbered sequentially (`0034_…`, `0035_…`) with a shared
+`drizzle/meta/_journal.json`. **Two parallel branches must not both add a
+migration at the same index.** Whichever branch lands second **renumbers its own
+migrations** to follow the first (regenerate the snapshot + journal entry; keep
+any hand-written data migration body). Two branches each defining `0034/0035`
+already caused one collision (doc-drafting vs the harness branch — resolved by
+renumbering doc-drafting to `0036/0037`; see the Decision log). The CI from-zero
+migration chain is what makes a duplicate index or a bad renumber fail loudly.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

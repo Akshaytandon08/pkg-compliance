@@ -101,3 +101,57 @@ Checkpoint-level:
 Organisation-level (Stack B registration):
 - **`official_register`**, **`register_operator`**, **`producer_responsibility_organisation`** — THREE separate columns. A PRO (CITEO, CONAI…) is never a register; a DB CHECK (`checkpoints_register_not_pro`) plus a corpus test refuse a PRO value in `official_register`.
 - **`registration_threshold`** vs **`contribution_threshold`** (text, optional) — kept separate (the NL lesson): the threshold to *register* and the threshold to *contribute/report* can differ.
+
+## 11. The extraction claim-type vocabulary omitted ~half the expected fields — RESOLVED, implemented
+
+**Ruling (2026-09-09): approved and implemented** (Part 3b). Not a migration:
+`extracted_claims.claim_type` is a `text` column, so extending the vocabulary is a
+change to the *prompt/tool schema surface* and the deterministic matcher, not to
+the database.
+
+**How it surfaced.** The Part 1 error analysis
+([docs/extraction-error-analysis.md](extraction-error-analysis.md)) classified every
+missed field across both models. Class (b) — "comparison too strict" — was **empty
+(0 of 393 fields)**, so no comparison fix could help. Instead the most-missed
+parameters shared one property: **no `claim_type` slot existed for them**, and the
+Anthropic tool `input_schema` constrains `claim_type` to that enum — so the model
+*could not emit them however it was instructed*. Counts of 10/10 (5 documents × 2
+models) mean missed on every document by both models:
+
+| Class | Structurally-missed parameters (miss count) |
+|---|---|
+| supplier_declaration | signatory_designation (20), signatory_name (19), batch_reference (18), compliance_standard (13), heavy_metals_sum_limit (12), document_reference (10), length/width/dynamic_load_capacity/construction (10 each) |
+| lab_test_report | product_grade, accreditation_reference, screening_method, signatory_name, signatory_designation, document_reference, batch_reference, client, sample_received_date, test_start_date (10 each) |
+| heat_treatment_certificate | quantity, document_valid_until, signatory_name, signatory_designation, ippc_country_code, ippc_provider_code (10 each), batch_reference, treatment_code (9), ippc_mark_code, document_reference (8) |
+| mill_declaration | inks, adhesives, coatings, signatory_name, signatory_designation (10 each), virgin_fibre_share, substance_minimisation_standard, heavy_metals_sum_limit, batch_reference (8) |
+
+**Added.** Shared document-identity types on all four classes — `signatory`
+(parameter `name` \| `designation`), `document_reference`, `batch_or_lot_reference`,
+`document_validity`. Per class: supplier gains `stated_limit`,
+`compliance_standard`, `physical_dimension`; lab gains `product_grade`,
+`client_identity`, `screening_method`, `sample_date`; heat-treatment gains
+`ippc_mark_element` (parameter `country_code` \| `producer_code` \|
+`treatment_code` \| `mark_code`) and `physical_dimension`; mill gains
+`virgin_fibre_share`, `substance_group_statement` (inks/adhesives/coatings),
+`compliance_standard`, `stated_limit`.
+
+**Propagation (the part that makes it more than a prompt edit).**
+- **Evidence matcher** ([src/lib/extraction/matching.ts](../src/lib/extraction/matching.ts)):
+  `ippc_mark_element` satisfies `marking` evidence — an element read off the stamp
+  *is* the ISPM-15 marking, exactly as the whole mark is. `substance_group_statement`
+  and `virgin_fibre_share` carry `supplier_declaration`.
+- **Deliberate non-evidence.** `METADATA_CLAIM_TYPES` names the types that identify
+  or date a document but close no checkpoint (signatory, document_reference,
+  batch_or_lot_reference, document_validity, physical_dimension, client_identity,
+  sample_date, product_grade, compliance_standard, screening_method). They are
+  absent from the evidence map **by decision**, so a reviewer can tell the omission
+  is intentional rather than an oversight.
+- **Flag wiring.** A `stated_limit` / `compliance_standard` claim now carries the
+  cited standard, so a limit quoted against the wrong standard feeds
+  `flag_wrong_standard` (previously only a `test_method` claim could trigger it).
+- **Prompts** bumped to `1.2.0`, one changelog entry per class naming the missed
+  parameters the addition targets.
+
+**Unchanged:** the LLM still only *extracts*; every claim remains a
+pending-confirmation proposal judged by the deterministic engine, and corpus
+approval discipline is untouched.
