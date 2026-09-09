@@ -21,9 +21,14 @@ export function resolveStorageBackend(): "local" | "blob" | "s3" {
   if (backend !== "local" && backend !== "blob" && backend !== "s3") {
     throw new Error(`unknown EVIDENCE_STORAGE_BACKEND: ${backend}`);
   }
-  if (backend === "local" && process.env.VERCEL_ENV === "production") {
+  // Refuse local-FS on ANY deployed Vercel environment. Preview is the same
+  // read-only serverless filesystem as production, so a preview that fell back to
+  // local-FS would fail identically (and silently pass review). `development`
+  // (i.e. `vercel dev`) runs on a real writable filesystem and is allowed.
+  const deployedEnv = process.env.VERCEL_ENV === "production" || process.env.VERCEL_ENV === "preview";
+  if (backend === "local" && deployedEnv) {
     throw new Error(
-      "refusing local-filesystem storage in production (VERCEL_ENV=production): Vercel's filesystem is read-only, so document/evidence writes would fail. Create a Vercel Blob store so BLOB_READ_WRITE_TOKEN is set (Storage → Blob), or set EVIDENCE_STORAGE_BACKEND explicitly.",
+      `refusing local-filesystem storage on a deployed environment (VERCEL_ENV=${process.env.VERCEL_ENV}): Vercel's filesystem is read-only, so document/evidence writes would fail. Create a Vercel Blob store so BLOB_READ_WRITE_TOKEN is set (Storage → Blob), or set EVIDENCE_STORAGE_BACKEND explicitly.`,
     );
   }
   return backend;

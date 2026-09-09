@@ -78,8 +78,15 @@ test("resolveStorageBackend: auto-selects blob by token, refuses local-FS in pro
     process.env.VERCEL_ENV = "production";
     assert.throws(() => resolveStorageBackend(), /read-only|refusing local/i); // prod + no blob → refuse
 
+    process.env.VERCEL_ENV = "preview";
+    assert.throws(() => resolveStorageBackend(), /read-only|refusing local/i); // preview is read-only too
+
+    process.env.VERCEL_ENV = "development";
+    assert.equal(resolveStorageBackend(), "local"); // `vercel dev` has a writable FS
+
+    process.env.VERCEL_ENV = "production";
     process.env.EVIDENCE_STORAGE_BACKEND = "local";
-    assert.throws(() => resolveStorageBackend(), /production/i); // explicit local in prod still refused
+    assert.throws(() => resolveStorageBackend(), /deployed environment/i); // explicit local in prod still refused
 
     process.env.BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_test_xxx";
     process.env.EVIDENCE_STORAGE_BACKEND = "blob";
