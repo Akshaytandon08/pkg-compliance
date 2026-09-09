@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile, access } from "node:fs/promises";
+import { mkdir, readFile, writeFile, access, unlink } from "node:fs/promises";
 import { constants } from "node:fs";
 import path from "node:path";
 import { isSafeStorageKey, type StorageAdapter } from "./types.ts";
@@ -43,6 +43,15 @@ export class LocalFilesystemAdapter implements StorageAdapter {
       return true;
     } catch {
       return false;
+    }
+  }
+
+  async delete(key: string): Promise<void> {
+    try {
+      await unlink(this.resolve(key));
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === "ENOENT") return; // idempotent
+      throw e;
     }
   }
 }

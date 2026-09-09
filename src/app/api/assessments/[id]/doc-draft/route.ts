@@ -15,9 +15,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const result = await generateDoCDraft(assessmentId, languages, by);
   if (result.ok) return Response.json({ ok: true, drafts: result.drafts }, { status: 201 });
-  if (result.reason === "not_found") return Response.json({ error: "Assessment not found." }, { status: 404 });
-  if (result.reason === "not_eligible") {
-    return Response.json({ error: "Not eligible for a draft.", blockers: result.eligibility.blockers }, { status: 409 });
+  // Every failure returns a category the panel renders verbatim, plus specifics,
+  // instead of a bare "Generation failed." The full error is already logged
+  // server-side (with the assessment id) by the generator.
+  switch (result.reason) {
+    case "not_found":
+      return Response.json({ error: "Assessment not found.", category: "not_found" }, { status: 404 });
+    case "not_eligible":
+      return Response.json(
+        { error: "Eligibility changed — this assessment no longer qualifies for a draft.", category: "eligibility_changed", blockers: result.eligibility.blockers },
+        { status: 409 },
+      );
+    case "template_pending":
+      return Response.json({ error: result.message, category: "template_not_approved", blockers: [result.message] }, { status: 409 });
+    case "render_failed":
+      return Response.json({ error: result.message, category: "render_failed" }, { status: 500 });
+    case "storage_unavailable":
+      return Response.json({ error: result.message, category: "storage_unavailable" }, { status: 503 });
   }
-  return Response.json({ error: result.message, blockers: [result.message] }, { status: 409 });
 }

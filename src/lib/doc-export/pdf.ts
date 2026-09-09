@@ -1,11 +1,13 @@
 import PDFDocument from "pdfkit";
 import type { DocBlock, DraftDocument } from "./model.ts";
+import { registerPdfBrandFonts, type BrandFontNames } from "./fonts.ts";
 
 // PDF preview generated from the SAME structured model as the .docx (not from
 // markdown). Fitsol brand colours + wordmark + green accent rule, and the DRAFT
 // watermark stamped diagonally on every page and repeated in the footer. The PDF
 // is the in-browser preview; the .docx is the document the manufacturer signs.
-// (Preview uses a system sans; the .docx carries DM Sans.)
+// DM Sans (bundled TTFs) is embedded via registerPdfBrandFonts; if the TTFs are
+// unavailable it falls back to the built-in Helvetica family (see fonts.ts).
 
 const CONTENT_WIDTH = 595.28 - 72 * 2; // A4 width minus margins
 
@@ -13,7 +15,7 @@ function hex(c: string): string {
   return c.startsWith("#") ? c : `#${c}`;
 }
 
-function drawTable(doc: PDFKit.PDFDocument, columns: string[], rows: string[][], brand: DraftDocument["brand"]) {
+function drawTable(doc: PDFKit.PDFDocument, columns: string[], rows: string[][], brand: DraftDocument["brand"], f: BrandFontNames) {
   const colW = CONTENT_WIDTH / columns.length;
   const x0 = doc.page.margins.left;
   const pad = 4;
@@ -31,17 +33,17 @@ function drawTable(doc: PDFKit.PDFDocument, columns: string[], rows: string[][],
     }
   };
   // header
-  const hH = rowHeight(columns, "Helvetica-Bold");
+  const hH = rowHeight(columns, f.bold);
   ensure(hH);
   doc.rect(x0, y, CONTENT_WIDTH, hH).fill(hex("02402D"));
-  doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(9);
+  doc.fillColor("#FFFFFF").font(f.bold).fontSize(9);
   columns.forEach((c, i) => doc.text(c, x0 + i * colW + pad, y + pad, { width: colW - pad * 2 }));
   y += hH;
   // body
   for (const r of rows) {
-    const rH = rowHeight(r, "Helvetica");
+    const rH = rowHeight(r, f.regular);
     ensure(rH);
-    doc.font("Helvetica").fontSize(9).fillColor(hex(brand.n800));
+    doc.font(f.regular).fontSize(9).fillColor(hex(brand.n800));
     r.forEach((cell, i) => doc.text(cell, x0 + i * colW + pad, y + pad, { width: colW - pad * 2 }));
     doc.strokeColor("#CCCDD4").lineWidth(0.5).rect(x0, y, CONTENT_WIDTH, rH).stroke();
     y += rH;
@@ -50,77 +52,77 @@ function drawTable(doc: PDFKit.PDFDocument, columns: string[], rows: string[][],
   doc.x = x0;
 }
 
-function renderBlock(doc: PDFKit.PDFDocument, block: DocBlock, brand: DraftDocument["brand"]) {
+function renderBlock(doc: PDFKit.PDFDocument, block: DocBlock, brand: DraftDocument["brand"], f: BrandFontNames) {
   const left = doc.page.margins.left;
   doc.x = left;
   switch (block.type) {
     case "wordmark":
-      doc.font("Helvetica-Bold").fontSize(20).fillColor(hex(brand.green)).text(brand.wordmark, { continued: false });
+      doc.font(f.bold).fontSize(20).fillColor(hex(brand.green)).text(brand.wordmark, { continued: false });
       doc.moveTo(left, doc.y + 2).lineTo(left + CONTENT_WIDTH, doc.y + 2).lineWidth(2).strokeColor(hex(brand.green)).stroke();
       doc.moveDown(0.8);
       break;
     case "title":
-      doc.font("Helvetica-Bold").fontSize(18).fillColor(hex(brand.n800)).text(block.text, { align: "center" });
+      doc.font(f.bold).fontSize(18).fillColor(hex(brand.n800)).text(block.text, { align: "center" });
       doc.moveDown(0.2);
       break;
     case "subtitle":
-      doc.font("Helvetica").fontSize(11).fillColor(hex(brand.n600)).text(block.text, { align: "center" });
+      doc.font(f.regular).fontSize(11).fillColor(hex(brand.n600)).text(block.text, { align: "center" });
       doc.moveDown(0.6);
       break;
     case "metaRows":
       doc.fontSize(9);
       for (const [k, v] of block.rows) {
-        doc.font("Helvetica-Bold").fillColor(hex(brand.n600)).text(`${k}: `, { continued: true });
-        doc.font("Helvetica").fillColor(hex(brand.n800)).text(v);
+        doc.font(f.bold).fillColor(hex(brand.n600)).text(`${k}: `, { continued: true });
+        doc.font(f.regular).fillColor(hex(brand.n800)).text(v);
       }
       doc.moveDown(0.4);
       break;
     case "heading":
       doc.moveDown(0.4);
-      doc.font("Helvetica-Bold").fontSize(13).fillColor(hex(brand.n800)).text(block.text);
+      doc.font(f.bold).fontSize(13).fillColor(hex(brand.n800)).text(block.text);
       doc.moveDown(0.2);
       break;
     case "paragraph":
-      doc.font(block.muted ? "Helvetica-Oblique" : "Helvetica").fontSize(10).fillColor(hex(block.muted ? brand.n600 : brand.n800)).text(block.text);
+      doc.font(block.muted ? f.italic : f.regular).fontSize(10).fillColor(hex(block.muted ? brand.n600 : brand.n800)).text(block.text);
       doc.moveDown(0.3);
       break;
     case "annexElement": {
       const numeric = /^\d+$/.test(block.ref);
-      doc.font("Helvetica").fontSize(10).fillColor(hex(brand.n800));
+      doc.font(f.regular).fontSize(10).fillColor(hex(brand.n800));
       doc.text(numeric ? `${block.ref}.  ${block.fixedText}` : block.fixedText);
-      if (block.fill) renderField(doc, block.fill, brand);
+      if (block.fill) renderField(doc, block.fill, brand, f);
       doc.moveDown(0.2);
       break;
     }
     case "field":
-      renderField(doc, block.value && block.value.length ? block.value : block.label, brand, !block.value);
+      renderField(doc, block.value && block.value.length ? block.value : block.label, brand, f, !block.value);
       break;
     case "table":
       if (block.caption) {
-        doc.font("Helvetica-Bold").fontSize(9).fillColor(hex(brand.n600)).text(block.caption);
+        doc.font(f.bold).fontSize(9).fillColor(hex(brand.n600)).text(block.caption);
         doc.moveDown(0.2);
       }
-      drawTable(doc, block.columns, block.rows, brand);
+      drawTable(doc, block.columns, block.rows, brand, f);
       break;
     case "articleLines":
       doc.fontSize(10);
       for (const it of block.items) {
-        doc.font("Helvetica-Bold").fillColor(hex(brand.green)).text(`Article ${it.article} — `, { continued: true });
-        doc.font("Helvetica").fillColor(hex(brand.n800)).text(it.text);
+        doc.font(f.bold).fillColor(hex(brand.green)).text(`Article ${it.article} — `, { continued: true });
+        doc.font(f.regular).fillColor(hex(brand.n800)).text(it.text);
       }
       doc.moveDown(0.2);
       break;
     case "bullets":
-      doc.font("Helvetica").fontSize(10).fillColor(hex(brand.n800));
+      doc.font(f.regular).fontSize(10).fillColor(hex(brand.n800));
       for (const it of block.items) doc.text(`•  ${it}`, { indent: 8 });
       doc.moveDown(0.2);
       break;
     case "signatureBlock":
       doc.moveDown(0.6);
-      doc.font("Helvetica-Bold").fontSize(11).fillColor(hex(brand.n800)).text("Signature");
+      doc.font(f.bold).fontSize(11).fillColor(hex(brand.n800)).text("Signature");
       doc.moveDown(0.3);
       for (const l of block.lines) {
-        doc.font("Helvetica").fontSize(9).fillColor(hex(brand.n600)).text(l);
+        doc.font(f.regular).fontSize(9).fillColor(hex(brand.n600)).text(l);
         doc.moveDown(0.1);
         doc.moveTo(left, doc.y).lineTo(left + CONTENT_WIDTH * 0.6, doc.y).lineWidth(0.5).strokeColor("#999AA8").stroke();
         doc.moveDown(0.5);
@@ -128,7 +130,7 @@ function renderBlock(doc: PDFKit.PDFDocument, block: DocBlock, brand: DraftDocum
       break;
     case "notice":
       doc.moveDown(0.3);
-      doc.font("Helvetica-Oblique").fontSize(9).fillColor("#713F12").text(block.text);
+      doc.font(f.italic).fontSize(9).fillColor("#713F12").text(block.text);
       doc.moveDown(0.3);
       break;
     case "spacer":
@@ -137,25 +139,25 @@ function renderBlock(doc: PDFKit.PDFDocument, block: DocBlock, brand: DraftDocum
   }
 }
 
-function renderField(doc: PDFKit.PDFDocument, label: string, brand: DraftDocument["brand"], placeholder = true) {
+function renderField(doc: PDFKit.PDFDocument, label: string, brand: DraftDocument["brand"], f: BrandFontNames, placeholder = true) {
   doc.moveDown(0.15);
-  doc.font("Helvetica-Bold").fontSize(9).fillColor(hex(brand.teal)).text("» To complete by the manufacturer: ", { continued: true });
-  doc.font(placeholder ? "Helvetica-Oblique" : "Helvetica").fillColor(hex(brand.n600)).text(label);
+  doc.font(f.bold).fontSize(9).fillColor(hex(brand.teal)).text("» To complete by the manufacturer: ", { continued: true });
+  doc.font(placeholder ? f.italic : f.regular).fillColor(hex(brand.n600)).text(label);
   doc.moveDown(0.25);
 }
 
-function stampWatermark(doc: PDFKit.PDFDocument, model: DraftDocument) {
+function stampWatermark(doc: PDFKit.PDFDocument, model: DraftDocument, f: BrandFontNames) {
   const { width, height } = doc.page;
   if (model.diagonalWatermark) {
     doc.save();
     doc.rotate(-45, { origin: [width / 2, height / 2] });
-    doc.fillColor(hex(model.brand.green)).fillOpacity(0.07).font("Helvetica-Bold").fontSize(46);
+    doc.fillColor(hex(model.brand.green)).fillOpacity(0.07).font(f.bold).fontSize(46);
     doc.text(model.diagonalWatermark, 0, height / 2 - 30, { width, align: "center" });
     doc.restore();
   }
   // Footer line (always).
   doc.save();
-  doc.fillOpacity(1).font("Helvetica-Bold").fontSize(7).fillColor(hex(model.brand.teal));
+  doc.fillOpacity(1).font(f.bold).fontSize(7).fillColor(hex(model.brand.teal));
   doc.text(model.watermark, doc.page.margins.left, height - doc.page.margins.bottom + 12, { width: CONTENT_WIDTH, align: "center" });
   doc.restore();
 }
@@ -163,18 +165,19 @@ function stampWatermark(doc: PDFKit.PDFDocument, model: DraftDocument) {
 export function renderPdf(model: DraftDocument): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margins: { top: 90, bottom: 60, left: 72, right: 72 }, bufferPages: true, info: { Title: model.title } });
+    const f = registerPdfBrandFonts(doc);
     const chunks: Buffer[] = [];
     doc.on("data", (c: Buffer) => chunks.push(c));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    for (const block of model.blocks) renderBlock(doc, block, model.brand);
+    for (const block of model.blocks) renderBlock(doc, block, model.brand, f);
 
     // Stamp the watermark on every buffered page.
     const range = doc.bufferedPageRange();
     for (let i = range.start; i < range.start + range.count; i++) {
       doc.switchToPage(i);
-      stampWatermark(doc, model);
+      stampWatermark(doc, model, f);
     }
     doc.flushPages();
     doc.end();

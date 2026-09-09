@@ -15,6 +15,7 @@ import {
   WidthType,
 } from "docx";
 import type { DocBlock, DraftDocument } from "./model.ts";
+import { docxBrandFonts } from "./fonts.ts";
 
 // .docx generated directly from the structured model via controlled composition —
 // NOT markdown conversion. Fitsol brand system applied: DM Sans default font, N800
@@ -200,9 +201,14 @@ export async function renderDocx(doc: DraftDocument): Promise<Buffer> {
     ],
   });
 
+  // Embed DM Sans so the .docx carries the brand font itself, not just its name
+  // (docxBrandFonts returns [] if the TTF is unreadable — Word then substitutes by
+  // family name, the prior behaviour).
+  const embeddedFonts = docxBrandFonts();
   const document = new Document({
     creator: "Fitsol pkg-compliance",
     title: doc.title,
+    ...(embeddedFonts.length ? { fonts: embeddedFonts } : {}),
     styles: { default: { document: { run: { font: brand.fontName } } } },
     sections: [
       {

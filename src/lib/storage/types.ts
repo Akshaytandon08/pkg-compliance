@@ -13,6 +13,10 @@ export interface StorageAdapter {
   /** Read the bytes at `key`. Throws if absent. */
   getBytes(key: string): Promise<Uint8Array>;
   exists(key: string): Promise<boolean>;
+  /** Remove the object at `key`. Idempotent: absent key is not an error. Used by
+   *  the storage self-test to clean up its throwaway probe; document keys are
+   *  never deleted in normal operation (a new version gets a new key). */
+  delete(key: string): Promise<void>;
 }
 
 // A generated, traversal-safe key: <prefix>/<32-hex>.<ext>. The hex is random,

@@ -4,6 +4,17 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { LanguageOption } from "@/lib/doc-export/languages";
 
+// Server error categories → human labels shown in the panel (Part 0d), so the
+// user sees "Storage unavailable" / "Template not approved" etc., never a bare
+// "Generation failed." The full error is in the server logs, keyed by assessment.
+const CATEGORY_LABEL: Record<string, string> = {
+  storage_unavailable: "Storage unavailable",
+  template_not_approved: "Template not approved",
+  eligibility_changed: "Eligibility changed",
+  render_failed: "Render failed",
+  not_found: "Assessment not found",
+};
+
 interface Draft {
   id: number;
   version: number;
@@ -44,11 +55,14 @@ export function DoCDraftPanel({
       if (res.ok) {
         router.refresh();
       } else {
-        const data = (await res.json().catch(() => ({}))) as { error?: string; blockers?: string[] };
-        setError(data.blockers?.join(" ") ?? data.error ?? "Generation failed.");
+        const data = (await res.json().catch(() => ({}))) as { error?: string; blockers?: string[]; category?: string };
+        // Prefer the server's error category label, then its message/blockers; the
+        // bare "Generation failed." remains only for a non-JSON/network failure.
+        const label = data.category ? `${CATEGORY_LABEL[data.category] ?? "Generation failed"}: ` : "";
+        setError(label + (data.blockers?.join(" ") ?? data.error ?? "Generation failed."));
       }
     } catch {
-      setError("Generation failed.");
+      setError("Generation failed (network error).");
     } finally {
       setBusy(false);
     }
