@@ -127,6 +127,10 @@ test("every document class has a versioned prompt and a strict tool schema", () 
     };
     const item = schema.properties.claims.items;
     assert.equal(item.additionalProperties, false, `${dc} claim schema must be strict`);
-    assert.deepEqual(item.required, ["claim_type", "confidence", "provenance"]);
+    // `legibility` is REQUIRED on purpose (Part 3a): as an optional field the model
+    // simply omitted it on every claim, and on an obscured document it abstained
+    // wholesale instead of marking the one unreadable field. Required, it must
+    // self-report per field, which is what stops an obscured value being guessed.
+    assert.deepEqual(item.required, ["claim_type", "confidence", "provenance", "legibility"]);
   }
 });

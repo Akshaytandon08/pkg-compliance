@@ -136,10 +136,12 @@ export class AnthropicExtractionProvider implements ExtractionProvider {
       response = await client.messages.create({
         model: this.model,
         max_tokens: MAX_TOKENS,
-        // Sampling pinned for reproducibility (Part 3a): extraction is
-        // transcription, not generation, and the harness measures run-to-run
-        // variance. Recorded in prompt_version so a run is attributable.
-        temperature: 0,
+        // NOTE: `temperature` is NOT sent. Claude Sonnet 5 / Opus 5 reject it
+        // outright — 400 invalid_request_error "`temperature` is deprecated for
+        // this model." Sampling therefore cannot be pinned from the client on
+        // these models, so extraction reproducibility is MEASURED instead:
+        // eval/extraction/run.ts --runs=N reports per-run variance and takes the
+        // UNION of silent errors across runs as the acceptance figure.
         system: prompt.instruction,
         tools: [extractionTool(input)],
         tool_choice: { type: "tool", name: TOOL_NAME },

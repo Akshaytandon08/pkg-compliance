@@ -98,9 +98,15 @@ export function deriveFlags(doc: ManifestDoc, claims: ExtractedClaimDraft[], req
   if (hasPerMetal && !hasSum) add("flag_missing_sum", "per-metal values present but no aggregate sum");
 
   // flag_wrong_standard — the cited heavy-metals method is not the correct one.
+  // Part 3b: a `stated_limit` / `compliance_standard` claim now carries the cited
+  // standard in test_method, so a limit quoted against the wrong standard feeds
+  // this check too (previously only a test_method claim could trigger it).
   for (const c of claims) {
     const method = `${c.testMethod ?? ""} ${c.value ?? ""}`;
-    if (/13695|heavy metal|substance|art(icle)?\s*5/i.test(`${c.parameter ?? ""} ${c.claimType} ${method}`)) {
+    const limitCitesStandard =
+      /^(stated_limit|compliance_standard)$/.test(c.claimType) &&
+      /metal|sum|substance|pb|cd|hg|chrom/i.test(`${c.parameter ?? ""} ${c.value ?? ""}`);
+    if (limitCitesStandard || /13695|heavy metal|substance|art(icle)?\s*5/i.test(`${c.parameter ?? ""} ${c.claimType} ${method}`)) {
       const cited = c.testMethod ?? "";
       if (cited && !HEAVY_METAL_STANDARDS.some((s) => norm(cited).includes(norm(s)))) {
         add("flag_wrong_standard", `cited "${cited}" is not the heavy-metals reference method`);
