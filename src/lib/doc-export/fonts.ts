@@ -42,7 +42,11 @@ export function registerPdfBrandFonts(doc: PDFKit.PDFDocument): BrandFontNames {
 // by family name, which is the prior behaviour.
 export function docxBrandFonts(): { name: string; data: Buffer }[] {
   try {
-    return [{ name: "DM Sans", data: readFileSync(DM_SANS_FILES.regular) }];
+    // turbopackIgnore: this path is not statically analysable (it is composed at
+    // runtime from process.cwd()), and without the opt-out Next traces the WHOLE
+    // project into every function that reaches this module. The fonts are shipped
+    // deliberately via outputFileTracingIncludes in next.config.ts instead.
+    return [{ name: "DM Sans", data: readFileSync(/*turbopackIgnore: true*/ DM_SANS_FILES.regular) }];
   } catch {
     return [];
   }

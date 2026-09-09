@@ -12,7 +12,11 @@ export class LocalFilesystemAdapter implements StorageAdapter {
   private readonly root: string;
 
   constructor(root?: string) {
-    this.root = path.resolve(root ?? process.env.EVIDENCE_STORAGE_DIR ?? ".evidence-store");
+    // turbopackIgnore: the root is runtime-configured, so Next's static analysis
+    // cannot scope it and would trace the WHOLE project into any function that
+    // reaches this module. This adapter is dev/test only — deployed environments
+    // refuse it (see resolveStorageBackend) — so nothing needs tracing here.
+    this.root = path.resolve(/*turbopackIgnore: true*/ root ?? process.env.EVIDENCE_STORAGE_DIR ?? ".evidence-store");
   }
 
   private resolve(key: string): string {
