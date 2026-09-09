@@ -57,6 +57,21 @@ export function deriveFlags(doc: ManifestDoc, claims: ExtractedClaimDraft[], req
   if (!flags.has("flag_low_confidence") && claims.some((c) => c.confidence < LOW_CONFIDENCE)) {
     add("flag_low_confidence", "a claim was below the confidence threshold");
   }
+  // Part 3a: a field the model reported as not fully legible, or a value the
+  // deterministic post-validator rejected as the wrong type, escalates through the
+  // SAME "needs a human" signal (CLAUDE.md: low confidence → escalate, never
+  // guess). Deliberately reusing flag_low_confidence rather than minting a new
+  // flag name keeps the flag vocabulary — and therefore the scoring — stable.
+  if (!flags.has("flag_low_confidence")) {
+    const illegible = claims.find((c) => c.legibility && c.legibility !== "clear");
+    if (illegible) add("flag_low_confidence", `field "${illegible.parameter ?? illegible.claimType}" reported ${illegible.legibility}`);
+  }
+  if (!flags.has("flag_low_confidence")) {
+    const mismatch = claims.find((c) => c.validation === "type_mismatch");
+    if (mismatch) {
+      add("flag_low_confidence", `post-validator rejected "${mismatch.rejectedValue}" on "${mismatch.parameter ?? mismatch.claimType}" as the wrong type`);
+    }
+  }
 
   // flag_scope_mismatch — external requested scope vs the document's own scope.
   if (requestedScope) {

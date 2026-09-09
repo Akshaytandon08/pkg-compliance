@@ -57,6 +57,9 @@ export interface DocScore {
   latencyMs: number;
   inputTokens: number;
   outputTokens: number;
+  /** Per-field legibility self-reports and post-validator rejections (Part 3a). */
+  legibility: { clear: number; partially_obscured: number; illegible: number; unreported: number };
+  typeMismatches: number;
   rawClaims: ExtractedClaimDraft[]; // persisted so Part 2 can re-score offline
 }
 
@@ -86,6 +89,15 @@ export function scoreDoc(doc: ManifestDoc, result: ExtractionResult): DocScore {
   const flagExactMatch = derived.join("|") === expectedFlags.join("|");
   const silentErrors = detectSilentErrors(doc, claims, flags);
 
+  const legibility = { clear: 0, partially_obscured: 0, illegible: 0, unreported: 0 };
+  for (const c of claims) {
+    if (c.legibility === "clear") legibility.clear++;
+    else if (c.legibility === "partially_obscured") legibility.partially_obscured++;
+    else if (c.legibility === "illegible") legibility.illegible++;
+    else legibility.unreported++;
+  }
+  const typeMismatches = claims.filter((c) => c.validation === "type_mismatch").length;
+
   return {
     file: doc.file,
     class: doc.class,
@@ -104,6 +116,8 @@ export function scoreDoc(doc: ManifestDoc, result: ExtractionResult): DocScore {
     latencyMs: result.latencyMs,
     inputTokens: result.usage.inputTokens,
     outputTokens: result.usage.outputTokens,
+    legibility,
+    typeMismatches,
     rawClaims: claims,
   };
 }
@@ -126,6 +140,9 @@ export interface ModelReport {
   flagFN: number;
   silentErrorCount: number;
   silentErrors: SilentError[];
+  /** Summed per-field legibility reports and post-validator rejections. */
+  legibility: { clear: number; partially_obscured: number; illegible: number; unreported: number };
+  typeMismatches: number;
   refusals: number;
   usableRate: number;
   medianLatencyMs: number;
@@ -173,6 +190,16 @@ export function aggregate(model: string, scores: DocScore[]): ModelReport {
     flagFN: fn,
     silentErrorCount: silentErrors.length,
     silentErrors,
+    legibility: scores.reduce(
+      (a, s2) => ({
+        clear: a.clear + s2.legibility.clear,
+        partially_obscured: a.partially_obscured + s2.legibility.partially_obscured,
+        illegible: a.illegible + s2.legibility.illegible,
+        unreported: a.unreported + s2.legibility.unreported,
+      }),
+      { clear: 0, partially_obscured: 0, illegible: 0, unreported: 0 },
+    ),
+    typeMismatches: scores.reduce((a, s2) => a + s2.typeMismatches, 0),
     refusals: scores.filter((s) => s.status === "refused").length,
     usableRate: scores.length ? scores.filter((s) => s.usable).length / scores.length : 0,
     medianLatencyMs: median(scores.map((s) => s.latencyMs)),

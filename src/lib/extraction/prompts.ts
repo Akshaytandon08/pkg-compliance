@@ -32,12 +32,29 @@ never infer or fill a plausible default. Set confidence in [0,1] to your own
 certainty that the value is correct AND correctly located; when the text is
 ambiguous, faint, or partly illegible, lower the confidence rather than guessing.
 Dates must be ISO (YYYY-MM-DD). You judge nothing about compliance — you only
-transcribe values and where they came from.`;
+transcribe values and where they came from.
+
+LEGIBILITY (report per field, mandatory): set legibility to "clear" only when the
+value is fully readable. Set "partially_obscured" when it is redacted, blacked
+out, overprinted, cut off, or only partly readable; set "illegible" when you
+cannot read it at all. When legibility is NOT "clear" you MUST set value to null.
+Do not guess, do not reconstruct from context, and do not infer an obscured
+figure from surrounding values or from what would be plausible or compliant. A
+null value with a legibility flag is the CORRECT answer; a plausible-looking
+guess is the worst possible answer, because a reviewer cannot tell it is wrong.
+
+VALUE TYPE: a measurement, limit, percentage, quantity or sum must be a NUMBER
+(optionally with a comparator and a unit, e.g. "12.4", "<0.5", "30%"). Never put
+a method name, standard reference, or sentence in such a field — if the number is
+not stated, omit the claim or mark it illegible.`;
 
 const supplierDeclaration: DocClassPrompt = {
   docClass: "supplier_declaration",
-  version: "1.0.0",
-  changelog: [{ version: "1.0.0", date: "2026-09-08", note: "Initial supplier-declaration prompt." }],
+  version: "1.1.0",
+  changelog: [
+    { version: "1.0.0", date: "2026-09-08", note: "Initial supplier-declaration prompt." },
+    { version: "1.1.0", date: "2026-09-09", note: "Part 3a abstention hardening. Targets the guessed-obscured-value silent errors and the type-mismatch case (heavy_metals_sum returned as the method string \"CR 13695-1:2000\"): per-field legibility must be reported, a non-clear field must carry value null, and measurement/limit/sum fields must be numeric. Sampling pinned to temperature=0." },
+  ],
   instruction: `You are extracting values from a SUPPLIER DECLARATION / declaration of
 conformity for packaging material. Extract: the material(s) declared, any stated
 recycled-content percentage, restricted-substance statements (heavy metals, SVHC,
@@ -54,8 +71,11 @@ of what the declaration covers, and issue/validity dates. ${SHARED_RULES}`,
 
 const labTestReport: DocClassPrompt = {
   docClass: "lab_test_report",
-  version: "1.0.0",
-  changelog: [{ version: "1.0.0", date: "2026-09-08", note: "Initial lab-test-report prompt." }],
+  version: "1.1.0",
+  changelog: [
+    { version: "1.0.0", date: "2026-09-08", note: "Initial lab-test-report prompt." },
+    { version: "1.1.0", date: "2026-09-09", note: "Part 3a abstention hardening: per-field legibility, null value when not clear, numeric-only measured values and stated limits. Targets obscured detection-limit/result guessing on Tier-C/D scans. Sampling pinned to temperature=0." },
+  ],
   instruction: `You are extracting values from a LABORATORY TEST REPORT. Extract each
 measured parameter with its result and unit, the test method/standard used
 (e.g. EN 71-3, ISO 17294), the pass/fail limit the lab printed (as stated, not
@@ -73,8 +93,11 @@ reference, the sample/scope described, and the report date. ${SHARED_RULES}`,
 
 const heatTreatmentCertificate: DocClassPrompt = {
   docClass: "heat_treatment_certificate",
-  version: "1.0.0",
-  changelog: [{ version: "1.0.0", date: "2026-09-08", note: "Initial ISPM-15 / heat-treatment prompt." }],
+  version: "1.1.0",
+  changelog: [
+    { version: "1.0.0", date: "2026-09-08", note: "Initial ISPM-15 / heat-treatment prompt." },
+    { version: "1.1.0", date: "2026-09-09", note: "Part 3a abstention hardening: per-field legibility, null value when not clear, numeric-only temperature/duration/quantity. Targets guessed treatment figures on obscured stamps. Sampling pinned to temperature=0." },
+  ],
   instruction: `You are extracting values from a HEAT-TREATMENT / ISPM-15 certificate for
 wood packaging. Extract: the treatment type (HT / heat treatment) and the
 temperature/duration stated, the ISPM-15 mark or registration number, the treating
@@ -91,8 +114,11 @@ treatment/issue dates. ${SHARED_RULES}`,
 
 const millDeclaration: DocClassPrompt = {
   docClass: "mill_declaration",
-  version: "1.0.0",
-  changelog: [{ version: "1.0.0", date: "2026-09-08", note: "Initial mill-declaration prompt." }],
+  version: "1.1.0",
+  changelog: [
+    { version: "1.0.0", date: "2026-09-08", note: "Initial mill-declaration prompt." },
+    { version: "1.1.0", date: "2026-09-09", note: "Part 3a abstention hardening: per-field legibility, null value when not clear, numeric-only recycled/virgin share and sums. Targets the MUF_resin_solids_content guess (25 where truth was 55) and heavy_metals_sum type mismatch. Sampling pinned to temperature=0." },
+  ],
   instruction: `You are extracting values from a MILL DECLARATION for paper/board. Extract:
 the grade and fibre composition, any recycled-fibre percentage, certification
 scheme references (FSC/PEFC) and chain-of-custody numbers, the mill (issuer), the
@@ -147,6 +173,10 @@ export function buildClaimToolSchema(docClass: DocClass): Record<string, unknown
             issue_date: { type: "string", format: "date" },
             expiry: { type: "string", format: "date" },
             scope_text: { type: "string" },
+            // Per-field legibility self-report (Part 3a). Anything but "clear"
+            // must come with value omitted/null — the prompt states the rule and
+            // the deterministic post-validator enforces it.
+            legibility: { type: "string", enum: ["clear", "partially_obscured", "illegible"] },
             // NOTE: Anthropic tool input_schema does not support the JSON-Schema
             // range/size keywords (minimum/maximum on numbers, minItems/maxItems on
             // arrays) — including any of them returns a 400. The bounds are stated
