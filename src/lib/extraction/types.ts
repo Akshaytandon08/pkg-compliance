@@ -25,6 +25,18 @@ export interface ExtractionInput {
   scanned?: boolean;
 }
 
+// How legible the source region was for THIS field. The model reports it per
+// field; anything but `clear` must come with value === null (abstention), never a
+// guess — that is the rule that keeps an obscured figure from being invented.
+export const LEGIBILITY = ["clear", "partially_obscured", "illegible"] as const;
+export type Legibility = (typeof LEGIBILITY)[number];
+
+// Outcome of deterministic post-validation of a model-proposed claim.
+// `type_mismatch`: the value is not of the type the parameter requires (e.g. a
+// method string where a number is expected). The value is NOT stored — it is
+// nulled and the offending text preserved in `rejectedValue` for the reviewer.
+export type ClaimValidation = "ok" | "type_mismatch";
+
 // One extracted value, shaped to map straight onto an extracted_claims row. Every
 // draft carries a confidence self-score and provenance; a draft with neither is
 // not a usable claim.
@@ -41,6 +53,12 @@ export interface ExtractedClaimDraft {
   scopeText?: string | null;
   confidence: number; // 0..1 model self-score
   provenance: ClaimProvenance;
+  /** Per-field legibility self-report (Part 3a). Absent = treated as `clear`. */
+  legibility?: Legibility | null;
+  /** Deterministic post-validation verdict. Absent = not yet validated. */
+  validation?: ClaimValidation | null;
+  /** The value rejected by post-validation, kept for inspection, never as a value. */
+  rejectedValue?: string | null;
 }
 
 export type ExtractionStatus = "succeeded" | "refused" | "failed";

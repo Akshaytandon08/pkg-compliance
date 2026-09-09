@@ -56,13 +56,39 @@ Target: **Vercel + managed Postgres** (Vercel Postgres, Neon, or Supabase — an
 | Var | Vercel scope | Purpose |
 |---|---|---|
 | `DATABASE_URL` | Production (+ Development) | Managed Postgres connection string (Postgres 16) — the **production** database. |
-| `PREVIEW_DATABASE_URL` | **Preview** | A **separate** Postgres 16 database for preview deployments. When `VERCEL_ENV=preview` (set automatically by Vercel), both migrations (`vercel-build`) and runtime use this instead of `DATABASE_URL`, so previews never read or migrate production (`src/db/database-url.ts`). If unset on a preview, the app warns and falls back to `DATABASE_URL` — set this to keep previews isolated. |
+| `PREVIEW_DATABASE_URL` | **Preview** — **REQUIRED** | A **separate** Postgres 16 database for preview deployments. When `VERCEL_ENV=preview` (set automatically by Vercel), both migrations (`vercel-build`) and runtime use this instead of `DATABASE_URL`, so previews never read or migrate production (`src/db/database-url.ts`). If unset on a preview, the app warns and falls back to `DATABASE_URL` — set this to keep previews isolated. |
 | `BASIC_AUTH_USER`, `BASIC_AUTH_PASSWORD` | Production + Preview | **Access gate.** When both are set, every route requires HTTP Basic Auth (`src/proxy.ts`) — client BOM data must not sit on an open URL. Leave unset only for local dev. **Exception:** the public passport tier `/passport/<token>` is deliberately ungated (see below). |
-| `ANTHROPIC_API_KEY` | — | Reserved for the extraction pipeline (not yet used). |
+| `BLOB_READ_WRITE_TOKEN` | Production + Preview — **REQUIRED** | **Object storage (required in production).** Generated DoC drafts and uploaded evidence documents are written through a storage adapter (`src/lib/storage/`). Vercel's serverless filesystem is **read-only**, so the local-FS adapter cannot write there — the app **refuses** local-FS when `VERCEL_ENV` is `production` **or** `preview` and selects the **Vercel Blob** adapter (private access) whenever this token is present. Create a Blob store in **Vercel → Storage → Blob**; the token is injected as this env var automatically. Without it, "Generate draft" and evidence upload fail (the post-deploy smoke's storage self-test goes red). |
+| `EVIDENCE_STORAGE_BACKEND` | (optional) | Force the adapter: `local` or `blob`. Unset = auto (Blob when `BLOB_READ_WRITE_TOKEN` is present, else local). `local` is refused on any deployed environment (production/preview). |
+| `ANTHROPIC_API_KEY` | Production + Preview | Extraction pipeline (Claude API). Never logged. |
 
-**Env-var mapping (Vercel → Settings → Environment Variables):** add `DATABASE_URL` scoped to *Production* (and *Development*), and `PREVIEW_DATABASE_URL` scoped to *Preview*. `VERCEL_ENV` is provided by Vercel automatically — no need to set it.
+### Required setup — do these two before the first deploy
 
-**Post-deploy smoke.** [`.github/workflows/deploy-smoke.yml`](.github/workflows/deploy-smoke.yml) runs on a successful **Production** `deployment_status` and hits `/api/health` (`scripts/smoke.ts` / `npm run smoke -- <origin>`), failing on anything but `{status:"ok",database:"connected"}`. It probes the **stable production alias only**: set the repo variable **`PRODUCTION_URL`** (`Settings → Secrets and variables → Actions → Variables`) to the alias (e.g. `https://pkg-compliance.vercel.app`); if it is unset the job **fails loudly** rather than fall back to the deployment-hash URL from the `deployment_status` payload — those hosts sit behind Vercel *Standard Protection* and return HTTP 401 "Protected deployment", so smoking one is meaningless. `scripts/smoke.ts` additionally **refuses** any `*.vercel.app` deployment-hash host as a recurrence guard. The app makes this reachable by bypassing Basic Auth for **exactly** `/api/health` (it returns only `{status, database}` — no user data; every other `/api` route stays gated), so no protection toggle or bypass token is needed for the alias.
+Both are **required**; the app fails loudly rather than degrading if either is missing.
+
+**1. Object storage (`BLOB_READ_WRITE_TOKEN`) — without it, document generation and evidence upload cannot work at all.**
+Vercel's serverless filesystem is **read-only**, so the local-FS adapter cannot write there. The app therefore *refuses* local-FS whenever `VERCEL_ENV` is `production` or `preview` (`development`/`vercel dev` still uses it), and selects the **Vercel Blob** adapter (private access) when the token is present.
+
+1. Vercel dashboard → **Storage** → **Blob** → **Create store** (accept the default region).
+2. Connect the store to the `pkg-compliance` project when prompted. Vercel injects **`BLOB_READ_WRITE_TOKEN`** automatically, scoped to *Production* and *Preview* — you do not paste it by hand.
+3. **Redeploy.** Creating the variable does **not** apply to already-running deployments; production picks it up only on the next deployment.
+
+Verify: `curl -s "https://<alias>/api/health?storage=1"` must return `{"status":"ok","database":"connected","storage":"ok","storageBackend":"blob"}`. The post-deploy smoke asserts exactly this, so a missing token turns the smoke red instead of surfacing as "Generation failed" on a user's first click.
+
+**2. Preview database isolation (`PREVIEW_DATABASE_URL`) — without it, preview builds migrate PRODUCTION.**
+`vercel-build` runs migrations on every deployment. If a preview has no separate database it falls back to `DATABASE_URL`, i.e. it migrates and reads the production database. (This happened: a preview build applied the DoC migrations to production, leaving orphan ledger rows — see the Decision log.)
+
+1. **Neon** → your project → **Branches** → **New branch** off `production`/`main` (name it e.g. `preview`).
+2. Copy that branch's **pooled** connection string (the host containing `-pooler`).
+3. **Vercel** → Settings → **Environment Variables** → add **`PREVIEW_DATABASE_URL`** = that string, scoped to **Preview only** (mark it sensitive).
+
+Alternatively, enable the Neon–Vercel integration's *"Create a database branch for each Preview Deployment"* toggle, which provisions one per preview automatically.
+
+Verify: the preview build log must **not** contain `PREVIEW_DATABASE_URL is unset — falling back to DATABASE_URL`, and should end with `migrations applied successfully!`.
+
+`DATABASE_URL` is scoped to *Production* (and *Development*). `VERCEL_ENV` is provided by Vercel automatically — no need to set it.
+
+**Post-deploy smoke.** [`.github/workflows/deploy-smoke.yml`](.github/workflows/deploy-smoke.yml) runs on a successful **Production** `deployment_status` and hits `/api/health?storage=1` (`scripts/smoke.ts` / `npm run smoke -- <origin>`), failing on anything but `{status:"ok",database:"connected",storage:"ok"}`. The `?storage=1` flag makes the app run a **storage round-trip self-test** (write → read → delete a throwaway object), so a deploy where document storage cannot write — local-FS refused in production, or `BLOB_READ_WRITE_TOKEN` missing — fails smoke here rather than surfacing as "Generation failed" on a user's first click. It probes the **stable production alias only**: set the repo variable **`PRODUCTION_URL`** (`Settings → Secrets and variables → Actions → Variables`) to the alias (e.g. `https://pkg-compliance.vercel.app`); if it is unset the job **fails loudly** rather than fall back to the deployment-hash URL from the `deployment_status` payload — those hosts sit behind Vercel *Standard Protection* and return HTTP 401 "Protected deployment", so smoking one is meaningless. `scripts/smoke.ts` additionally **refuses** any `*.vercel.app` deployment-hash host as a recurrence guard. The app makes this reachable by bypassing Basic Auth for **exactly** `/api/health` (it returns only `{status, database}` — no user data; every other `/api` route stays gated), so no protection toggle or bypass token is needed for the alias.
 
 **Migrations are wired into deploy:** the `vercel-build` script runs `drizzle-kit migrate && next build`, so the hosted DB is migrated on every deployment. (Set the platform Build Command to `npm run vercel-build` if it is not auto-detected.)
 

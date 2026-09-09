@@ -1,10 +1,12 @@
 import { buildClaimToolSchema, getPrompt } from "./prompts.ts";
+import { LEGIBILITY } from "./types.ts";
 import type {
   ExtractedClaimDraft,
   ExtractionInput,
   ExtractionProvider,
   ExtractionResult,
 } from "./types.ts";
+import { validateClaims } from "./validate.ts";
 
 // Narrow view of the Anthropic Messages API. The request/response shapes here are
 // pinned to the current Claude API reference (strict tool use for structured
@@ -60,6 +62,7 @@ interface RawClaim {
   issue_date?: string;
   expiry?: string;
   scope_text?: string;
+  legibility?: string;
   confidence: number;
   provenance: { page: number; span?: [number, number]; bbox?: [number, number, number, number] };
 }
@@ -76,6 +79,9 @@ function toDraft(c: RawClaim): ExtractedClaimDraft {
     issueDate: c.issue_date ?? null,
     expiry: c.expiry ?? null,
     scopeText: c.scope_text ?? null,
+    legibility: (LEGIBILITY as readonly string[]).includes(c.legibility ?? "")
+      ? (c.legibility as ExtractedClaimDraft["legibility"])
+      : null,
     confidence: c.confidence,
     provenance: c.provenance,
   };
@@ -130,6 +136,12 @@ export class AnthropicExtractionProvider implements ExtractionProvider {
       response = await client.messages.create({
         model: this.model,
         max_tokens: MAX_TOKENS,
+        // NOTE: `temperature` is NOT sent. Claude Sonnet 5 / Opus 5 reject it
+        // outright — 400 invalid_request_error "`temperature` is deprecated for
+        // this model." Sampling therefore cannot be pinned from the client on
+        // these models, so extraction reproducibility is MEASURED instead:
+        // eval/extraction/run.ts --runs=N reports per-run variance and takes the
+        // UNION of silent errors across runs as the acceptance figure.
         system: prompt.instruction,
         tools: [extractionTool(input)],
         tool_choice: { type: "tool", name: TOOL_NAME },
@@ -174,7 +186,10 @@ export class AnthropicExtractionProvider implements ExtractionProvider {
       };
     }
 
-    const claims = rawClaims.filter(isUsable).map(toDraft);
+    // Deterministic post-validation: a value of the wrong type for its field, or
+    // a value on a field the model itself marked not fully legible, is rejected
+    // (nulled, offending text preserved) so it can never be stored as a value.
+    const claims = validateClaims(rawClaims.filter(isUsable).map(toDraft));
     return { ...base, status: "succeeded", claims, usage, latencyMs };
   }
 }

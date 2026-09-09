@@ -47,16 +47,33 @@ if (isVercelDeploymentHost(targetOrigin)) {
   process.exit(2);
 }
 
-const url = `${targetOrigin.replace(/\/+$/, "")}/api/health`;
+// Probe with ?storage=1 so the app also runs a storage round-trip self-test — a
+// deploy where document storage cannot write (local-FS refused in production, or
+// a missing Blob token) must fail smoke here, not on a user's first "Generate
+// draft" click. The pathname is still exactly /api/health, so the Basic-Auth
+// bypass applies (the query string is not part of the path).
+const url = `${targetOrigin.replace(/\/+$/, "")}/api/health?storage=1`;
 try {
   const res = await fetch(url, { headers: { accept: "application/json" }, redirect: "follow" });
   const body = await res.json().catch(() => null);
-  if (res.ok && body && body.status === "ok" && body.database === "connected") {
-    console.log(`smoke OK — ${url}`, body);
-    process.exit(0);
+  if (!body || typeof body !== "object") {
+    console.error(`smoke FAILED — ${url} — HTTP ${res.status} — (non-JSON body; likely an auth interstitial)`);
+    process.exit(1);
   }
-  console.error(`smoke FAILED — ${url} — HTTP ${res.status}`, body ?? "(non-JSON body)");
-  process.exit(1);
+  if (!(res.ok && body.status === "ok" && body.database === "connected")) {
+    console.error(`smoke FAILED — ${url} — HTTP ${res.status} — database not connected`, body);
+    process.exit(1);
+  }
+  if (body.storage !== "ok") {
+    console.error(
+      `smoke FAILED — ${url} — storage self-test did not pass (backend=${body.storageBackend ?? "?"}): ${body.storageError ?? "unknown"}.\n` +
+        "Production requires a writable object store: create a Vercel Blob store (Storage → Blob) so BLOB_READ_WRITE_TOKEN is set. Vercel's filesystem is read-only, so the local-FS adapter is refused in production.",
+      body,
+    );
+    process.exit(1);
+  }
+  console.log(`smoke OK — ${url}`, body);
+  process.exit(0);
 } catch (err) {
   console.error(`smoke FAILED — ${url} —`, err instanceof Error ? err.message : err);
   process.exit(1);

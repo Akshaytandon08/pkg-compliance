@@ -3,7 +3,9 @@
 Working codename: `pkg-compliance` (product name TBD — do not invent one).
 Source of truth for product decisions: [docs/BRIEF.md](docs/BRIEF.md). Decisions there are settled; raise deltas to Akshay Tandon (product owner & interim regulatory owner). Every corpus change requires his sign-off — hard gate.
 
-**Status: Batch 1 (12) `in_force` under `batch-1`. Sprint 2a + 2b delivered (report loop, guidance, templates). Batch 2 VALIDATED and ready for approval — 9 EU rows (draft v3, confidence H, reconciled against `docs/ppwr-batch-2-validated.md`) + 7 India rows (draft v2, confidence H, verbatim from `docs/india-pwm-validated.md`); approve EU under `batch-2-eu`, India under `batch-2-in`. Demo-completeness delivered (three-pack suite, Stack D PCF, Stack C passport). CI gate + preview/prod DB separation + post-deploy smoke wired. Deployment prepared; actual deploy needs a Vercel account + managed Postgres. Engine 100% golden agreement. Last updated: 2026-09-07.**
+**Status: PILOT DEPLOYED and the corpus is approved + verified in production.** Production corpus: **29 `in_force`** — `batch-1` (12), `batch-2-eu` (10, including ISPM-15 v2 / wood taxonomy), `batch-2-in` (7) — **all verified** (`citation_verified_date` set). The 6 evidence-guidance rows are **approved + verified**, and the PPWR Annex VIII encoding (`EU-DoC-AnnexVIII@1`) is **approved on production**. Only the **FR Triman** row remains `draft` (unvalidated — deliberately left). Sprints 1–4 delivered (report loop, guidance, templates, three-pack demo suite, Stack D PCF, Stack C passport, DoC draft generator, document extraction v1 + magic-link intake). Hosted at `https://pkg-compliance.vercel.app` with migrate-on-deploy, post-deploy smoke, **Vercel Blob object storage** and an **isolated preview database**. Engine 100% golden agreement (17/17). Extraction synthetic ceiling — **not** the acceptance metric — is **sonnet 9.9% / opus 38.4%** at prompt 1.0.0 under the corrected comparison; see the matcher-fix note below. **Last updated: 2026-09-09.**
+
+> **Corrected extraction ceilings.** Figures previously quoted as *30.5% (sonnet) / 68.7% (opus)* were produced by a field-accuracy matcher with an unsafe token-subset rule (it matched whenever every ≥3-character token of the expected value appeared anywhere in any claim field, so "Grade A" matched "Grade B"). That rule is removed and the safe comparison is pinned by `eval/extraction/canonical.test.ts`. **The corrected figures replace the old ones everywhere.** All extraction numbers in this plan are a SYNTHETIC CEILING on 25 generated documents; acceptance is measured only on the product owner's real, PII-scrubbed set.
 
 ## Hard constraints (enforce in code, verify in review)
 
@@ -251,6 +253,15 @@ Prepared (Commit "Deploy readiness"); execution needs a Vercel account + a manag
 
 ## Decision log
 
+- **2026-09-09 — Production storage is Vercel Blob; the local-FS adapter is refused on any deployed environment.** The production "Generation failed" on the DoC draft button was the storage layer selecting the local-filesystem adapter (the default) and Vercel's serverless filesystem being **read-only** — `storeDraft`'s `mkdir`/`writeFile` threw `EROFS`. Fonts were *not* implicated (the .docx names DM Sans, the PDF used pdfkit's built-in Helvetica; both render in memory before the write). Fixed by implementing `BlobStorageAdapter` (private access; the app reads bytes back server-side with the store token and re-streams them through its own gated routes, so no blob URL reaches a client), auto-selected when `BLOB_READ_WRITE_TOKEN` is present. `resolveStorageBackend` **refuses** local-FS when `VERCEL_ENV` is `production` or `preview` — preview is the same read-only filesystem, so allowing it there would let the failure survive the very review meant to catch it. Enforcement is per-call in `getStorageAdapter`, not at boot, so a misconfiguration fails storage operations rather than taking down health/reports. The post-deploy smoke now probes `/api/health?storage=1`, which does a put→read→delete round-trip, so this class of failure is caught on deploy instead of on a user's first click.
+- **2026-09-09 — Two orphan rows in the production migration ledger, from pre-isolation preview builds (owner-observed).** Reported by the product owner from a direct read of production: **38 rows in `drizzle.__drizzle_migrations` against 36 entries in `main`'s journal** — two extra records written by preview deployments that ran `vercel-build` against the **production** database, because `PREVIEW_DATABASE_URL` did not yet exist and the app fell back to `DATABASE_URL`. The stray `doc_templates` / `document_drafts` objects those builds created were **dropped by the owner on 2026-09-08**, before the renumbered `0036/0037` deploy, and carried only the unapproved Annex VIII seed — no approved row was lost. Recorded here as owner-observed: Claude could not verify it directly (pulling the production database credential was refused, correctly). Root cause is closed by `PREVIEW_DATABASE_URL` (set 2026-09-08, Preview scope) plus the AGENTS.md rule that parallel branches must not both add migrations. The same divergence exists on the local dev DB in a milder form — its ledger holds a *pre-rebase* hash for `0036_doc-templates`, so `db:migrate` there re-applies and collides; see the migrate-runner note below.
+- **2026-09-09 — The empty corpus version `corpus-2026-09-08` came from a failed approval, and `corpus:approve` now validates the target first.** A `corpus:approve` run created the corpus-version row **before** calling `promoteCheckpointToInForce`; when the promotion then failed, the version row was already committed, leaving a corpus version with nothing under it. `scripts/corpus-approve.ts` now checks that the target checkpoint exists **and is `draft`** before any version row is written, and refuses with "no corpus version created" otherwise. The empty `corpus-2026-09-08` label is inert (no checkpoints reference it) and is left in place rather than deleted — production data is not hard-deleted to tidy a record.
+- **2026-09-09 — Neon database password rotation is DEFERRED: accepted risk, owner decision.** The production Neon connection string was pulled into local tooling during the preview-deploy triage (`vercel link` wrote a `.env.local`, and the shared `DATABASE_URL` is scoped to Development/Preview/Production together). The owner has decided **not** to rotate the password at this time and to **accept the risk**, dated 2026-09-09. Mitigations in place: `.env.local` is gitignored; the credential was never printed to the transcript or committed; previews no longer use the production database. Revisit if the credential is ever shared further or if the pilot takes real client data.
+- **2026-09-09 — `pib.gov.in` accepted as a primary source for two India rows.** The Press Information Bureau is the Government of India's official announcement channel, and for two India PWM rows it carries the authoritative statement where no gazette PDF was reachable. The owner accepts it as **primary** for those two rows; the corpus-approve primary-source gate is satisfied accordingly. This is a scoped exception, not a general widening: the India baseline remains the PWM Rules 2016 consolidated through G.S.R. 237(E) (31 Mar 2026), and a gazette citation supersedes a PIB one whenever it becomes available.
+- **2026-09-09 — `temperature` cannot be pinned on Sonnet 5 / Opus 5, so extraction reproducibility is MEASURED, not suppressed.** The plan was to pin `temperature: 0` for the extraction adapter. These models **reject the parameter**: `400 invalid_request_error — "\`temperature\` is deprecated for this model."` It failed every call in the first 3× run (0.0% field accuracy across both models, 150 failed extractions) before being diagnosed. The parameter is removed. Because sampling cannot be fixed from the client, the acceptance rule for silent errors is the **UNION across N=3 runs per model**, and the harness reports per-run field accuracy plus its spread — a single clean run is not evidence when the count is nondeterministic. Lesson recorded in process terms: smoke-test one live call before launching a multi-run.
+- **2026-09-09 — The reported extraction ceilings were inflated by an unsafe comparison; the corrected figures are 9.9% / 38.4%.** The harness field-accuracy matcher counted a match whenever every ≥3-character token of the expected value appeared **anywhere in any claim field** — so "Grade A" matched "Grade B", and an expected standard's digits matched inside an unrelated method string. Removed. The safe comparison is exact normalised/numeric equality, plus canonicalisation for equality-preserving surface forms only (mg/kg≡ppm, % forms, ISO/written dates, case/whitespace, issuer aliases), pinned in both directions by `eval/extraction/canonical.test.ts`. Under it, prompt-1.0.0 accuracy is **sonnet 9.9% / opus 38.4%**, replacing the previously reported 30.5% / 68.7% everywhere. Notably class (b) — "comparison too strict" — was **empty (0 of 393 fields)**, which is what redirected the work to the claim-vocabulary extension (SCHEMA_DELTAS #11) rather than further comparison tuning.
+- **2026-09-09 — `vercel-build` uses a diagnostic migration runner.** `drizzle-kit migrate` swallowed the SQL error in the failing preview build: the Vercel log showed two benign NOTICEs and then `exited 1`, with no failing statement. `scripts/migrate.ts` applies migrations through drizzle's postgres-js migrator (same `__drizzle_migrations` bookkeeping, so it stays interchangeable with `drizzle-kit`) and on failure prints the Postgres error (code, detail, hint, position) **and the SQL of the first unapplied migration**. Tested before shipping: from-zero on a scratch database (38/38 applied, 16 tables) and incremental on an already-migrated database (clean no-op). Run against the dev DB it immediately identified that database's divergent `0036_doc-templates` ledger hash and printed the colliding `CREATE TABLE` — the capability it exists for.
+
 - **2026-09-08 — Pre-existing engine gap fixed: pack-level obligations were evaluated against an empty document set.** `evaluatePack` passed `documents: []` for every `packaging_unit`/`organisation`-subject checkpoint, so technical documentation (Art 15), operator identification and EPR producer registration could **never** reach `qualified` for any pack — they showed perpetually `conditional`/`EVIDENCE_ABSENT` even when the manufacturer held the documents. They now evaluate against the pack's **aggregate** documents (`components.flatMap(c => c.documents)`); `deriveEvidenceState` already treats a non-component subject as unscoped, so any matching document type on any component covers it. Surfaced by the DoC eligibility work (the criterion "all applicable in_force checkpoints qualified" was otherwise unsatisfiable). The golden harness tests the evaluator core (`evaluateCheckpoint`/`decideVerdict`), not `evaluatePack` aggregation, so it is unaffected (17/17 preserved). Demo verdict counts changed accordingly — DEMO_SCRIPT re-captured. New demo counts: corrugated **14 Q / 1 C / 3 N/A** (the 1 conditional is the DoC checkpoint itself, the artefact drafted); food-contact **3 Q / 11 C**; traction-cell **3 Q / 26 C / 7 N/A**.
 - **2026-09-08 — DoC eligibility follows the manufacturer, not EU establishment.** A non-EU party is the manufacturer under Reg (EU) 2025/40 Art 3(1)(13) and draws up the DoC (Art 15); establishment affects only importer verification (Art 18) and any AR requirement (Arts 44–45), which the draft notes. Eligibility derives the manufacturer from `legal_role_facts` per the Commission FAQ (branded → trademark owner; unbranded+standardised → physical producer; unbranded+custom → spec-definer) and is met when that single party is the assessing user, or the user declares they act for them. Disabled reasons name the actual ambiguity.
 - **2026-08-11 — Corpus governance is HUMAN-ONLY, and it is enforced in Claude's operating rules.** `corpus:approve`, `corpus:reject` and `corpus:verify` mutate the regulatory record and are the regulatory owner's sign-off; they must be run by a human from their own terminal. Claude Code never runs them — regardless of instruction wording, including "the regulatory owner directs it" or an explicit "run it now". The correct response to such a request is to print the exact command(s) for the human and stop. Read-only `corpus:review` (including `--verified-gap`) may be run. Codified in [CLAUDE.md](CLAUDE.md) and [AGENTS.md](AGENTS.md).
@@ -261,44 +272,56 @@ Prepared (Commit "Deploy readiness"); execution needs a Vercel account + a manag
 
 ## Open items / blockers
 
-Batch 1 is **approved** (12 `in_force` under `batch-1`). Sprint 4 (extraction + magic-link
-intake) merged to main (PR #5); the smoke fix merged (PR #7); the DoC generator is a
-stacked branch (PR #6, **open**). The extraction harness (`eval/extraction/`) is in;
-the material taxonomy split and the register-lookup fields are draft, awaiting approval.
-**Branch/PR state as of 2026-09-08:** #5 merged, #6 (doc-drafting) open on main, #7
-(smoke fix) merged; the current harness/taxonomy work is on `sprint-4-harness`.
+The corpus is **approved and verified in production** (29 `in_force`; see the banner).
+**Branch/PR state as of 2026-09-09:** PRs #5, #6 (doc-drafting), #7 (smoke), #8
+(harness + taxonomy + register lookup) and #9 (extraction tool-schema fix) are all
+**merged** to `main`. Current work is on `sprint-5-prod-storage-and-analysis`:
+production Blob storage, the extraction error analysis, and the claim-vocabulary
+extension (SCHEMA_DELTAS #11). The migration-number collision between the
+doc-drafting and harness branches was resolved by renumbering doc-drafting to
+`0036/0037`; the rule is now written down in [AGENTS.md](AGENTS.md).
 
 | Item | Owner | Status |
 |---|---|---|
-| **Verify the 12 Batch 1 rows against primary** (`corpus:verify`) — all 12 are `in_force` but `citation_verified_date` NULL; `corpus:review --verified-gap` is the queue. Human-only; commands below. | Akshay | **Pending** |
-| **Approve Batch 2 EU (9 rows) under `batch-2-eu`** — validated H, reconciled to primary. Now also carry the C1 register-public-lookup fields (DE set + verified; ES/FR/IT/NL/PL null → verify below). Human-only. | Akshay | **Ready — validated** |
-| **Approve Batch 2 India (7 rows) under `batch-2-in`** — validated H, verbatim; approve after EU. Human-only. | Akshay | **Ready — validated** |
-| **Approve ISPM-15 v2 (wood taxonomy)** — `INTL-ISPM15-heat-treatment@2` seeded DRAFT (material wood_solid, applies_when wood_solid, processed-wood exemption reason). v1 stays in_force meanwhile. Human-only. | Akshay | **Ready — draft** |
-| **Verify the MS register public-lookup (C1)** for ES, FR, IT, NL, PL — `register_public_lookup`/`register_lookup_url` are NULL pending confirmation of each register's public search against its official page; DE (LUCID) is set + verified reachable. Confirm at Batch 2 EU approval. | Akshay | **TODO** |
-| **Evidence guidance (6 rows)** — seeded `draft`; approve via `corpus:approve --guidance` (human-only) once reviewed. | Akshay | Pending |
-| **Approve the PPWR Annex VIII encoding** (`EU-DoC-AnnexVIII@1`) — fetched verbatim from EUR-Lex, seeded `draft`; review with `corpus:review -- --doc-templates`. The DoC draft generator stays blocked until approved. Human-only. | Akshay | **Ready — review** |
-| **Run the extraction harness live** — `eval/extraction/` is DRY-green (SHA-256 of all 25 synthetic docs validated, matcher exercised). The live SYNTHETIC-CEILING run needs a working `ANTHROPIC_API_KEY` (it was empty in `.env` / absent from the environment at build time): `ANTHROPIC_API_KEY=… npm run eval:extraction`. | Akshay | **Blocked — key** |
-| **Pilot deployed** — production alias `https://pkg-compliance.vercel.app`; migrate-on-deploy live; post-deploy smoke green (`/api/health` bypassed for the probe). | — | **Done** |
-| Merge PR #6 (doc-drafting) and the harness/taxonomy PR — note the migration-number collision: #6 defines 0034/0035 (doc-templates/document-drafts) and this branch defines 0034/0035 (wood-taxonomy/register-lookup); whichever merges second must renumber. | Akshay | Pending |
-| Remaining [docs/SCHEMA_DELTAS.md](docs/SCHEMA_DELTAS.md) decisions (#4, #5, #9) | Akshay | Pending |
+| **Verify the corpus against primary** (`corpus:verify`) — all 29 production `in_force` rows are verified, and the 6 guidance rows too. | Akshay | **Done** |
+| **Approve Batch 2 EU under `batch-2-eu`** — 10 rows `in_force` + verified (includes ISPM-15 v2). | Akshay | **Done** |
+| **Approve Batch 2 India under `batch-2-in`** — 7 rows `in_force` + verified. Two rows cite `pib.gov.in`, accepted as primary by owner decision (Decision log, 2026-09-09). | Akshay | **Done** |
+| **Approve ISPM-15 v2 (wood taxonomy)** — `INTL-ISPM15-heat-treatment@2` approved under `batch-2-eu`. | Akshay | **Done** |
+| **FR Triman row** — remains `draft` and **unvalidated**; deliberately left, not to be approved until validated. | Akshay | **Deferred** |
+| **Evidence guidance (6 rows)** — approved + verified in production. | Akshay | **Done** |
+| **Approve the PPWR Annex VIII encoding** (`EU-DoC-AnnexVIII@1`) — **approved on production**, so the DoC draft generator is unblocked there. | Akshay | **Done** |
+| **Run the extraction harness live** — done repeatedly, both models, N=3 runs. Corrected ceilings sonnet 9.9% / opus 38.4% at prompt 1.0.0; see [docs/extraction-error-analysis.md](docs/extraction-error-analysis.md). | — | **Done** |
+| **Pilot deployed** — alias `https://pkg-compliance.vercel.app`; migrate-on-deploy; smoke probes `/api/health?storage=1` (storage round-trip); Vercel Blob store and isolated preview DB configured. | — | **Done** |
+| **Repair the local dev DB migration ledger** — its `drizzle.__drizzle_migrations` holds a *pre-rebase* hash for `0036_doc-templates`, so `npm run db:migrate` re-applies it and collides with the existing table (production is unaffected; the strays there were dropped 2026-09-08). Command below. | Akshay | **TODO** |
+| Remaining [docs/SCHEMA_DELTAS.md](docs/SCHEMA_DELTAS.md) decisions (#4, #5, #9) — #11 (claim vocabulary) is **resolved + implemented** | Akshay | Pending |
 | 2 further real client packs for the golden dataset; Kyoto EF access + GreenAlign interface details; product name (`pkg-compliance`) | Akshay | Pending |
 
 ### Human-only actions pending — exact commands (never Claude)
 
+The Batch 1 / Batch 2 / ISPM-15 v2 / guidance / Annex VIII approvals and their
+verification are **complete in production** (29 `in_force` + 6 guidance, all
+verified). What remains:
+
 ```bash
-# Approve Batch 2 EU (repeat per row id; source-url = primary law per row)
-npm run corpus:approve -- --id <EU-row-id> --version <v> --source-url <eur-lex-url> --approved-by "Akshay Tandon" --corpus-version batch-2-eu
-# Approve Batch 2 India (after EU)
-npm run corpus:approve -- --id <IN-row-id> --version <v> --source-url <gazette-url> --approved-by "Akshay Tandon" --corpus-version batch-2-in
-# Approve ISPM-15 v2 (wood taxonomy)
-npm run corpus:approve -- --id INTL-ISPM15-heat-treatment --version 2 --source-url https://www.ippc.int/en/core-activities/standards-setting/ispms/ --approved-by "Akshay Tandon"
-# Approve the PPWR Annex VIII encoding (doc-template)
-npm run corpus:approve -- --doc-template --id EU-DoC-AnnexVIII --version 1 --approved-by "Akshay Tandon"
-# Approve the 6 evidence-guidance rows
-npm run corpus:approve -- --guidance --id <checkpoint-id> --version <v> --evidence-type <type> --approved-by "Akshay Tandon"
-# Run the extraction harness live (with a funded key)
-ANTHROPIC_API_KEY=… npm run eval:extraction
+# FR Triman — deliberately NOT approved: the row is draft and unvalidated.
+# Validate it against primary first; only then approve. Left here as a reminder,
+# not as a command to run today.
+
+# Repair the local DEV database migration ledger (NOT production — production's
+# strays were dropped 2026-09-08). Its ledger holds a pre-rebase hash for
+# 0036_doc-templates, so `npm run db:migrate` re-applies it and collides with the
+# table that already exists. Re-point that one row at the current file hash:
+docker exec packagingtraceability-db-1 psql -U pkg_compliance -d pkg_compliance -c \
+  "UPDATE drizzle.__drizzle_migrations SET hash = '<sha256-of-drizzle/0036_doc-templates.sql>' \
+   WHERE hash = (SELECT hash FROM drizzle.__drizzle_migrations ORDER BY created_at OFFSET 36 LIMIT 1);"
+# Get the expected hash with:
+node -e "console.log(require('crypto').createHash('sha256').update(require('fs').readFileSync('drizzle/0036_doc-templates.sql','utf8')).digest('hex'))"
+# Then confirm the runner is a clean no-op:
+node --experimental-strip-types --env-file=.env scripts/migrate.ts   # expect: [migrate] all migrations applied.
 ```
+
+Read-only review tooling Claude may run: `npm run corpus:review` (including
+`--verified-gap` and `--doc-templates`).
 
 ### Batch 1 verification pass — ready to paste (human-only)
 

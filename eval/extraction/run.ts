@@ -45,9 +45,14 @@ async function runModel(model: string, docs: ManifestDoc[]): Promise<{ report: M
 
 function printReport(report: ModelReport): void {
   console.log(`\n  Model: ${report.model}   (${report.docs} documents)`);
-  console.log(`    Field accuracy (expected-to-extract fields):  ${pct(report.fieldAccuracy)}`);
+  console.log(`    Field accuracy (canonical comparison):        ${pct(report.fieldAccuracy)}   (strict baseline ${pct(report.fieldAccuracyStrict)})`);
+  const tiers = Object.keys(report.byTier).sort();
+  console.log(`    By tier (canonical):                          ${tiers.map((t) => `${t} ${pct(report.byTier[t].total ? report.byTier[t].matched / report.byTier[t].total : 0)}`).join("  ")}`);
   console.log(`    Flag exact-set match rate:                    ${pct(report.flagExactRate)}   (TP ${report.flagTP} / FP ${report.flagFP} / FN ${report.flagFN})`);
   console.log(`    Silent errors:                                ${report.silentErrorCount}   ← wrong/guessed value, unflagged`);
+  const lg = report.legibility;
+  console.log(`    Per-field legibility:                         clear ${lg.clear}, partially_obscured ${lg.partially_obscured}, illegible ${lg.illegible}, unreported ${lg.unreported}`);
+  console.log(`    Post-validator type-mismatch rejections:      ${report.typeMismatches}`);
   console.log(`    Refusals (distinct from extracted-nothing):   ${report.refusals}`);
   console.log(`    Usable-document rate:                         ${pct(report.usableRate)}`);
   console.log(`    Median latency:                               ${report.medianLatencyMs} ms`);
@@ -59,12 +64,29 @@ function printReport(report: ModelReport): void {
 }
 
 // ---- main ----------------------------------------------------------------
-const models = process.argv.slice(2).length > 0 ? process.argv.slice(2) : DEFAULT_MODELS;
+// Args: bare model names, and optional --class=<docClass> to re-run ONE class
+// live (Part 3: prompt v2 iterates one class at a time). --class also tags the
+// persisted filename so a partial re-run does not overwrite a full-set run.
+const rawArgs = process.argv.slice(2);
+const classFilter = rawArgs.find((a) => a.startsWith("--class="))?.slice("--class=".length);
+// --runs=N repeats the whole set N times per model. Acceptance for silent errors
+// is the UNION across runs (a single clean run proves nothing when the count is
+// nondeterministic), and N runs also give field-accuracy variance.
+const runsPerModel = Math.max(1, Number(rawArgs.find((a) => a.startsWith("--runs="))?.slice("--runs=".length) ?? 1));
+const models = rawArgs.filter((a) => !a.startsWith("--")).length > 0 ? rawArgs.filter((a) => !a.startsWith("--")) : DEFAULT_MODELS;
 
-const docs = loadExtractionSet();
+let docs = loadExtractionSet();
 if (!docs) {
   console.error("Extraction set not found at reference/extraction-set-synthetic/ — STOP. Nothing composed.");
   process.exit(2);
+}
+if (classFilter) {
+  docs = docs.filter((d) => d.class === classFilter);
+  if (docs.length === 0) {
+    console.error(`--class=${classFilter} matched no documents. Classes: supplier_declaration, lab_test_report, heat_treatment_certificate, mill_declaration.`);
+    process.exit(2);
+  }
+  console.log(`CLASS FILTER: ${classFilter} — ${docs.length} document(s). Partial re-run (not a full-set ceiling).`);
 }
 
 const hash = validateHashes(docs);
@@ -92,13 +114,44 @@ const stamp = new Date().toISOString().replace(/[:.]/g, "-");
 const summary: Record<string, unknown>[] = [];
 
 for (const model of models) {
-  console.log(`\n---- running ${model} over ${docs.length} documents ----`);
-  const { report, scores, promptVersions } = await runModel(model, docs);
-  printReport(report);
-  // Persist the run with prompt_version pinned per document class.
-  const persist = { evaluated_at: stamp, model, prompt_versions: promptVersions, report, per_document: scores };
-  writeFileSync(`${RESULTS_DIR}${stamp}_${model}.json`, JSON.stringify(persist, null, 2));
-  summary.push({ model, fieldAccuracy: report.fieldAccuracy, flagExactRate: report.flagExactRate, silentErrors: report.silentErrorCount, refusals: report.refusals, usableRate: report.usableRate, medianLatencyMs: report.medianLatencyMs, costPerDocUsd: report.costPerDocUsd });
+  const runReports: ModelReport[] = [];
+  for (let run = 1; run <= runsPerModel; run++) {
+    console.log(`\n---- running ${model} over ${docs.length} documents (run ${run}/${runsPerModel}) ----`);
+    const { report, scores, promptVersions } = await runModel(model, docs);
+    printReport(report);
+    runReports.push(report);
+    // Persist each run with prompt_version pinned per document class.
+    const persist = { evaluated_at: stamp, run, runs_total: runsPerModel, model, class_filter: classFilter ?? null, prompt_versions: promptVersions, report, per_document: scores };
+    const tag = `${classFilter ? `${model}_${classFilter}` : model}${runsPerModel > 1 ? `_run${run}` : ""}`;
+    writeFileSync(`${RESULTS_DIR}${stamp}_${tag}.json`, JSON.stringify(persist, null, 2));
+  }
+
+  // Across-run acceptance: silent errors are the UNION (deduped), and accuracy is
+  // reported with its spread so a lucky run cannot be mistaken for the ceiling.
+  const accs = runReports.map((r) => r.fieldAccuracy);
+  const union = new Map<string, string>();
+  for (const r of runReports) for (const e of r.silentErrors) union.set(`${e.file}|${e.kind}|${e.detail}`, `[${e.kind}] ${e.file}: ${e.detail}`);
+  if (runsPerModel > 1) {
+    console.log(`\n  ===== ${model}: ACROSS ${runsPerModel} RUNS =====`);
+    console.log(`    Field accuracy per run: ${accs.map((a) => pct(a)).join(", ")}`);
+    console.log(`    Field accuracy min/mean/max: ${pct(Math.min(...accs))} / ${pct(accs.reduce((a, b) => a + b, 0) / accs.length)} / ${pct(Math.max(...accs))}  (spread ${pct(Math.max(...accs) - Math.min(...accs))})`);
+    console.log(`    Refusals per run: ${runReports.map((r) => r.refusals).join(", ")}`);
+    console.log(`    Silent errors per run: ${runReports.map((r) => r.silentErrorCount).join(", ")}`);
+    console.log(`    UNIONED silent errors: ${union.size}   ${union.size === 0 ? "← target met" : "← TARGET NOT MET"}`);
+    for (const line of union.values()) console.log(`      - ${line}`);
+  }
+  const last = runReports[runReports.length - 1];
+  summary.push({
+    model,
+    runs: runsPerModel,
+    fieldAccuracyMean: accs.reduce((a, b) => a + b, 0) / accs.length,
+    fieldAccuracySpread: Math.max(...accs) - Math.min(...accs),
+    silentErrorsUnioned: union.size,
+    refusalsTotal: runReports.reduce((a, r) => a + r.refusals, 0),
+    usableRate: last.usableRate,
+    medianLatencyMs: last.medianLatencyMs,
+    costPerDocUsd: last.costPerDocUsd,
+  });
 }
 
 console.log(`\n===== default chosen by the numbers =====`);

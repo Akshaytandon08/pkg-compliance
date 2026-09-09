@@ -26,7 +26,33 @@ export const EVIDENCE_TYPE_BY_CLAIM: Record<string, string> = {
   accreditation: "test_report",
   heat_treatment: "marking",
   ispm15_mark: "marking",
+  // Part 3b: the IPPC mark broken into elements still IS the marking evidence —
+  // a country/producer/treatment code read off the stamp satisfies the ISPM-15
+  // marking requirement exactly as the whole mark does.
+  ippc_mark_element: "marking",
+  // A mill's substance-group statement (inks/adhesives/coatings) and its
+  // virgin-fibre share are declaration content, so they carry the same evidence
+  // type as the other declared composition claims.
+  substance_group_statement: "supplier_declaration",
+  virgin_fibre_share: "supplier_declaration",
 };
+
+// Part 3b — claim types that are DOCUMENT METADATA: they identify or date the
+// document but never close a checkpoint, so they are deliberately absent from
+// EVIDENCE_TYPE_BY_CLAIM and yield no attachment. Listed explicitly so the
+// omission reads as a decision rather than an oversight.
+export const METADATA_CLAIM_TYPES = [
+  "signatory",
+  "document_reference",
+  "batch_or_lot_reference",
+  "document_validity",
+  "physical_dimension",
+  "client_identity",
+  "sample_date",
+  "product_grade",
+  "compliance_standard",
+  "screening_method",
+] as const;
 
 export interface MatchComponent {
   id: number;

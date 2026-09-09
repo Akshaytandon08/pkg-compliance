@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "vercel-build": "drizzle-kit migrate && next build",
+    "vercel-build": "node scripts/migrate.ts && next build",
     "lint": "eslint",
     "check:language": "node scripts/check-language.ts",
     "test": "node --test \"tests/**/*.test.ts\" \"eval/**/*.test.ts\"",
@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
+    "@vercel/blob": "^2.8.0",
     "docx": "^9.7.1",
     "drizzle-orm": "^0.45.2",
     "jszip": "^3.10.1",
