@@ -45,7 +45,9 @@ async function runModel(model: string, docs: ManifestDoc[]): Promise<{ report: M
 
 function printReport(report: ModelReport): void {
   console.log(`\n  Model: ${report.model}   (${report.docs} documents)`);
-  console.log(`    Field accuracy (expected-to-extract fields):  ${pct(report.fieldAccuracy)}`);
+  console.log(`    Field accuracy (canonical comparison):        ${pct(report.fieldAccuracy)}   (strict baseline ${pct(report.fieldAccuracyStrict)})`);
+  const tiers = Object.keys(report.byTier).sort();
+  console.log(`    By tier (canonical):                          ${tiers.map((t) => `${t} ${pct(report.byTier[t].total ? report.byTier[t].matched / report.byTier[t].total : 0)}`).join("  ")}`);
   console.log(`    Flag exact-set match rate:                    ${pct(report.flagExactRate)}   (TP ${report.flagTP} / FP ${report.flagFP} / FN ${report.flagFN})`);
   console.log(`    Silent errors:                                ${report.silentErrorCount}   ← wrong/guessed value, unflagged`);
   console.log(`    Refusals (distinct from extracted-nothing):   ${report.refusals}`);
@@ -59,12 +61,25 @@ function printReport(report: ModelReport): void {
 }
 
 // ---- main ----------------------------------------------------------------
-const models = process.argv.slice(2).length > 0 ? process.argv.slice(2) : DEFAULT_MODELS;
+// Args: bare model names, and optional --class=<docClass> to re-run ONE class
+// live (Part 3: prompt v2 iterates one class at a time). --class also tags the
+// persisted filename so a partial re-run does not overwrite a full-set run.
+const rawArgs = process.argv.slice(2);
+const classFilter = rawArgs.find((a) => a.startsWith("--class="))?.slice("--class=".length);
+const models = rawArgs.filter((a) => !a.startsWith("--")).length > 0 ? rawArgs.filter((a) => !a.startsWith("--")) : DEFAULT_MODELS;
 
-const docs = loadExtractionSet();
+let docs = loadExtractionSet();
 if (!docs) {
   console.error("Extraction set not found at reference/extraction-set-synthetic/ — STOP. Nothing composed.");
   process.exit(2);
+}
+if (classFilter) {
+  docs = docs.filter((d) => d.class === classFilter);
+  if (docs.length === 0) {
+    console.error(`--class=${classFilter} matched no documents. Classes: supplier_declaration, lab_test_report, heat_treatment_certificate, mill_declaration.`);
+    process.exit(2);
+  }
+  console.log(`CLASS FILTER: ${classFilter} — ${docs.length} document(s). Partial re-run (not a full-set ceiling).`);
 }
 
 const hash = validateHashes(docs);
@@ -96,8 +111,9 @@ for (const model of models) {
   const { report, scores, promptVersions } = await runModel(model, docs);
   printReport(report);
   // Persist the run with prompt_version pinned per document class.
-  const persist = { evaluated_at: stamp, model, prompt_versions: promptVersions, report, per_document: scores };
-  writeFileSync(`${RESULTS_DIR}${stamp}_${model}.json`, JSON.stringify(persist, null, 2));
+  const persist = { evaluated_at: stamp, model, class_filter: classFilter ?? null, prompt_versions: promptVersions, report, per_document: scores };
+  const tag = classFilter ? `${model}_${classFilter}` : model;
+  writeFileSync(`${RESULTS_DIR}${stamp}_${tag}.json`, JSON.stringify(persist, null, 2));
   summary.push({ model, fieldAccuracy: report.fieldAccuracy, flagExactRate: report.flagExactRate, silentErrors: report.silentErrorCount, refusals: report.refusals, usableRate: report.usableRate, medianLatencyMs: report.medianLatencyMs, costPerDocUsd: report.costPerDocUsd });
 }
 
