@@ -242,9 +242,9 @@ export function buildRuleRows({ cards, documents, corpusByKey, assessorFlag, gui
       confidence: card.confidence ? (CONFIDENCE_LABEL[card.confidence] ?? card.confidence) : null,
       assessorFlag: assessorFlag ?? null,
       acceptedEvidenceTypes: accepted,
-      // Only offered where there is something to request; never on an
-      // informational row.
-      requestTemplates: informational ? [] : requestTemplatesFor(card, accepted, assessmentId, componentId),
+      // Only where evidence is actually outstanding. A qualified row does not
+      // need a request template, and an informational row has nothing to request.
+      requestTemplates: needsEvidence ? requestTemplatesFor(card, accepted, assessmentId, componentId) : [],
       guidance: guidance
         ? [...new Set((card.evidenceRequirements.allOf ?? []).flatMap((c) => c.anyOf))]
             .map((t) => ({ t, g: guidance.get(guidanceKey(card.checkpointId, card.version, t)) }))
