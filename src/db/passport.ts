@@ -23,13 +23,14 @@ export type PassportReasonCategory =
   | "Evidence pending"
   | "Test required"
   | "Design non-compliant"
-  | "Not applicable";
+  | "Not applicable"
+  | "Not yet applicable";
 
 export type PassportCheckpoint = {
   checkpointId: string;
   version: number;
   requirement: string; // plain-language requirement text (public law)
-  verdict: "qualified" | "conditional" | "gap" | "not_applicable";
+  verdict: "qualified" | "conditional" | "gap" | "not_applicable" | "upcoming";
   reasonCategory: PassportReasonCategory;
   citationText: string;
   citationUrl: string | null;
@@ -46,13 +47,18 @@ export type PassportPayload = {
   asOf: string;
   demo: boolean;
   materialComposition: { material: string; componentCount: number }[];
-  counts: { qualified: number; conditional: number; gap: number; not_applicable: number; caveat: number };
+  // `upcoming` is optional because passports are PERSISTED and hash-chained:
+  // versions published before the temporal state existed have no such key and
+  // must still parse and re-render. Absent reads as 0.
+  counts: { qualified: number; conditional: number; gap: number; not_applicable: number; caveat: number; upcoming?: number };
   overallVerdict: string;
   checkpoints: PassportCheckpoint[];
   pcf: { totalKgCo2e: number; unit: string; resolvedComponents: number; unresolvedComponents: number };
 };
 
-const VERDICT_RANK: Record<string, number> = { not_applicable: 0, qualified: 1, conditional: 2, gap: 3 };
+// `upcoming` ranks with not_applicable: a requirement that does not yet apply must
+// never become a component's worst disclosed verdict.
+const VERDICT_RANK: Record<string, number> = { not_applicable: 0, upcoming: 0, qualified: 1, conditional: 2, gap: 3 };
 
 const REASON_CATEGORY: Record<string, PassportReasonCategory> = {
   EVIDENCE_COMPLETE: "Evidence complete",
@@ -62,6 +68,7 @@ const REASON_CATEGORY: Record<string, PassportReasonCategory> = {
   TEST_REQUIRED: "Test required",
   DESIGN_NONCOMPLIANT: "Design non-compliant",
   NOT_APPLICABLE_SCOPE: "Not applicable",
+  UPCOMING_NOT_YET_APPLICABLE: "Not yet applicable",
 };
 
 // Split "pinpoint. https://…" into display text + primary-source URL.
@@ -110,6 +117,10 @@ export async function buildPassportPayload(assessment: LoadedAssessment): Promis
     ...report.componentSections.flatMap((s) => s.cards),
     ...report.packagingUnit,
     ...report.organisation,
+    // Upcoming requirements ARE disclosed — the public tier is the rule set, and
+    // "this applies to you from <date>" is exactly the kind of thing a reader
+    // needs. They carry their own verdict and render under their own heading.
+    ...report.upcoming,
   ];
   for (const card of allCards) {
     const outcome = card.outcome;

@@ -48,9 +48,10 @@ export type ReasonCode =
   | "TEST_REQUIRED"
   | "DESIGN_NONCOMPLIANT"
   | "NOT_APPLICABLE_SCOPE"
-  | "CONTEXT_REQUIRED";
+  | "CONTEXT_REQUIRED"
+  | "UPCOMING_NOT_YET_APPLICABLE";
 
-export type Disposition = "verdict" | "caveat" | "not_applicable";
+export type Disposition = "verdict" | "caveat" | "not_applicable" | "upcoming";
 
 export type CheckpointOutcome = {
   disposition: Disposition;
@@ -186,7 +187,21 @@ export type CheckpointEvalInput = {
   // not_applicable (e.g. the ISPM-15 processed-wood exemption). Falls back to the
   // generic scope message when absent.
   notApplicableReason?: string | null;
+  // TEMPORAL applicability. `triggerDate` is the date the requirement starts to
+  // apply; `laterOfCondition` is the "…or N months after act X, whichever is
+  // later" clause, which means the real date may be LATER than triggerDate and is
+  // not yet fixed. Before the trigger the checkpoint is `upcoming`: reported, but
+  // never evaluated for evidence and never counted as a gap.
+  triggerDate?: string | null;
+  laterOfCondition?: string | null;
 };
+
+/** The informational reason shown on an `upcoming` row. */
+export function upcomingDetail(triggerDate: string, laterOfCondition?: string | null): string {
+  return laterOfCondition
+    ? `Applies from ${triggerDate} or later, pending ${laterOfCondition}`
+    : `Applies from ${triggerDate}`;
+}
 
 /** The single place a per-checkpoint outcome is decided. */
 export function evaluateCheckpoint(input: CheckpointEvalInput): CheckpointOutcome {
@@ -206,6 +221,19 @@ export function evaluateCheckpoint(input: CheckpointEvalInput): CheckpointOutcom
       disposition: "not_applicable",
       reasonCode: "NOT_APPLICABLE_SCOPE",
       detail: input.notApplicableReason ?? "Out of scope for this assessment's context.",
+    };
+  }
+
+  // TEMPORAL GATE — before evidence is considered. A requirement whose trigger
+  // date is after the assessment's as-of date does not yet apply: it cannot be
+  // satisfied, so calling it a gap (or demanding evidence for it) would be wrong.
+  // It reports as `upcoming` with its own count and blocks nothing.
+  if (input.triggerDate && input.asOf < input.triggerDate) {
+    return {
+      disposition: "upcoming",
+      verdict: "upcoming",
+      reasonCode: "UPCOMING_NOT_YET_APPLICABLE",
+      detail: upcomingDetail(input.triggerDate, input.laterOfCondition),
     };
   }
 

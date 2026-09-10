@@ -29,6 +29,10 @@ const VERDICT_GROUPS: { verdict: string; label: string }[] = [
   { verdict: "conditional", label: "Conditional" },
   { verdict: "gap", label: "Gap" },
   { verdict: "not_applicable", label: "Not applicable" },
+  // Requirements that exist but do not yet apply as of the screening date. Shown
+  // under their own heading so a reader can see what is coming without mistaking
+  // it for something outstanding today.
+  { verdict: "upcoming", label: "Not yet applicable" },
 ];
 
 export default async function PassportPage({ params }: PageProps<"/passport/[token]">) {
@@ -66,11 +70,12 @@ export default async function PassportPage({ params }: PageProps<"/passport/[tok
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
         <Count n={p.counts.qualified} label="Qualified" href="#cp-qualified" />
         <Count n={p.counts.conditional} label="Conditional" href="#cp-conditional" />
         <Count n={p.counts.gap} label="Gap" href="#cp-gap" />
         <Count n={p.counts.not_applicable} label="N/A" href="#cp-not_applicable" />
+        <Count n={p.counts.upcoming ?? 0} label="Upcoming" href="#cp-upcoming" />
         <Count n={p.counts.caveat} label="Caveats" />
       </div>
 
