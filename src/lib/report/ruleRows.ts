@@ -18,8 +18,18 @@ import {
 // stay a dumb client component: every string is resolved here, and no engine
 // code or corpus row is shipped to the browser.
 
+/** One extracted claim, as the drawer shows it. */
+export interface ClaimSummary {
+  parameter: string | null;
+  value: string | null;
+  issuer: string | null;
+  status: string;
+  page: number | null;
+}
+
 export interface EvidenceRelied {
   docId: string;
+  type: string;
   typeLabel: string;
   reference: string | null;
   validity: string | null;
@@ -27,6 +37,24 @@ export interface EvidenceRelied {
    *  can open it. "manual" is a typed record. Drives the chip's glyph. */
   source: "manual" | "extracted";
   sourceDocumentId: number | null;
+  // --- drawer detail ---
+  issuedDate: string | null;
+  expiryDate: string | null;
+  scope: { components: string[]; materials: string[]; parameters: string[] };
+  /** Short-lived signed URL for the stored file, when there is one. */
+  sourceUrl: string | null;
+  /** Extracted claims for this component. NOTE: matched by component, not by
+   *  evidence row — the loaded evidence does not carry extracted_claim_id, and
+   *  adding it would be a schema change. Labelled as such in the drawer. */
+  claims: ClaimSummary[];
+}
+
+export interface EvidenceContext {
+  /** documentId → signed source URL. */
+  sourceLinks?: Map<number, string>;
+  /** componentId → extracted claims. */
+  claimsByComponent?: Map<number, ClaimSummary[]>;
+  componentId?: number;
 }
 
 /** Approved "how to obtain this evidence" guidance, resolved to plain data so the
@@ -94,18 +122,31 @@ function validityOf(doc: EvidenceDocument): string | null {
  * view is how the two drift apart. Where more than one acceptable document is on
  * file, all are listed; each is genuinely relevant evidence.
  */
-function reliedOnFor(card: CheckpointCard, documents: EvidenceDocument[]): EvidenceRelied[] {
+export function toEvidenceRelied(d: EvidenceDocument, ctx: EvidenceContext = {}): EvidenceRelied {
+  const extracted = d.source === "extracted";
+  return {
+    docId: d.docId,
+    type: d.type,
+    typeLabel: evidenceTypeLabel(d.type),
+    reference: d.reference ?? null,
+    validity: validityOf(d),
+    source: extracted ? "extracted" : "manual",
+    sourceDocumentId: d.sourceDocumentId ?? null,
+    issuedDate: d.issuedDate ?? null,
+    expiryDate: d.expiryDate ?? null,
+    scope: {
+      components: d.scope?.components ?? [],
+      materials: d.scope?.materials ?? [],
+      parameters: d.scope?.parameters ?? [],
+    },
+    sourceUrl: d.sourceDocumentId != null ? (ctx.sourceLinks?.get(d.sourceDocumentId) ?? null) : null,
+    claims: extracted && ctx.componentId != null ? (ctx.claimsByComponent?.get(ctx.componentId) ?? []) : [],
+  };
+}
+
+function reliedOnFor(card: CheckpointCard, documents: EvidenceDocument[], ctx: EvidenceContext): EvidenceRelied[] {
   const accepted = new Set((card.evidenceRequirements.allOf ?? []).flatMap((c) => c.anyOf));
-  return documents
-    .filter((d) => accepted.has(d.type))
-    .map((d) => ({
-      docId: d.docId,
-      typeLabel: evidenceTypeLabel(d.type),
-      reference: d.reference ?? null,
-      validity: validityOf(d),
-      source: d.source === "extracted" ? "extracted" : "manual",
-      sourceDocumentId: d.sourceDocumentId ?? null,
-    }));
+  return documents.filter((d) => accepted.has(d.type)).map((d) => toEvidenceRelied(d, ctx));
 }
 
 export interface BuildRowsInput {
@@ -122,6 +163,8 @@ export interface BuildRowsInput {
   /** Needed to build the request-template URLs; omit for pack/organisation rows. */
   assessmentId?: number;
   componentId?: number;
+  /** Signed links + claims, so an evidence chip can open a populated drawer. */
+  evidenceContext?: EvidenceContext;
 }
 
 /** Request templates a rule can offer, as resolved URLs. */
@@ -143,7 +186,8 @@ function requestTemplatesFor(
   return out;
 }
 
-export function buildRuleRows({ cards, documents, corpusByKey, assessorFlag, guidance, assessmentId, componentId }: BuildRowsInput): RuleRow[] {
+export function buildRuleRows({ cards, documents, corpusByKey, assessorFlag, guidance, assessmentId, componentId, evidenceContext }: BuildRowsInput): RuleRow[] {
+  const evCtx: EvidenceContext = { ...evidenceContext, componentId: componentId ?? evidenceContext?.componentId };
   return cards.map((card, i) => {
     const outcome = card.outcome;
     const verdict = outcome?.verdict ?? null;
@@ -172,7 +216,7 @@ export function buildRuleRows({ cards, documents, corpusByKey, assessorFlag, gui
         : `${ruleName(card.checkpointId)}: ${card.caveat?.label ?? "Pending approval"}`,
       why: outcome ? reasonLabel(outcome.reasonCode, outcome.detail) : (card.caveat?.reason ?? ""),
       informational,
-      reliedOn: qualified ? reliedOnFor(card, documents) : [],
+      reliedOn: qualified ? reliedOnFor(card, documents, evCtx) : [],
       requiredText: needsEvidence ? `Provide any one of: ${describeRequirement(card.evidenceRequirements)}` : null,
       citationText,
       citationUrl,

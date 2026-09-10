@@ -4,6 +4,7 @@ import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { ChevronRight, ExternalLink, FileText, Pencil } from "lucide-react";
 import { StatusChip, toChipStatus } from "@/app/_components/StatusChip";
 import { AddEvidenceForm } from "./AddEvidenceForm";
+import { EvidenceDrawer } from "./EvidenceDrawer";
 import type { RuleRow, EvidenceRelied } from "@/lib/report/ruleRows";
 
 // One row per applicable rule, in a real table: a packaging manager scans down a
@@ -258,6 +259,10 @@ export function RuleTable({
 }) {
   const [sort, setSort] = useState<SortState>(null);
   const [open, setOpen] = useState<Set<string>>(new Set());
+  const [drawerItem, setDrawerItem] = useState<EvidenceRelied | null>(null);
+  // The table owns the drawer so every chip in it is openable without the page
+  // having to thread a callback through a server component.
+  const openEvidence = onOpenEvidence ?? setDrawerItem;
 
   const sorted = useMemo(() => {
     if (!sort) return rows;
@@ -286,6 +291,7 @@ export function RuleTable({
 
   return (
     <>
+      <EvidenceDrawer item={drawerItem} onClose={() => setDrawerItem(null)} />
       {/* ---------- table (md and up) ---------- */}
       <div className="hidden overflow-x-auto md:block">
         <table className="w-full border-collapse text-left text-sm">
@@ -326,7 +332,7 @@ export function RuleTable({
                       <StatusChip status={toChipStatus(row.verdict ?? "pending")} label={row.verdictText} ariaLabel={row.verdictAria} />
                     </td>
                     <td className="py-3 pr-3 text-n700">{row.why}</td>
-                    <td className="py-3 pr-3"><EvidenceCell row={row} onOpenEvidence={onOpenEvidence} /></td>
+                    <td className="py-3 pr-3"><EvidenceCell row={row} onOpenEvidence={openEvidence} /></td>
                     <td className="py-3 pr-3 max-w-[18rem]"><CitationLink row={row} /></td>
                     <td className="py-3 min-w-[12rem]"><ActionCell row={row} assessmentId={assessmentId} componentId={componentId} componentName={componentName} /></td>
                   </tr>
@@ -355,7 +361,7 @@ export function RuleTable({
               </div>
               <dl className="mt-2 space-y-2 text-sm">
                 <div><dt className="text-xs font-semibold uppercase tracking-wide text-n600">Why</dt><dd className="text-n700">{row.why}</dd></div>
-                <div><dt className="text-xs font-semibold uppercase tracking-wide text-n600">Evidence relied on</dt><dd><EvidenceCell row={row} onOpenEvidence={onOpenEvidence} /></dd></div>
+                <div><dt className="text-xs font-semibold uppercase tracking-wide text-n600">Evidence relied on</dt><dd><EvidenceCell row={row} onOpenEvidence={openEvidence} /></dd></div>
                 <div><dt className="text-xs font-semibold uppercase tracking-wide text-n600">Citation</dt><dd><CitationLink row={row} /></dd></div>
                 {!row.informational && (
                   <div>

@@ -17,8 +17,9 @@ import { StatusChip, toChipStatus } from "@/app/_components/StatusChip";
 import { Breadcrumbs } from "@/app/_components/Breadcrumbs";
 import { getAllGuidance } from "@/db/guidance";
 import { RULE_REFERENCE_TOOLTIP, ruleReference } from "@/lib/report/labels";
-import { buildRuleRows } from "@/lib/report/ruleRows";
+import { buildRuleRows, toEvidenceRelied, type ClaimSummary } from "@/lib/report/ruleRows";
 import { RuleTable } from "./RuleTable";
+import { EvidenceList } from "./EvidenceList";
 import { GeneratePassport } from "./GeneratePassport";
 
 function AnnotationLine({ component }: { component: ComponentInput }) {
@@ -43,61 +44,6 @@ function AnnotationLine({ component }: { component: ComponentInput }) {
     <p className="mb-2 text-xs text-neutral-500">
       Assessor risk annotation: no inherent risk{by}.
     </p>
-  );
-}
-
-function EvidenceOnFile({
-  documents,
-  sourceLinks,
-  pendingCount,
-  assessmentId,
-}: {
-  documents: ComponentInput["documents"];
-  sourceLinks: Map<number, string>;
-  pendingCount: number;
-  assessmentId: number;
-}) {
-  if (documents.length === 0 && pendingCount === 0) return null;
-  return (
-    <div className="mt-1 mb-2 rounded-md border border-neutral-200 bg-neutral-50/60 px-3 py-2 text-xs dark:border-neutral-800 dark:bg-neutral-900/40">
-      <p className="font-medium text-neutral-600 dark:text-neutral-300">Evidence on file</p>
-      {documents.length > 0 ? (
-        <ul className="mt-1 space-y-1">
-          {documents.map((d, i) => {
-            const extracted = d.source === "extracted";
-            const link = d.sourceDocumentId != null ? sourceLinks.get(d.sourceDocumentId) : undefined;
-            return (
-              <li key={i} className="flex flex-wrap items-center gap-2">
-                <span
-                  className={`rounded-full border px-2 py-0.5 ${
-                    extracted
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300"
-                      : "border-neutral-300 bg-white text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
-                  }`}
-                >
-                  {extracted ? "Extracted · confirmed" : "Manual"}
-                </span>
-                <span className="text-neutral-700 dark:text-neutral-300">{d.type}</span>
-                {d.expiryDate && <span className="text-neutral-400">· expires {d.expiryDate}</span>}
-                {link && (
-                  <a href={link} target="_blank" rel="noreferrer" className="text-neutral-500 underline hover:text-neutral-700">
-                    source
-                  </a>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
-      {pendingCount > 0 && (
-        <p className="mt-1 text-amber-700 dark:text-amber-300">
-          {pendingCount} extracted claim{pendingCount === 1 ? "" : "s"} awaiting confirmation —{" "}
-          <Link href={`/assessments/${assessmentId}/evidence`} className="underline">
-            review
-          </Link>
-        </p>
-      )}
-    </div>
   );
 }
 
@@ -244,11 +190,26 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
     }
   }
   const pendingByComponent = new Map<number, number>();
+  // Claim detail for the evidence drawer: what was read, by whom, from which
+  // page. Keyed by component — the stored evidence row does not carry the
+  // extracted-claim id, and adding it would be a schema change.
+  const claimsByComponent = new Map<number, ClaimSummary[]>();
   for (const claim of await listClaimsForAssessment(assessment.id)) {
-    if (claim.status === "pending" && claim.componentId != null) {
+    if (claim.componentId == null) continue;
+    if (claim.status === "pending") {
       pendingByComponent.set(claim.componentId, (pendingByComponent.get(claim.componentId) ?? 0) + 1);
     }
+    const list = claimsByComponent.get(claim.componentId) ?? [];
+    list.push({
+      parameter: claim.parameter ?? null,
+      value: claim.value ?? null,
+      issuer: claim.issuer ?? null,
+      status: claim.status,
+      page: (claim.provenance as { page?: number } | null)?.page ?? null,
+    });
+    claimsByComponent.set(claim.componentId, list);
   }
+  const evidenceContext = { sourceLinks, claimsByComponent };
 
   // Draft EU declaration of conformity — eligibility (button state) + existing drafts.
   const docEligibility = (await doCDraftEligibility(assessment.id)) ?? { eligible: false, blockers: ["Assessment not found."] };
@@ -418,11 +379,11 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
                 <span className="text-neutral-400">· {s.component.material}</span>
               </h3>
               <AnnotationLine component={s.component} />
-              <EvidenceOnFile
-                documents={s.component.documents}
-                sourceLinks={sourceLinks}
+              <EvidenceList
+                items={s.component.documents.map((d) =>
+                  toEvidenceRelied(d, { ...evidenceContext, componentId: s.component.id }),
+                )}
                 pendingCount={s.component.id != null ? (pendingByComponent.get(s.component.id) ?? 0) : 0}
-                assessmentId={assessment.id}
               />
               {s.cards.length > 0 ? (
                 <RuleTable
@@ -435,6 +396,7 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
                     guidance: guidanceMap,
                     assessmentId: assessment.id,
                     componentId: s.component.id,
+                    evidenceContext,
                   })}
                   assessmentId={assessment.id}
                   componentId={s.component.id}
@@ -455,7 +417,7 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-500">Packaging unit</h2>
           <RuleTable
             caption="Applicable rules held at packaging-unit level"
-            rows={buildRuleRows({ cards: report.packagingUnit, documents: packDocuments, corpusByKey, guidance: guidanceMap })}
+            rows={buildRuleRows({ cards: report.packagingUnit, documents: packDocuments, corpusByKey, guidance: guidanceMap, evidenceContext })}
           />
         </section>
       )}
@@ -465,7 +427,7 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-500">Organisation</h2>
           <RuleTable
             caption="Applicable rules held at organisation level"
-            rows={buildRuleRows({ cards: report.organisation, documents: packDocuments, corpusByKey, guidance: guidanceMap })}
+            rows={buildRuleRows({ cards: report.organisation, documents: packDocuments, corpusByKey, guidance: guidanceMap, evidenceContext })}
           />
         </section>
       )}
