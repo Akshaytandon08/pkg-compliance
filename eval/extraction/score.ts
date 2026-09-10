@@ -2,6 +2,17 @@ import type { ExtractedClaimDraft, ExtractionResult } from "../../src/lib/extrac
 import type { ManifestDoc, ExpectedClaim } from "./manifest.ts";
 import { deriveFlags, detectSilentErrors, type SilentError } from "./flags.ts";
 import { strictMatch, canonicalMatch, normText, type MatchKind } from "./canonical.ts";
+import { readFileSync, existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+// COMMIT 3 — optional v2 expected-flag overlay. Present only as a PROPOSAL: it is
+// scored alongside the manifest's legacy flags so the effect of accepting it is
+// visible, but it is never ground truth until the owner folds it in.
+const OVERLAY_PATH = fileURLToPath(new URL("./expected-flags-v2.json", import.meta.url));
+const FLAG_OVERLAY: Record<string, string[]> | null = existsSync(OVERLAY_PATH)
+  ? (JSON.parse(readFileSync(OVERLAY_PATH, "utf8")) as Record<string, string[]>)
+  : null;
+export const hasFlagOverlay = FLAG_OVERLAY !== null;
 
 // Per-model pricing (USD per 1M tokens), verified against the current Claude API
 // reference (see prompts/README.md). Used only to report cost/doc on the harness.
@@ -53,6 +64,8 @@ export interface DocScore {
   derivedFlags: string[];
   falsePositiveFlags: string[]; // derived − expected, per doc (the 20 sonnet FPs)
   flagExactMatch: boolean;
+  /** Same comparison against the proposed v2 expected flags (null when absent). */
+  flagExactMatchV2: boolean | null;
   silentErrors: SilentError[];
   latencyMs: number;
   inputTokens: number;
@@ -95,6 +108,8 @@ export function scoreDoc(
   const expSet = new Set(expectedFlags);
   const falsePositiveFlags = derived.filter((f) => !expSet.has(f));
   const flagExactMatch = derived.join("|") === expectedFlags.join("|");
+  const v2 = FLAG_OVERLAY?.[doc.file];
+  const flagExactMatchV2 = v2 ? derived.join("|") === [...v2].sort().join("|") : null;
   const silentErrors = detectSilentErrors(doc, claims, flags);
 
   const legibility = { clear: 0, partially_obscured: 0, illegible: 0, unreported: 0 };
@@ -122,6 +137,7 @@ export function scoreDoc(
     derivedFlags: derived,
     falsePositiveFlags,
     flagExactMatch,
+    flagExactMatchV2,
     silentErrors,
     latencyMs: result.latencyMs,
     inputTokens: result.usage.inputTokens,
@@ -149,6 +165,8 @@ export interface ModelReport {
   fieldAccuracyStrict: number; // exact-only baseline
   byTier: Record<string, TierAccuracy>;
   flagExactRate: number; // docs whose derived flag-set exactly equals expected
+  /** Same rate against the proposed v2 flags; null when no overlay is present. */
+  flagExactRateV2: number | null;
   flagTP: number;
   flagFP: number;
   flagFN: number;
@@ -202,6 +220,10 @@ export function aggregate(model: string, scores: DocScore[]): ModelReport {
     fieldAccuracyStrict: fieldTotal ? fieldMatchedStrict / fieldTotal : 0,
     byTier,
     flagExactRate: scores.length ? scores.filter((s) => s.flagExactMatch).length / scores.length : 0,
+    flagExactRateV2:
+      scores.length && scores.some((s) => s.flagExactMatchV2 !== null)
+        ? scores.filter((s) => s.flagExactMatchV2).length / scores.length
+        : null,
     flagTP: tp,
     flagFP: fp,
     flagFN: fn,

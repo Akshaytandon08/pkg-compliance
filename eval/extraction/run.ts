@@ -52,6 +52,9 @@ function printReport(report: ModelReport): void {
   const tiers = Object.keys(report.byTier).sort();
   console.log(`    By tier (canonical):                          ${tiers.map((t) => `${t} ${pct(report.byTier[t].total ? report.byTier[t].matched / report.byTier[t].total : 0)}`).join("  ")}`);
   console.log(`    Flag exact-set match rate:                    ${pct(report.flagExactRate)}   (TP ${report.flagTP} / FP ${report.flagFP} / FN ${report.flagFN})`);
+  if (report.flagExactRateV2 !== null) {
+    console.log(`      …against PROPOSED v2 expected flags:        ${pct(report.flagExactRateV2)}   (proposal only — not ground truth)`);
+  }
   console.log(`    Silent errors:                                ${report.silentErrorCount}   ← wrong/guessed value, unflagged`);
   const lg = report.legibility;
   console.log(`    Per-field legibility:                         clear ${lg.clear}, partially_obscured ${lg.partially_obscured}, illegible ${lg.illegible}, unreported ${lg.unreported}`);
