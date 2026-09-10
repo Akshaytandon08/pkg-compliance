@@ -280,9 +280,16 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
       </div>
 
       {/* Sticky in-page section index */}
-      <nav className="sticky top-0 z-10 -mx-6 flex gap-4 overflow-x-auto border-b border-n50 bg-page/90 px-6 py-2 text-xs text-n600 backdrop-blur">
+      <nav
+        aria-label="Report sections"
+        className="sticky top-0 z-10 -mx-6 flex gap-4 overflow-x-auto border-b border-n50 bg-page/90 px-6 py-2 text-xs text-n600 backdrop-blur"
+      >
         {sections.map((s) => (
-          <a key={s.id} href={`#${s.id}`} className="whitespace-nowrap hover:text-n900">
+          <a
+            key={s.id}
+            href={`#${s.id}`}
+            className="whitespace-nowrap rounded hover:text-n900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-p600"
+          >
             {s.label}
           </a>
         ))}

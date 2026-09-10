@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 // Client drop zone for the public intake. Posts one file to the token-scoped
 // public API. Client-side type/size hints are UX only — the server sniffs and
@@ -10,15 +10,32 @@ const MAX_BYTES = 15 * 1024 * 1024;
 
 type State = { kind: "idle" } | { kind: "uploading" } | { kind: "done" } | { kind: "error"; message: string };
 
+// Extraction runs inside the upload request and takes ~45s at the median, so a
+// static "Uploading…" looks frozen for most of a minute. Count elapsed seconds
+// and say what is actually happening — reading the document — with the expected
+// duration, so waiting feels like progress rather than a hang.
+const READING_AFTER_SECONDS = 3;
+
 export function DropZone({ token }: { token: string }) {
   const [state, setState] = useState<State>({ kind: "idle" });
   const [dragging, setDragging] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    // Subscribe only: the counter is reset where the upload starts, so this
+    // effect never calls setState synchronously in its body.
+    if (state.kind !== "uploading") return;
+    const started = Date.now();
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => clearInterval(id);
+  }, [state.kind]);
 
   async function upload(file: File) {
     if (file.size > MAX_BYTES) {
       setState({ kind: "error", message: "File is too large (max 15 MB)." });
       return;
     }
+    setElapsed(0);
     setState({ kind: "uploading" });
     try {
       const form = new FormData();
@@ -73,7 +90,18 @@ export function DropZone({ token }: { token: string }) {
           onChange={(e) => onFiles(e.target.files)}
         />
         {state.kind === "uploading" ? (
-          <span className="text-neutral-600">Uploading…</span>
+          <span className="flex flex-col items-center" role="status" aria-live="polite">
+            <span className="font-medium text-neutral-700">
+              {elapsed < READING_AFTER_SECONDS ? "Uploading…" : "Reading document…"}
+            </span>
+            <span className="mt-1 text-xs text-neutral-500">
+              {elapsed}s elapsed{elapsed >= READING_AFTER_SECONDS ? " · usually about 45 seconds" : ""}
+            </span>
+            {/* Indeterminate bar: honest about not knowing the fraction done. */}
+            <span aria-hidden="true" className="mt-2 block h-1 w-40 overflow-hidden rounded bg-neutral-200">
+              <span className="block h-full w-1/3 animate-pulse rounded bg-p600" />
+            </span>
+          </span>
         ) : (
           <>
             <span className="font-medium text-neutral-700">Drop a file here or click to choose</span>

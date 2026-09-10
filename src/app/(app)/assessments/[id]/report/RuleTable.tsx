@@ -25,7 +25,7 @@ function EvidenceChip({ item, onOpen }: { item: EvidenceRelied; onOpen?: (item: 
   const openable = item.source === "extracted" || item.sourceDocumentId !== null;
   const Glyph = openable ? FileText : Pencil;
   const label = [item.typeLabel, item.reference, item.validity].filter(Boolean).join(" · ");
-  const common = "inline-flex max-w-full items-center gap-1 rounded-full border border-n300 bg-n50 px-2 py-0.5 text-xs text-n800";
+  const common = "inline-flex max-w-full items-center gap-1 rounded-full border border-n400 bg-n50 px-2 py-0.5 text-xs text-n800";
   if (!onOpen) {
     return (
       <span className={common}>
@@ -213,7 +213,7 @@ function ActionCell({
             <div key={t.label} className="flex flex-wrap items-center gap-1.5">
               <a
                 href={t.docxUrl}
-                className="rounded border border-n300 px-2 py-0.5 hover:bg-n100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-p600"
+                className="rounded border border-n400 px-2 py-0.5 hover:bg-n100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-p600"
               >
                 ↓ {t.label} (.docx)
               </a>

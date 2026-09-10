@@ -48,19 +48,34 @@ audit-level and not independently assured, no LLM touches the number.
 
 **3 — The gap → guidance → template → evidence loop.** Open **Client A —
 traction-cell (demo)**. It is mostly conditional — the pack is blocked by missing
-evidence, not by chemistry. Walk one card end to end:
+evidence, not by chemistry. Each component is now a **table** — one row per
+applicable rule, columns *Rule · Verdict · Why · Evidence relied on · Citation ·
+Action* — so you scan the Verdict column rather than reading every card. Sort by
+**Verdict** to bring gaps to the top. Walk one row end to end:
 - The **Green polyester strap (PET)** carries an assessor **at-risk** annotation
-  (green pigment families historically included lead chromate) → a
-  `TEST_REQUIRED` conditional with the rationale shown.
-- Expand **"How to obtain this evidence"** — the approved guidance for the
-  evidence type (what a compliant document must contain, what to watch for).
-- Use **"Request templates"** to download the lab-test request as a **.docx**
+  (green pigment families historically included lead chromate) → **Conditional**
+  with **"Test required"** in the *Why* column, and the annotation shown as an
+  **Assessor flag** in the expanded row. (A component with no annotation shows
+  nothing there — there is no default "risk low".)
+- **Expand the row** (click the rule name) for the full requirement text,
+  thresholds, exemptions, phase-in and analyst confidence, plus the approved
+  **"How to obtain this evidence"** guidance.
+- Click any **evidence chip** — in the row or in "Evidence on file" — to open the
+  evidence **drawer**: the stored document previewed inline, with the values read
+  from it (issuer, page, confirmation status), or the typed record for a manual
+  entry. Escape closes it and focus returns to the chip.
+- Use **"Request evidence"** in the Action column to download the lab-test request
+  as a **.docx**
   (with a **PDF preview** alongside) — a Fitsol-branded drafting aid the user sends
   to their lab, never a system-issued document. (Every document export is .docx +
   PDF; markdown is internal only.)
-- In **"Add evidence"**, add a `lab_test` (or `test_report`) for the strap and
-  save. The report re-evaluates in place and the strap flips **conditional →
-  qualified**, with no code change and no corpus change.
+- **"Add evidence"** sits in the same Action cell: add a lab test (or test report)
+  for the strap and save. The report re-evaluates in place and the strap flips
+  **Conditional → Qualified**, with no code change and no corpus change.
+- On a phone (≤768px) the same rows render as stacked cards in the same field
+  order — nothing is hidden, the reading order just becomes vertical.
+- A rule that does not apply yet shows as **Upcoming — applies from <date>**,
+  muted, with no action: it is counted separately and never as a gap.
 
 **4 — The applicability contrast.** Open **Demo — food-contact laminate pouch**.
 Because `food_contact` is true, the **PFAS restriction now applies** (it was N/A

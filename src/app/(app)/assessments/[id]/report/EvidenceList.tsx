@@ -27,7 +27,7 @@ export function EvidenceList({ items, pendingCount }: { items: EvidenceRelied[];
                   type="button"
                   onClick={() => setDrawerItem(item)}
                   aria-label={`${openable ? "Open" : "View"} evidence: ${detail}`}
-                  className="inline-flex items-center gap-1 rounded-full border border-n300 bg-white px-2 py-0.5 text-n800 hover:bg-n100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-p600"
+                  className="inline-flex items-center gap-1 rounded-full border border-n400 bg-white px-2 py-0.5 text-n800 hover:bg-n100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-p600"
                 >
                   <Glyph aria-hidden="true" className="size-3 shrink-0" />
                   <span>{detail}</span>
