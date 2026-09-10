@@ -17,6 +17,15 @@ import { describeDeltaAction, describeRequirement } from "@/lib/report/deltaActi
 import { PCF_DISCLAIMER, SCREENING_DISCLAIMER } from "@/lib/report/language";
 import { StatusChip, toChipStatus } from "@/app/_components/StatusChip";
 import { Breadcrumbs } from "@/app/_components/Breadcrumbs";
+import {
+  CONFIDENCE_LABEL,
+  RULE_REFERENCE_TOOLTIP,
+  evidenceTypeLabel,
+  reasonLabel,
+  ruleReference,
+  verdictAriaLabel,
+  verdictLabel,
+} from "@/lib/report/labels";
 import { AddEvidenceForm } from "./AddEvidenceForm";
 import { GeneratePassport } from "./GeneratePassport";
 
@@ -37,7 +46,7 @@ function GuidancePanel({ card, guidance }: { card: CheckpointCard; guidance: Map
       <div className="space-y-3">
         {entries.map(({ t, g }) => (
           <div key={t} className="text-xs">
-            <p className="font-medium">{t.replace(/_/g, " ")}</p>
+            <p className="font-medium">{evidenceTypeLabel(t)}</p>
             {g.status === "draft" ? (
               <p className="text-neutral-500">Guidance pending approval.</p>
             ) : (
@@ -220,15 +229,26 @@ function VerdictCard({
     <div className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="font-mono text-xs text-neutral-500">{card.checkpointId}@{card.version}</p>
+          <p
+            className="font-mono text-xs text-n600 dark:text-neutral-400"
+            title={RULE_REFERENCE_TOOLTIP}
+          >
+            {ruleReference(card.checkpointId, card.version)}
+          </p>
           <p className="mt-0.5 text-sm">{card.requirementText}</p>
         </div>
-        {outcome.verdict && <StatusChip status={toChipStatus(outcome.verdict)} />}
+        {outcome.verdict && (
+          <StatusChip
+            status={toChipStatus(outcome.verdict)}
+            label={verdictLabel(outcome.verdict, outcome.detail)}
+            ariaLabel={verdictAriaLabel(outcome.verdict, card.requirementText, outcome.detail)}
+          />
+        )}
       </div>
       <dl className="mt-3 grid gap-1 text-xs text-neutral-600 dark:text-neutral-400">
         <div className="flex gap-2">
-          <dt className="font-medium">Reason</dt>
-          <dd>{outcome.reasonCode}{outcome.risk ? ` · risk ${outcome.risk}` : ""}</dd>
+          <dt className="font-medium">Why</dt>
+          <dd>{reasonLabel(outcome.reasonCode, outcome.detail)}</dd>
         </div>
         <div className="flex gap-2">
           <dt className="font-medium">Evidence required</dt>
@@ -241,7 +261,7 @@ function VerdictCard({
         {card.confidence && (
           <div className="flex gap-2">
             <dt className="font-medium">Confidence</dt>
-            <dd>{card.confidence === "H" ? "High" : card.confidence === "M" ? "Medium" : "Low"}</dd>
+            <dd>{CONFIDENCE_LABEL[card.confidence] ?? card.confidence}</dd>
           </div>
         )}
         {card.laterOfCondition && (
@@ -261,9 +281,12 @@ function VerdictCard({
           </ul>
         </div>
       )}
-      {outcome.reasonCode === "TEST_REQUIRED" && rationale && (
+      {/* Assessor flag — rendered ONLY when an assessor actually annotated this
+          component. An un-annotated component previously inherited a derived
+          "risk low", which read as a reassurance nobody had given. */}
+      {rationale && (
         <p className="mt-2 rounded bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
-          <span className="font-semibold">Assessor rationale (at risk): </span>
+          <span className="font-semibold">Assessor flag: </span>
           {rationale}
         </p>
       )}
@@ -297,7 +320,9 @@ function CaveatCard({ card }: { card: CheckpointCard }) {
   return (
     <div className={`rounded-md border p-4 ${tone}`}>
       <div className="flex items-center justify-between gap-3">
-        <p className="font-mono text-xs text-neutral-500">{card.checkpointId}@{card.version}</p>
+        <p className="font-mono text-xs text-n600 dark:text-neutral-400" title={RULE_REFERENCE_TOOLTIP}>
+          {ruleReference(card.checkpointId, card.version)}
+        </p>
         <span className="rounded-full bg-white/70 px-2.5 py-0.5 text-xs font-semibold dark:bg-black/30">
           {card.caveat?.label}
         </span>
@@ -571,7 +596,9 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
             {report.upcoming.map((c, i) => (
               <li key={`${c.checkpointId}-${i}`} className="rounded-md border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900/40">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <p className="font-mono text-xs text-neutral-500">{c.checkpointId}@{c.version}</p>
+                  <p className="font-mono text-xs text-n600 dark:text-neutral-400" title={RULE_REFERENCE_TOOLTIP}>
+                    {ruleReference(c.checkpointId, c.version)}
+                  </p>
                   <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
                     {c.outcome?.detail}
                   </span>
