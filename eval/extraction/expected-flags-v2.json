@@ -1,0 +1,59 @@
+{
+  "01_supplier_declaration_A.pdf": [],
+  "02_supplier_declaration_B.pdf": [],
+  "03_supplier_declaration_B.pdf": [
+    "flag_wrong_standard"
+  ],
+  "04_supplier_declaration_C.pdf": [
+    "flag_low_confidence"
+  ],
+  "05_supplier_declaration_D.jpg": [
+    "flag_issuer",
+    "flag_low_confidence"
+  ],
+  "06_lab_test_report_A.pdf": [],
+  "07_lab_test_report_B.pdf": [],
+  "08_lab_test_report_B.pdf": [],
+  "09_lab_test_report_C.pdf": [
+    "flag_low_confidence"
+  ],
+  "10_lab_test_report_D.jpg": [
+    "flag_low_confidence",
+    "flag_unit_conversion"
+  ],
+  "11_heat_treatment_certificate_A.pdf": [],
+  "12_heat_treatment_certificate_B.pdf": [
+    "flag_low_confidence"
+  ],
+  "13_heat_treatment_certificate_B.pdf": [],
+  "14_heat_treatment_certificate_C.pdf": [
+    "flag_low_confidence"
+  ],
+  "15_heat_treatment_certificate_D.jpg": [
+    "flag_expired",
+    "flag_low_confidence"
+  ],
+  "16_mill_declaration_A.pdf": [
+    "flag_low_confidence"
+  ],
+  "17_mill_declaration_B.pdf": [],
+  "18_mill_declaration_B.pdf": [
+    "flag_missing_sum"
+  ],
+  "19_mill_declaration_C.pdf": [
+    "flag_low_confidence"
+  ],
+  "20_mill_declaration_D.jpg": [
+    "flag_low_confidence",
+    "flag_scope_mismatch"
+  ],
+  "21_presswood_na-4840_A.pdf": [],
+  "22_presswood_eu-1208_B.pdf": [],
+  "23_presswood_au-1165_B.pdf": [],
+  "24_presswood_as-1111_C.pdf": [
+    "flag_low_confidence"
+  ],
+  "25_presswood_as-1210_D.jpg": [
+    "flag_low_confidence"
+  ]
+}

@@ -752,3 +752,93 @@ expected value appeared *anywhere* in *any* claim field — so "Grade A" matched
 "Grade B", and an expected standard's digits matched inside an unrelated method
 string. That rule has been removed. The safe figures are **9.9% / 38.4%**; the
 `canonical.test.ts` suite pins the equality-preserving guarantee.
+
+---
+
+# Results at prompt 1.3.0 (grounding + two-pass) — 3-run means
+
+> **Synthetic ceiling, not the acceptance metric.** 25 generated documents.
+> Acceptance is measured only on the product owner's real, PII-scrubbed set.
+
+`claude-sonnet-5`, 3 runs, prompt 1.3.0. Sampling cannot be pinned on these
+models (they reject `temperature`), so every figure is a 3-run mean with its
+spread, and silent errors are the **union** across runs.
+
+| Metric | 1.0.0 | 1.2.0 (3 runs) | **1.3.0 (3 runs)** |
+|---|--:|--:|--:|
+| Field accuracy (mean) | 9.9% | 61.9% | **51.7%** |
+| Spread across runs | — | 6.6 pts | **13.0 pts** |
+| Per run | — | 58.3 / 64.9 / 62.6 | **43.5 / 55.0 / 56.5** |
+| **Unioned silent errors** | 1 (1 run) | **2** | **0 — target met** |
+| Refusals (total) | 1 | 0 | 2 |
+| Usable-document rate | 92% | 92–100% | 96% |
+| Cost/doc | $0.0150 | $0.0227 | **$0.0351** |
+| Median latency | 8.4 s | 44 s | 39 s |
+
+## The two mechanisms' catch counts (per run)
+
+| Mechanism | run 1 | run 2 | run 3 | total |
+|---|--:|--:|--:|--:|
+| Type-mismatch (wrong type for field) | 9 | 13 | 14 | 36 |
+| **Ungrounded** (snippet absent from text) | 2 | 0 | 1 | **3** |
+| **Pass-disagreement** (image-only) | 23 | 21 | 10 | **54** |
+| Extra API calls (two-pass) | 10 | 10 | 10 | 30 |
+
+**Two-pass does the heavy lifting; grounding catches little — and that is itself a
+finding.** Only 3 snippets across 3 runs could not be located in the document,
+meaning the model quotes faithfully when it has text to quote. The uncertainty is
+concentrated in the image-only documents, where there is no text to check and two
+independent reads disagree 10–23 times per run.
+
+## The cost of safety, stated plainly
+
+Silent errors went 2 → **0**, which was the objective. Field accuracy fell 61.9% →
+51.7% and the run-to-run spread doubled (6.6 → 13.0 pts). Both follow directly
+from the mechanisms: ~31 values per run are now WITHHELD, and some of those were
+correct — two-pass is deliberately conservative, discarding a value whenever two
+reads differ even though one of them was right. Part of the increased "instability"
+is therefore the safeguards' own variability (disagreements ranged 23/21/10), not
+the model's.
+
+That is the intended trade: a withheld value is visible to a reviewer and costs a
+manual entry; a wrong value that reaches a verdict is invisible and costs a wrong
+verdict. The accuracy number is the price, and it should be quoted alongside the
+silent-error count rather than on its own.
+
+## Field stability (per-field, 3 runs)
+
+| Prompt | Fields | Always matched | Never matched | Unstable |
+|---|--:|--:|--:|--:|
+| 1.2.0 | 393 | 191 | 106 | 96 (24.4%) |
+| 1.3.0 | 393 | 116 | 101 | 176 (44.8%) |
+
+## mill_declaration instability: the remedy does not address the cause
+
+Two-pass agreement was expected to stabilise it. **It cannot**, because two-pass is
+image-only and the instability is on text-layer documents:
+
+| Doc | Tier | Mode | 1.3.0 claims per run |
+|---|---|---|---|
+| 16 | A | grounding | 19 / 19 / **1** |
+| 17 | B | grounding | 17 / 17 / 17 |
+| 18 | B | grounding | **0** / 19 / **0** |
+| 19 | C | **two_pass** | 16 / 16 / 16 |
+| 20 | D | **two_pass** | 18 / 18 / 19 |
+
+The failure is intermittent **whole-document dropout** — the model returns 0–1
+claims instead of ~19, with status `succeeded` — and it lands on tier A/B docs,
+which two-pass never touches. The two image-tier documents, where two-pass does
+apply, are the stable ones in both prompt versions.
+
+**Recommended fix (not implemented):** retry once when a document with a
+substantial text layer yields ~0 claims. It is cheap (fires only on failure), it
+targets the actual cause, and it needs no extra call on the healthy path.
+
+## Flag scoring: legacy vs the proposed v2 ground truth
+
+From the same runs, computed offline: legacy 28 / 20 / 20% → v2 **32 / 20 / 24%**.
+Accepting the proposed diff (7 documents, 60 justified rejections, 33 excluded as
+unprovable — see [flag-groundtruth-proposal.md](flag-groundtruth-proposal.md))
+improves the flag score only modestly. So the stale ground truth explains *part*
+of the false-positive gap, not all of it; the rest is genuine over-flagging that
+still needs work.
