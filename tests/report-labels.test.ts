@@ -123,6 +123,9 @@ test("verdict chips carry an accessible name naming the rule", () => {
 const RENDER_SOURCES = [
   "../src/app/(app)/assessments/[id]/report/page.tsx",
   "../src/app/passport/[token]/page.tsx",
+  // The inline add-evidence form renders evidence types too — it leaked
+  // `supplier declaration` (underscore-stripped) until the live scan found it.
+  "../src/app/(app)/assessments/[id]/report/AddEvidenceForm.tsx",
 ];
 
 test("the report and passport never render a raw enum expression", () => {
@@ -146,7 +149,10 @@ test("the report and passport never render a raw enum expression", () => {
 test("the rule reference is muted, tooltipped, and hides the version by default", () => {
   assert.equal(ruleReference("EU-PPWR-heavy-metals", 3), "EU-PPWR-heavy-metals");
   assert.equal(ruleReference("EU-PPWR-heavy-metals", 3, true), "EU-PPWR-heavy-metals@3");
-  for (const rel of RENDER_SOURCES) {
+  // Only the surfaces that actually SHOW a rule reference — the add-evidence
+  // form renders none, so requiring one there would be meaningless.
+  const surfacesShowingTheReference = RENDER_SOURCES.filter((r) => r.endsWith("page.tsx"));
+  for (const rel of surfacesShowingTheReference) {
     const src = readFileSync(new URL(rel, import.meta.url), "utf8");
     assert.match(src, /RULE_REFERENCE_TOOLTIP/, `${rel}: the identifier must carry the tooltip`);
     assert.match(src, /ruleReference\(/, `${rel}: the identifier must go through ruleReference()`);
@@ -167,11 +173,20 @@ test("rendered HTML contains no enum token outside the muted reference line", li
   // Strip the sanctioned reference lines (the muted, tooltipped identifier) and
   // anything inside an href/URL, then look for leaks in what a reader sees.
   const visible = html
+    // Script/style BODIES are not user-visible text. Next inlines the RSC
+    // payload (props, chunk names) in <script>, which is not a rendering leak —
+    // scanning it would only ever produce false positives.
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    // The sanctioned muted rule-reference line.
     .replace(/<p[^>]*title="Rule reference[^"]*"[^>]*>[\s\S]*?<\/p>/g, "")
     .replace(/<[^>]+>/g, " ")
     .replace(/https?:\/\/\S+/g, " ");
 
-  const screaming = [...visible.matchAll(SCREAMING_SNAKE)].map((m) => m[0]);
+  // Both need the g flag for matchAll; the module-level patterns stay non-global
+  // because assertReadable uses them with .test()/doesNotMatch, where a shared
+  // lastIndex would make results depend on call order.
+  const screaming = [...visible.matchAll(new RegExp(SCREAMING_SNAKE, "g"))].map((m) => m[0]);
   const snake = [...visible.matchAll(new RegExp(LOWER_SNAKE, "g"))].map((m) => m[0]);
   assert.deepEqual(screaming, [], `SCREAMING_SNAKE enum tokens visible: ${screaming.join(", ")}`);
   assert.deepEqual(snake, [], `snake_case identifiers visible: ${snake.join(", ")}`);

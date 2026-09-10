@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { evidenceTypeLabel } from "@/lib/report/labels";
 
 const input =
   "w-full rounded border border-neutral-300 bg-white px-2 py-1 text-xs dark:border-neutral-700 dark:bg-neutral-900";
@@ -81,7 +82,7 @@ export function AddEvidenceForm({
           <select className={input} value={type} onChange={(e) => setType(e.target.value)}>
             {evidenceTypes.map((t) => (
               <option key={t} value={t}>
-                {t.replace(/_/g, " ")}
+                {evidenceTypeLabel(t)}
               </option>
             ))}
           </select>
