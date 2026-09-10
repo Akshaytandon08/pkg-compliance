@@ -32,6 +32,8 @@ export interface EvidenceRelied {
   type: string;
   typeLabel: string;
   reference: string | null;
+  /** Truncated for the chip; `reference` keeps the full text for the drawer. */
+  shortReference: string | null;
   validity: string | null;
   /** "extracted" evidence came from a document read by the pipeline; a reviewer
    *  can open it. "manual" is a typed record. Drives the chip's glyph. */
@@ -109,6 +111,15 @@ function splitCitation(citation: string): { text: string; url: string | null } {
   return { text: text || citation, url };
 }
 
+/** The chip shows a short reference; the full text lives in the drawer. Demo
+ *  references run to a full sentence, which otherwise forces the Citation and
+ *  Action columns off the side of the table. */
+function shortRef(reference: string | null | undefined): string | null {
+  if (!reference) return null;
+  const head = reference.split(/\s+[—–-]\s+/)[0].trim();
+  return head.length > 28 ? `${head.slice(0, 27)}…` : head;
+}
+
 function validityOf(doc: EvidenceDocument): string | null {
   if (doc.expiryDate) return `valid to ${doc.expiryDate}`;
   if (doc.issuedDate) return `issued ${doc.issuedDate}`;
@@ -129,6 +140,7 @@ export function toEvidenceRelied(d: EvidenceDocument, ctx: EvidenceContext = {})
     type: d.type,
     typeLabel: evidenceTypeLabel(d.type),
     reference: d.reference ?? null,
+    shortReference: shortRef(d.reference),
     validity: validityOf(d),
     source: extracted ? "extracted" : "manual",
     sourceDocumentId: d.sourceDocumentId ?? null,

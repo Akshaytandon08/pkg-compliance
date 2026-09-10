@@ -24,7 +24,8 @@ const VERDICT_ORDER: Record<string, number> = {
 function EvidenceChip({ item, onOpen }: { item: EvidenceRelied; onOpen?: (item: EvidenceRelied) => void }) {
   const openable = item.source === "extracted" || item.sourceDocumentId !== null;
   const Glyph = openable ? FileText : Pencil;
-  const label = [item.typeLabel, item.reference, item.validity].filter(Boolean).join(" · ");
+  // Short form on the chip; the drawer carries the full reference.
+  const label = [item.typeLabel, item.shortReference].filter(Boolean).join(" · ");
   const common = "inline-flex max-w-full items-center gap-1 rounded-full border border-n400 bg-n50 px-2 py-0.5 text-xs text-n800";
   if (!onOpen) {
     return (
@@ -294,16 +295,16 @@ export function RuleTable({
       <EvidenceDrawer item={drawerItem} onClose={() => setDrawerItem(null)} />
       {/* ---------- table (md and up) ---------- */}
       <div className="hidden overflow-x-auto md:block">
-        <table className="w-full border-collapse text-left text-sm">
+        <table className="w-full table-fixed border-collapse text-left text-sm">
           <caption className="sr-only">{caption}</caption>
           <thead>
             <tr className="border-b border-n300 text-xs uppercase tracking-wide text-n600">
-              <th scope="col" aria-sort={ariaSort("name")} className="py-2 pr-3"><SortButton k="name" sort={sort} onToggle={toggleSort}>Rule</SortButton></th>
-              <th scope="col" aria-sort={ariaSort("verdict")} className="py-2 pr-3"><SortButton k="verdict" sort={sort} onToggle={toggleSort}>Verdict</SortButton></th>
-              <th scope="col" className="py-2 pr-3 font-semibold">Why</th>
-              <th scope="col" className="py-2 pr-3 font-semibold">Evidence relied on</th>
-              <th scope="col" className="py-2 pr-3 font-semibold">Citation</th>
-              <th scope="col" className="py-2 font-semibold">Action</th>
+              <th scope="col" aria-sort={ariaSort("name")} className="w-[16%] py-2 pr-3"><SortButton k="name" sort={sort} onToggle={toggleSort}>Rule</SortButton></th>
+              <th scope="col" aria-sort={ariaSort("verdict")} className="w-[11%] py-2 pr-3"><SortButton k="verdict" sort={sort} onToggle={toggleSort}>Verdict</SortButton></th>
+              <th scope="col" className="w-[15%] py-2 pr-3 font-semibold">Why</th>
+              <th scope="col" className="w-[24%] py-2 pr-3 font-semibold">Evidence relied on</th>
+              <th scope="col" className="w-[18%] py-2 pr-3 font-semibold">Citation</th>
+              <th scope="col" className="w-[16%] py-2 font-semibold">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -333,8 +334,8 @@ export function RuleTable({
                     </td>
                     <td className="py-3 pr-3 text-n700">{row.why}</td>
                     <td className="py-3 pr-3"><EvidenceCell row={row} onOpenEvidence={openEvidence} /></td>
-                    <td className="py-3 pr-3 max-w-[18rem]"><CitationLink row={row} /></td>
-                    <td className="py-3 min-w-[12rem]"><ActionCell row={row} assessmentId={assessmentId} componentId={componentId} componentName={componentName} /></td>
+                    <td className="py-3 pr-3 text-xs"><CitationLink row={row} /></td>
+                    <td className="py-3 text-xs"><ActionCell row={row} assessmentId={assessmentId} componentId={componentId} componentName={componentName} /></td>
                   </tr>
                   {isOpen && (
                     <tr className="border-b border-n200">
