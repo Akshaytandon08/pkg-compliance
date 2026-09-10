@@ -10,86 +10,16 @@ import { languageOptionsFor } from "@/lib/doc-export/languages";
 import { signDownload, downloadPath } from "@/lib/storage";
 import { DoCDraftPanel } from "./DoCDraftPanel";
 import { computePackFootprint } from "@/lib/engine/pcf";
-import { getAllGuidance, guidanceKey, type GuidanceRow } from "@/db/guidance";
 import { evaluatePack, type CheckpointCard, type ComponentInput } from "@/lib/engine/pack";
 import { buildObligationCalendar } from "@/lib/report/obligations";
-import { describeDeltaAction, describeRequirement } from "@/lib/report/deltaActions";
 import { PCF_DISCLAIMER, SCREENING_DISCLAIMER } from "@/lib/report/language";
 import { StatusChip, toChipStatus } from "@/app/_components/StatusChip";
 import { Breadcrumbs } from "@/app/_components/Breadcrumbs";
-import {
-  CONFIDENCE_LABEL,
-  RULE_REFERENCE_TOOLTIP,
-  evidenceTypeLabel,
-  reasonLabel,
-  ruleReference,
-  verdictAriaLabel,
-  verdictLabel,
-} from "@/lib/report/labels";
-import { AddEvidenceForm } from "./AddEvidenceForm";
+import { getAllGuidance } from "@/db/guidance";
+import { RULE_REFERENCE_TOOLTIP, ruleReference } from "@/lib/report/labels";
+import { buildRuleRows } from "@/lib/report/ruleRows";
+import { RuleTable } from "./RuleTable";
 import { GeneratePassport } from "./GeneratePassport";
-
-function evidenceTypesOf(card: CheckpointCard): string[] {
-  return [...new Set((card.evidenceRequirements.allOf ?? []).flatMap((c) => c.anyOf))];
-}
-
-function GuidancePanel({ card, guidance }: { card: CheckpointCard; guidance: Map<string, GuidanceRow> }) {
-  const entries = evidenceTypesOf(card)
-    .map((t) => ({ t, g: guidance.get(guidanceKey(card.checkpointId, card.version, t)) }))
-    .filter((e): e is { t: string; g: GuidanceRow } => !!e.g);
-  if (entries.length === 0) return null;
-  return (
-    <div className="mt-3 rounded-md border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
-      <p className="mb-2 text-xs font-semibold text-neutral-600 dark:text-neutral-300">
-        How to obtain this evidence
-      </p>
-      <div className="space-y-3">
-        {entries.map(({ t, g }) => (
-          <div key={t} className="text-xs">
-            <p className="font-medium">{evidenceTypeLabel(t)}</p>
-            {g.status === "draft" ? (
-              <p className="text-neutral-500">Guidance pending approval.</p>
-            ) : (
-              <div className="mt-1 space-y-1 text-neutral-600 dark:text-neutral-400">
-                {g.issuerGuidance && <p>{g.issuerGuidance}</p>}
-                {g.mustContain && g.mustContain.length > 0 && (
-                  <div>
-                    <span className="font-medium">Must contain:</span>
-                    <ul className="ml-4 list-disc">
-                      {g.mustContain.map((m, i) => (
-                        <li key={i}>{m}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {g.redFlags && g.redFlags.length > 0 && (
-                  <div>
-                    <span className="font-medium">Watch for:</span>
-                    <ul className="ml-4 list-disc">
-                      {g.redFlags.map((m, i) => (
-                        <li key={i}>{m}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {g.typicalSourceOrgRole && (
-                  <p>
-                    <span className="font-medium">Typical source:</span> {g.typicalSourceOrgRole}
-                  </p>
-                )}
-                {g.costTurnaroundNote && (
-                  <p>
-                    <span className="font-medium">Cost &amp; turnaround:</span> {g.costTurnaroundNote}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function AnnotationLine({ component }: { component: ComponentInput }) {
   const by = component.riskAnnotatedBy ? ` (by ${component.riskAnnotatedBy})` : "";
@@ -116,45 +46,6 @@ function AnnotationLine({ component }: { component: ComponentInput }) {
   );
 }
 
-function TemplateLinks({
-  card,
-  assessmentId,
-  componentId,
-}: {
-  card: CheckpointCard;
-  assessmentId: number;
-  componentId: number;
-}) {
-  const types = evidenceTypesOf(card);
-  const hasSupplier = types.includes("supplier_declaration");
-  const hasLab = types.includes("lab_test") || types.includes("test_report");
-  if (!hasSupplier && !hasLab) return null;
-  const base = `/api/assessments/${assessmentId}/template?component=${componentId}&checkpoint=${encodeURIComponent(card.checkpointId)}&version=${card.version}`;
-  const link = "rounded border border-neutral-300 px-2.5 py-1 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800";
-  const preview = "text-neutral-500 underline hover:text-neutral-700";
-  return (
-    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-      <span className="text-neutral-500">Request templates:</span>
-      {hasSupplier && (
-        <span className="inline-flex items-center gap-1.5">
-          <a href={`${base}&kind=supplier_declaration&format=docx`} className={link}>↓ Supplier declaration request (.docx)</a>
-          <a href={`${base}&kind=supplier_declaration&format=pdf`} target="_blank" rel="noreferrer" className={preview}>preview</a>
-        </span>
-      )}
-      {hasLab && (
-        <span className="inline-flex items-center gap-1.5">
-          <a href={`${base}&kind=lab_test&format=docx`} className={link}>↓ Lab test request (.docx)</a>
-          <a href={`${base}&kind=lab_test&format=pdf`} target="_blank" rel="noreferrer" className={preview}>preview</a>
-        </span>
-      )}
-    </div>
-  );
-}
-
-// C2 — the evidence-on-file column. Each item is tagged by provenance (manual vs
-// extracted-and-confirmed) and, when it came from a stored file, links to that
-// source (signed, short-lived, still gated). A pending count nudges the reviewer
-// to the claim-review surface. This is GATED report only — the passport is unchanged.
 function EvidenceOnFile({
   documents,
   sourceLinks,
@@ -205,108 +96,6 @@ function EvidenceOnFile({
             review
           </Link>
         </p>
-      )}
-    </div>
-  );
-}
-
-function VerdictCard({
-  card,
-  rationale,
-  guidance,
-  assessmentId,
-  componentId,
-}: {
-  card: CheckpointCard;
-  rationale?: string | null;
-  guidance: Map<string, GuidanceRow>;
-  assessmentId: number;
-  componentId?: number;
-}) {
-  const outcome = card.outcome!;
-  const delta = describeDeltaAction(card);
-  return (
-    <div className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p
-            className="font-mono text-xs text-n600 dark:text-neutral-400"
-            title={RULE_REFERENCE_TOOLTIP}
-          >
-            {ruleReference(card.checkpointId, card.version)}
-          </p>
-          <p className="mt-0.5 text-sm">{card.requirementText}</p>
-        </div>
-        {outcome.verdict && (
-          <StatusChip
-            status={toChipStatus(outcome.verdict)}
-            label={verdictLabel(outcome.verdict, outcome.detail)}
-            ariaLabel={verdictAriaLabel(outcome.verdict, card.requirementText, outcome.detail)}
-          />
-        )}
-      </div>
-      <dl className="mt-3 grid gap-1 text-xs text-neutral-600 dark:text-neutral-400">
-        <div className="flex gap-2">
-          <dt className="font-medium">Why</dt>
-          <dd>{reasonLabel(outcome.reasonCode, outcome.detail)}</dd>
-        </div>
-        <div className="flex gap-2">
-          <dt className="font-medium">Evidence required</dt>
-          <dd>{describeRequirement(card.evidenceRequirements)}</dd>
-        </div>
-        <div className="flex gap-2">
-          <dt className="font-medium">Citation</dt>
-          <dd className="truncate">{card.citation.split(". http")[0]}</dd>
-        </div>
-        {card.confidence && (
-          <div className="flex gap-2">
-            <dt className="font-medium">Confidence</dt>
-            <dd>{CONFIDENCE_LABEL[card.confidence] ?? card.confidence}</dd>
-          </div>
-        )}
-        {card.laterOfCondition && (
-          <div className="flex gap-2">
-            <dt className="font-medium">Phase-in</dt>
-            <dd>{card.laterOfCondition}</dd>
-          </div>
-        )}
-      </dl>
-      {card.exemptions && card.exemptions.length > 0 && (
-        <div className="mt-2 rounded bg-sky-50 px-3 py-2 text-xs text-sky-900 dark:bg-sky-950/30 dark:text-sky-200">
-          <span className="font-semibold">Subject to exemptions ({card.exemptions.length}):</span>
-          <ul className="ml-4 mt-1 list-disc">
-            {card.exemptions.map((e, i) => (
-              <li key={i}>{e.scope} <span className="text-sky-700 dark:text-sky-300">({e.basis_pinpoint})</span></li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {/* Assessor flag — rendered ONLY when an assessor actually annotated this
-          component. An un-annotated component previously inherited a derived
-          "risk low", which read as a reassurance nobody had given. */}
-      {rationale && (
-        <p className="mt-2 rounded bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
-          <span className="font-semibold">Assessor flag: </span>
-          {rationale}
-        </p>
-      )}
-      {delta && (
-        <p className="mt-3 rounded bg-neutral-50 px-3 py-2 text-sm text-neutral-700 dark:bg-neutral-800/60 dark:text-neutral-200">
-          <span className="font-semibold">Action: </span>
-          {delta}
-        </p>
-      )}
-      {delta && <GuidancePanel card={card} guidance={guidance} />}
-      {delta && componentId !== undefined && (
-        <TemplateLinks card={card} assessmentId={assessmentId} componentId={componentId} />
-      )}
-      {delta && componentId !== undefined && (
-        <AddEvidenceForm
-          assessmentId={assessmentId}
-          componentId={componentId}
-          componentName={card.componentName ?? ""}
-          evidenceTypes={evidenceTypesOf(card)}
-        />
       )}
     </div>
   );
@@ -417,6 +206,14 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
   // approval must never change a report this assessment already produced.
   const corpus = await loadCorpusAsOf(assessment.corpusVersion);
   const guidanceMap = await getAllGuidance(db);
+  // Corpus rows keyed for the table's expandable detail (thresholds). Built here
+  // rather than added to CheckpointCard: the engine is not ours to change in a
+  // UX pass, and the page already holds the pinned corpus.
+  const corpusByKey = new Map(corpus.map((c) => [`${c.id}@${c.version}`, c]));
+  // Pack- and organisation-level obligations are evaluated against the pack's
+  // aggregate documents, so the evidence they rest on is the aggregate too.
+  const packDocuments = assessment.components.flatMap((c) => c.documents);
+
   const report = evaluatePack({
     checkpoints: corpus,
     context: assessment.context,
@@ -628,18 +425,21 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
                 assessmentId={assessment.id}
               />
               {s.cards.length > 0 ? (
-                <div className="grid gap-2">
-                  {s.cards.map((card, i) => (
-                    <VerdictCard
-                      key={`${card.checkpointId}-${i}`}
-                      card={card}
-                      rationale={s.component.riskRationale}
-                      guidance={guidanceMap}
-                      assessmentId={assessment.id}
-                      componentId={s.component.id}
-                    />
-                  ))}
-                </div>
+                <RuleTable
+                  caption={`Applicable rules for component ${s.component.line}, ${s.component.name}`}
+                  rows={buildRuleRows({
+                    cards: s.cards,
+                    documents: s.component.documents,
+                    corpusByKey,
+                    assessorFlag: s.component.riskRationale,
+                    guidance: guidanceMap,
+                    assessmentId: assessment.id,
+                    componentId: s.component.id,
+                  })}
+                  assessmentId={assessment.id}
+                  componentId={s.component.id}
+                  componentName={s.component.name}
+                />
               ) : (
                 <p className="rounded-md border border-dashed border-neutral-300 px-3 py-2 text-xs text-neutral-500 dark:border-neutral-700">
                   No verdicts yet — applicable checkpoints are pending regulatory approval (see caveats above).
@@ -653,22 +453,20 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
       {report.packagingUnit.length > 0 && (
         <section id="packaging-unit" className="scroll-mt-14">
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-500">Packaging unit</h2>
-          <div className="grid gap-2">
-            {report.packagingUnit.map((card, i) => (
-              <VerdictCard key={`${card.checkpointId}-${i}`} card={card} guidance={guidanceMap} assessmentId={assessment.id} />
-            ))}
-          </div>
+          <RuleTable
+            caption="Applicable rules held at packaging-unit level"
+            rows={buildRuleRows({ cards: report.packagingUnit, documents: packDocuments, corpusByKey, guidance: guidanceMap })}
+          />
         </section>
       )}
 
       {report.organisation.length > 0 && (
         <section id="organisation" className="scroll-mt-14">
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-500">Organisation</h2>
-          <div className="grid gap-2">
-            {report.organisation.map((card, i) => (
-              <VerdictCard key={`${card.checkpointId}-${i}`} card={card} guidance={guidanceMap} assessmentId={assessment.id} />
-            ))}
-          </div>
+          <RuleTable
+            caption="Applicable rules held at organisation level"
+            rows={buildRuleRows({ cards: report.organisation, documents: packDocuments, corpusByKey, guidance: guidanceMap })}
+          />
         </section>
       )}
 

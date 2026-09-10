@@ -212,3 +212,83 @@ export function humanise(token: string): string {
   const spaced = token.replace(/_/g, " ").trim();
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
+
+// --- rule names -------------------------------------------------------------
+
+// A table needs a SHORT name per rule. The corpus has only `requirement_text`
+// (a full legal sentence) and no title column, and the corpus is not ours to
+// change — so display names are curated here, keyed by checkpoint id. The id's
+// slug is already human-meaningful by convention (SCHEMA_DELTAS #9), which makes
+// the fallback safe, but a curated name reads better than a de-slugged one
+// ("PFAS in food-contact packaging", not "Pfas food contact").
+const RULE_NAME: Record<string, string> = {
+  "EU-EPR-producer-registration": "EPR producer registration",
+  "EU-MS-DE-epr-registration": "EPR registration — Germany",
+  "EU-MS-ES-epr-registration": "EPR registration — Spain",
+  "EU-MS-FR-epr-registration": "EPR registration — France",
+  "EU-MS-IT-epr-registration": "EPR registration — Italy",
+  "EU-MS-NL-epr-registration": "EPR registration — Netherlands",
+  "EU-MS-PL-epr-registration": "EPR registration — Poland",
+  "EU-MS-FR-labelling-triman-infotri": "Triman / Info-tri labelling — France",
+  "EU-PPWR-composite-plastic-relevant": "Composite packaging: plastic-relevant",
+  "EU-PPWR-declaration-of-conformity": "Declaration of conformity",
+  "EU-PPWR-heavy-metals": "Heavy metals limit",
+  "EU-PPWR-no-chemical-preservative": "No chemical preservative",
+  "EU-PPWR-no-transitional-stock": "No transitional stock",
+  "EU-PPWR-operator-id-importer": "Importer identification",
+  "EU-PPWR-operator-id-manufacturer": "Manufacturer identification",
+  "EU-PPWR-pfas-food-contact": "PFAS in food-contact packaging",
+  "EU-PPWR-recyclability-grade": "Recyclability grade",
+  "EU-PPWR-recycled-content-plastic": "Recycled content in plastic",
+  "EU-PPWR-soc-minimisation": "Substances of concern",
+  "EU-PPWR-technical-documentation": "Technical documentation",
+  "EU-green-claims-substantiation": "Green-claims substantiation",
+  "IN-PWM-category-classification": "Plastic category classification",
+  "IN-PWM-epr-recycled-content": "EPR recycled content",
+  "IN-PWM-epr-registration": "EPR registration — India",
+  "IN-PWM-epr-targets": "EPR targets",
+  "IN-PWM-marking": "Packaging marking",
+  "IN-PWM-sup-ban": "Single-use plastic ban",
+  "IN-PWM-thickness": "Minimum thickness",
+  "INTL-ISPM15-heat-treatment": "ISPM-15 heat treatment",
+};
+
+/** Acronyms that must not be sentence-cased by the slug fallback. */
+const ACRONYMS: Record<string, string> = {
+  pfas: "PFAS", epr: "EPR", soc: "SoC", ispm15: "ISPM-15", doc: "DoC",
+  eu: "EU", ms: "MS", id: "identification", sup: "single-use plastic", pwm: "PWM", ppwr: "PPWR",
+};
+
+/**
+ * The rule's short display name. Curated where we have one; otherwise derived
+ * from the id's slug (dropping the geography/instrument prefix), with acronyms
+ * preserved. Never returns the raw id — that is what `ruleReference` is for.
+ */
+export function ruleName(checkpointId: string): string {
+  const curated = RULE_NAME[checkpointId];
+  if (curated) return curated;
+  // Drop a leading GEOGRAPHY-INSTRUMENT (and an optional MS-XX) prefix.
+  const slug = checkpointId.replace(/^[A-Z]+-(?:MS-[A-Z]{2}-)?[A-Za-z0-9]+-/, "");
+  const words = slug.split("-").map((w) => ACRONYMS[w.toLowerCase()] ?? w);
+  const joined = words.join(" ");
+  return joined.charAt(0).toUpperCase() + joined.slice(1);
+}
+
+// --- thresholds -------------------------------------------------------------
+
+const OPERATOR_SYMBOL: Record<string, string> = {
+  lte: "≤", lt: "<", gte: "≥", gt: ">", eq: "=", ne: "≠",
+  "<=": "≤", "<": "<", ">=": "≥", ">": ">", "=": "=",
+};
+
+/** "Sum of Pb, Cd, Hg, Cr(VI) ≤ 100 mg/kg" — a threshold a reader can check. */
+export function describeThreshold(t: {
+  parameter?: string | null;
+  operator?: string | null;
+  value?: unknown;
+  unit?: string | null;
+}): string {
+  const symbol = OPERATOR_SYMBOL[String(t.operator ?? "").toLowerCase()] ?? String(t.operator ?? "");
+  const parts = [t.parameter, symbol, t.value, t.unit].filter((p) => p !== null && p !== undefined && p !== "");
+  return parts.join(" ").trim();
+}
