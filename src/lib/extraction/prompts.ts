@@ -43,6 +43,13 @@ figure from surrounding values or from what would be plausible or compliant. A
 null value with a legibility flag is the CORRECT answer; a plausible-looking
 guess is the worst possible answer, because a reviewer cannot tell it is wrong.
 
+SOURCE SNIPPET (mandatory whenever you report a value): set source_snippet to the
+text EXACTLY as it appears in the document around that value — copy it
+character-for-character, do not paraphrase, correct, reformat or translate it. It
+is checked against the document's own text, and a value whose snippet cannot be
+found there is discarded. If you cannot quote the document for a value, do not
+report the value.
+
 VALUE TYPE: a measurement, limit, percentage, quantity or sum must be a NUMBER
 (optionally with a comparator and a unit, e.g. "12.4", "<0.5", "30%"). Never put
 a method name, standard reference, or sentence in such a field — if the number is
@@ -71,12 +78,16 @@ document does not state — do not infer them.`;
 
 const supplierDeclaration: DocClassPrompt = {
   docClass: "supplier_declaration",
-  version: "1.2.0",
+  version: "1.3.0",
   changelog: [
     { version: "1.0.0", date: "2026-09-08", note: "Initial supplier-declaration prompt." },
+    { version: "1.3.0", date: "2026-09-10", note: "Commit 2 silent-error mechanisms: every value must carry source_snippet, the verbatim span it was read from. Text-layer documents are grounded against it (a value whose span is absent from the document is rejected); image-only documents get two independent passes and only agreeing values survive. Targets the residual guessed_obscured_value silent errors that the legibility self-report did not catch, because those were reported at high confidence with legibility clear." },
     { version: "1.2.0", date: "2026-09-09", note: "Part 3b claim-vocabulary extension (SCHEMA_DELTAS #11). Adds stated_limit (heavy_metals_sum_limit, 12 misses), compliance_standard (13), physical_dimension (length/width/dynamic_load_capacity/construction, 10 each) and the shared document-identity types signatory name+designation (19+20), document_reference (10), batch_or_lot_reference (18) — all previously unemittable because claim_type is enum-constrained." },
+    { version: "1.3.0", date: "2026-09-10", note: "Commit 2 silent-error mechanisms: every value must carry source_snippet, the verbatim span it was read from. Text-layer documents are grounded against it (a value whose span is absent from the document is rejected); image-only documents get two independent passes and only agreeing values survive. Targets the residual guessed_obscured_value silent errors that the legibility self-report did not catch, because those were reported at high confidence with legibility clear." },
     { version: "1.2.0", date: "2026-09-09", note: "Part 3b claim-vocabulary extension (SCHEMA_DELTAS #11). Adds product_grade, client_identity, screening_method, sample_date (sample_received_date/test_start_date) and the shared document-identity types — each missed on 10/10 documents by both models; accreditation_ref use made explicit." },
+    { version: "1.3.0", date: "2026-09-10", note: "Commit 2 silent-error mechanisms: every value must carry source_snippet, the verbatim span it was read from. Text-layer documents are grounded against it (a value whose span is absent from the document is rejected); image-only documents get two independent passes and only agreeing values survive. Targets the residual guessed_obscured_value silent errors that the legibility self-report did not catch, because those were reported at high confidence with legibility clear." },
     { version: "1.2.0", date: "2026-09-09", note: "Part 3b claim-vocabulary extension (SCHEMA_DELTAS #11). Adds ippc_mark_element (country_code/producer_code/treatment_code/mark_code — 10, 10, 9, 8 misses), physical_dimension for quantity (10), and the shared document-identity types incl. document_validity (document_valid_until, 10)." },
+    { version: "1.3.0", date: "2026-09-10", note: "Commit 2 silent-error mechanisms: every value must carry source_snippet, the verbatim span it was read from. Text-layer documents are grounded against it (a value whose span is absent from the document is rejected); image-only documents get two independent passes and only agreeing values survive. Targets the residual guessed_obscured_value silent errors that the legibility self-report did not catch, because those were reported at high confidence with legibility clear." },
     { version: "1.2.0", date: "2026-09-09", note: "Part 3b claim-vocabulary extension (SCHEMA_DELTAS #11). Adds substance_group_statement for inks/adhesives/coatings (10 each), virgin_fibre_share (8), compliance_standard (substance_minimisation_standard, 8), stated_limit (heavy_metals_sum_limit, 8) and the shared document-identity types." },
     { version: "1.1.0", date: "2026-09-09", note: "Part 3a abstention hardening. Targets the guessed-obscured-value silent errors and the type-mismatch case (heavy_metals_sum returned as the method string \"CR 13695-1:2000\"): per-field legibility must be reported, a non-clear field must carry value null, and measurement/limit/sum fields must be numeric. Sampling is NOT pinned: these models reject the temperature parameter (400 invalid_request_error, 'deprecated for this model'), so run-to-run variance is measured over N runs instead of suppressed." },
   ],
@@ -107,7 +118,7 @@ ${SHARED_RULES}`,
 
 const labTestReport: DocClassPrompt = {
   docClass: "lab_test_report",
-  version: "1.2.0",
+  version: "1.3.0",
   changelog: [
     { version: "1.0.0", date: "2026-09-08", note: "Initial lab-test-report prompt." },
     { version: "1.1.0", date: "2026-09-09", note: "Part 3a abstention hardening: per-field legibility, null value when not clear, numeric-only measured values and stated limits. Targets obscured detection-limit/result guessing on Tier-C/D scans. Sampling is NOT pinned: these models reject the temperature parameter (400 invalid_request_error, 'deprecated for this model'), so run-to-run variance is measured over N runs instead of suppressed." },
@@ -141,7 +152,7 @@ ${SHARED_RULES}`,
 
 const heatTreatmentCertificate: DocClassPrompt = {
   docClass: "heat_treatment_certificate",
-  version: "1.2.0",
+  version: "1.3.0",
   changelog: [
     { version: "1.0.0", date: "2026-09-08", note: "Initial ISPM-15 / heat-treatment prompt." },
     { version: "1.1.0", date: "2026-09-09", note: "Part 3a abstention hardening: per-field legibility, null value when not clear, numeric-only temperature/duration/quantity. Targets guessed treatment figures on obscured stamps. Sampling is NOT pinned: these models reject the temperature parameter (400 invalid_request_error, 'deprecated for this model'), so run-to-run variance is measured over N runs instead of suppressed." },
@@ -169,7 +180,7 @@ ${DOC_IDENTITY_RULES} ${SHARED_RULES}`,
 
 const millDeclaration: DocClassPrompt = {
   docClass: "mill_declaration",
-  version: "1.2.0",
+  version: "1.3.0",
   changelog: [
     { version: "1.0.0", date: "2026-09-08", note: "Initial mill-declaration prompt." },
     { version: "1.1.0", date: "2026-09-09", note: "Part 3a abstention hardening: per-field legibility, null value when not clear, numeric-only recycled/virgin share and sums. Targets the MUF_resin_solids_content guess (25 where truth was 55) and heavy_metals_sum type mismatch. Sampling is NOT pinned: these models reject the temperature parameter (400 invalid_request_error, 'deprecated for this model'), so run-to-run variance is measured over N runs instead of suppressed." },
@@ -236,9 +247,13 @@ export function buildClaimToolSchema(docClass: DocClass): Record<string, unknown
             test_method: { type: "string" },
             issuer: { type: "string" },
             accreditation_ref: { type: "string" },
-            issue_date: { type: "string", format: "date" },
-            expiry: { type: "string", format: "date" },
+            issue_date: { type: "string" },
+            expiry: { type: "string" },
             scope_text: { type: "string" },
+            // The verbatim span the value was read from (Commit 2). Checked
+            // against the document's own text layer; a value whose span is not
+            // in the document is rejected, never stored.
+            source_snippet: { type: "string" },
             // Per-field legibility self-report (Part 3a). Anything but "clear"
             // must come with value omitted/null — the prompt states the rule and
             // the deterministic post-validator enforces it.
@@ -249,15 +264,17 @@ export function buildClaimToolSchema(docClass: DocClass): Record<string, unknown
             // in the prompt instead: confidence is 0..1, page is 1-based, span is a
             // [start,end] pair and bbox is [x0,y0,x1,y1].
             confidence: { type: "number" },
+            // Provenance is the page plus `source_snippet` above. The char `span`
+            // and `bbox` arrays were removed: nothing rendered or consumed them,
+            // a char offset is not something a reviewer can verify by eye, and
+            // the nested arrays pushed the tool schema past Anthropic's
+            // complexity limit ("Schema is too complex."). The quoted snippet is
+            // strictly better provenance — you can find it in the document.
             provenance: {
               type: "object",
               additionalProperties: false,
               required: ["page"],
-              properties: {
-                page: { type: "integer" },
-                span: { type: "array", items: { type: "integer" } },
-                bbox: { type: "array", items: { type: "number" } },
-              },
+              properties: { page: { type: "integer" } },
             },
           },
         },

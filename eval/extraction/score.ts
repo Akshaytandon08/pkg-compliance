@@ -60,10 +60,18 @@ export interface DocScore {
   /** Per-field legibility self-reports and post-validator rejections (Part 3a). */
   legibility: { clear: number; partially_obscured: number; illegible: number; unreported: number };
   typeMismatches: number;
+  /** Commit 2 safeguard catches for this document. */
+  ungrounded: number;
+  passDisagreement: number;
+  safeguardMode: string;
+  extraCalls: number;
   rawClaims: ExtractedClaimDraft[]; // persisted so Part 2 can re-score offline
 }
 
-export function scoreDoc(doc: ManifestDoc, result: ExtractionResult): DocScore {
+export function scoreDoc(
+  doc: ManifestDoc,
+  result: ExtractionResult & { safeguardMode?: string; extraCalls?: number },
+): DocScore {
   const claims = result.claims;
   const expected = extractableClaims(doc);
 
@@ -97,6 +105,8 @@ export function scoreDoc(doc: ManifestDoc, result: ExtractionResult): DocScore {
     else legibility.unreported++;
   }
   const typeMismatches = claims.filter((c) => c.validation === "type_mismatch").length;
+  const ungrounded = claims.filter((c) => c.validation === "ungrounded").length;
+  const passDisagreement = claims.filter((c) => c.validation === "pass_disagreement").length;
 
   return {
     file: doc.file,
@@ -118,6 +128,10 @@ export function scoreDoc(doc: ManifestDoc, result: ExtractionResult): DocScore {
     outputTokens: result.usage.outputTokens,
     legibility,
     typeMismatches,
+    ungrounded,
+    passDisagreement,
+    safeguardMode: result.safeguardMode ?? "none",
+    extraCalls: result.extraCalls ?? 0,
     rawClaims: claims,
   };
 }
@@ -143,6 +157,9 @@ export interface ModelReport {
   /** Summed per-field legibility reports and post-validator rejections. */
   legibility: { clear: number; partially_obscured: number; illegible: number; unreported: number };
   typeMismatches: number;
+  ungrounded: number;
+  passDisagreement: number;
+  extraCalls: number;
   refusals: number;
   usableRate: number;
   medianLatencyMs: number;
@@ -200,6 +217,9 @@ export function aggregate(model: string, scores: DocScore[]): ModelReport {
       { clear: 0, partially_obscured: 0, illegible: 0, unreported: 0 },
     ),
     typeMismatches: scores.reduce((a, s2) => a + s2.typeMismatches, 0),
+    ungrounded: scores.reduce((a, s2) => a + s2.ungrounded, 0),
+    passDisagreement: scores.reduce((a, s2) => a + s2.passDisagreement, 0),
+    extraCalls: scores.reduce((a, s2) => a + s2.extraCalls, 0),
     refusals: scores.filter((s) => s.status === "refused").length,
     usableRate: scores.length ? scores.filter((s) => s.usable).length / scores.length : 0,
     medianLatencyMs: median(scores.map((s) => s.latencyMs)),

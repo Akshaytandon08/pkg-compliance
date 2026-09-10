@@ -35,7 +35,7 @@ export type Legibility = (typeof LEGIBILITY)[number];
 // `type_mismatch`: the value is not of the type the parameter requires (e.g. a
 // method string where a number is expected). The value is NOT stored — it is
 // nulled and the offending text preserved in `rejectedValue` for the reviewer.
-export type ClaimValidation = "ok" | "type_mismatch";
+export type ClaimValidation = "ok" | "type_mismatch" | "ungrounded" | "pass_disagreement";
 
 // One extracted value, shaped to map straight onto an extracted_claims row. Every
 // draft carries a confidence self-score and provenance; a draft with neither is
@@ -59,6 +59,9 @@ export interface ExtractedClaimDraft {
   validation?: ClaimValidation | null;
   /** The value rejected by post-validation, kept for inspection, never as a value. */
   rejectedValue?: string | null;
+  /** The verbatim span the value was read from. Grounding checks this against
+   *  the document's own text layer; a value that cannot be located is rejected. */
+  sourceSnippet?: string | null;
 }
 
 export type ExtractionStatus = "succeeded" | "refused" | "failed";
