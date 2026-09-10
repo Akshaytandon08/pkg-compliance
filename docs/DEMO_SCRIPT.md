@@ -73,7 +73,11 @@ special case.
 **Public passport** card and click **Generate passport**. A QR appears with an
 unguessable public link. Open it (or scan the QR): the `/passport/<token>` page is
 the **public tier** — pack name, aggregate material summary, verdict counts and
-the footprint total, with a "Demonstration data" tag. (The carton's counts show the
+the footprint total, with a "Demonstration data" tag. The summary now also carries an
+**Upcoming** count — requirements that exist but do not apply as of the screening date
+(e.g. green claims from 2026-09-27; recyclability grade and recycled content from
+2030-01-01). They are informational, never gaps, and never block the DoC draft. On a
+Batch-1-only database this count is 0; on production it is not. (The carton's counts show the
 pack-level obligations — technical documentation, operator identification, producer
 registration — as **qualified**: these now evaluate against the pack's documents
 rather than an empty set, so evidenced unit/organisation obligations resolve.) The

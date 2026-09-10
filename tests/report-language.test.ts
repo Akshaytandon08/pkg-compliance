@@ -4,10 +4,19 @@
 // remaining free to instruct the user about their own DoC obligations.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   findLanguageViolations,
   SCREENING_DISCLAIMER,
+  PCF_DISCLAIMER,
 } from "../src/lib/report/language.ts";
+import { evaluatePack } from "../src/lib/engine/pack.ts";
+import type { AssessmentContext } from "../src/lib/engine/evaluate.ts";
+
+const ctx = {
+  destination_member_states: ["DE"], food_contact: false, persona: "2a",
+  declared_reusable: false, legal_role_facts: {},
+} as unknown as AssessmentContext;
 
 // --- Detector behaviour: the corpus must be able to state law precisely ------
 
@@ -59,42 +68,61 @@ test("disclaimer itself passes the guardrail", () => {
   assert.deepEqual(findLanguageViolations(SCREENING_DISCLAIMER), []);
 });
 
-// --- Output-level assertions: enabled when the renderer lands (Sprint 2) -----
+// --- Output-level assertions -------------------------------------------------
+// These were six permanently-skipped stubs waiting on a `renderQualificationReport`
+// that was never built — the report became a React page instead. Empty tests with
+// an obsolete reason are worse than no tests: they read as coverage and assert
+// nothing. Each intent is now pointed at code that actually exists.
 
-const RENDERER_PENDING = { skip: "renderQualificationReport lands in Sprint 2" };
-
-test("rendered qualification report carries the screening disclaimer", RENDERER_PENDING, () => {
-  // const report = renderQualificationReport(exideFixture, corpusVersion);
-  // assert.ok(report.includes(SCREENING_DISCLAIMER));
+test("the screening disclaimer exists, is unambiguous, and passes the guardrail", () => {
+  assert.match(SCREENING_DISCLAIMER, /not a Declaration of Conformity/i);
+  assert.match(SCREENING_DISCLAIMER, /does not verify compliance/i);
+  assert.deepEqual(findLanguageViolations(SCREENING_DISCLAIMER), []);
 });
 
-test("rendered qualification report contains no issuing language", RENDERER_PENDING, () => {
-  // const report = renderQualificationReport(exideFixture, corpusVersion);
-  // assert.deepEqual(findLanguageViolations(report), []);
+test("the disclaimer still tells the user what THEY must do (not over-sanitised)", () => {
+  // The inverse failure mode: scrubbing output until it no longer states the
+  // user's own obligation. Responsibility must remain explicitly theirs.
+  assert.match(SCREENING_DISCLAIMER, /Responsibility/i);
+  assert.match(SCREENING_DISCLAIMER, /obligated economic operator/i);
 });
 
-test("rendered report still instructs the user on their DoC obligation", RENDERER_PENDING, () => {
-  // The inverse failure mode: over-sanitising output until it no longer tells
-  // the user what they must actually do.
-  // const report = renderQualificationReport(exideFixture, corpusVersion);
-  // assert.match(report, /Declaration of Conformity/);
-  // assert.match(report, /Annex VIII/);
+test("the report page renders the disclaimer verbatim, not a paraphrase", () => {
+  // Structural: the page must use the shared constant, so the wording cannot
+  // drift out of sync with the guardrail that polices it.
+  const page = readFileSync(new URL("../src/app/(app)/assessments/[id]/report/page.tsx", import.meta.url), "utf8");
+  assert.match(page, /SCREENING_DISCLAIMER/, "the report page must render the shared disclaimer constant");
 });
 
-test("rendered report records corpus version and as-of date", RENDERER_PENDING, () => {
-  // Reproducibility: any report must be re-derivable months later.
-  // const report = renderQualificationReport(exideFixture, corpusVersion);
-  // assert.match(report, /Corpus version:/);
-  // assert.match(report, /As of:/);
+test("a pack report records corpus version and as-of date (reproducibility)", () => {
+  // Any report must be re-derivable months later, so both must be on the object.
+  const report = evaluatePack({
+    checkpoints: [], context: ctx, components: [], asOf: "2026-08-12", corpusVersion: "batch-1",
+  });
+  assert.equal(report.corpusVersion, "batch-1");
+  assert.equal(report.asOf, "2026-08-12");
 });
 
-test("contested and draft checkpoints render as caveats, never verdicts", RENDERER_PENDING, () => {
-  // assert.match(report, /under legal challenge/);
-  // assert.doesNotMatch(contestedSection, /Qualified|Gap/);
+test("contested and draft checkpoints render as caveats, never verdicts", () => {
+  const mk = (status: string, id: string) => ({
+    id, version: 1, status, subject: "packaging_unit", requirementText: "r",
+    citation: "c https://eur-lex.europa.eu/x", testMethod: null,
+    evidenceRequirements: { allOf: [{ anyOf: ["supplier_declaration"] }] },
+    appliesWhen: null, material: null, triggerDate: null, sunsetDate: null,
+    confidence: "H", laterOfCondition: null, exemptions: null, notApplicableReason: null,
+  }) as never;
+  const report = evaluatePack({
+    checkpoints: [mk("contested", "C-1"), mk("draft", "D-1")],
+    context: ctx, components: [], asOf: "2026-08-12", corpusVersion: "v",
+  });
+  assert.equal(report.caveats.length, 2, "both must be caveats");
+  assert.equal(report.counts.qualified + report.counts.gap + report.counts.conditional, 0, "neither may yield a verdict");
+  assert.equal(report.overall.verdict, "pending");
+  assert.match(report.caveats.map((c) => c.caveat?.label ?? "").join(" "), /challenge|approval/i);
 });
 
-test("PCF output is labelled screening-grade", RENDERER_PENDING, () => {
-  // const pcf = renderPcf(...);
-  // assert.match(pcf, /screening-grade/);
-  // assert.deepEqual(findLanguageViolations(pcf), []);
+test("the PCF label says screening-grade and passes the guardrail", () => {
+  assert.match(PCF_DISCLAIMER, /Screening-grade/i);
+  assert.match(PCF_DISCLAIMER, /not audit-level/i);
+  assert.deepEqual(findLanguageViolations(PCF_DISCLAIMER), []);
 });

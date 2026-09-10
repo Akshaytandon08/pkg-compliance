@@ -17,6 +17,27 @@ already caused one collision (doc-drafting vs the harness branch — resolved by
 renumbering doc-drafting to `0036/0037`; see the Decision log). The CI from-zero
 migration chain is what makes a duplicate index or a bad renumber fail loudly.
 
+# Background wait loops must be able to terminate
+
+A polling loop that waits for another task must terminate on **both**:
+
+1. a **generic completion pattern**, not just the success string you hope for —
+   at minimum `exited with code|duration_ms|Error|✖`; and
+2. a **wall-clock timeout**, after which it gives up and reports.
+
+```bash
+# good: exits on completion OR failure OR timeout
+end=$((SECONDS+1800))
+until grep -qE "exited with code|duration_ms|Error|✖" "$LOG" || [ $SECONDS -gt $end ]; do sleep 5; done
+```
+
+*Incident (2026-09-08):* a loop waited on `npm run check` matching only
+`duration_ms|failing tests|error TS|✖ [0-9]+ problem`. The run died with
+`[exited with code 144]` after a test failure, printing none of those. Nothing
+matched, there was no timeout, and the loop polled a dead, unchanging file every
+3 seconds for **47 hours** until a human spotted it. It also masked the real
+failure, which was fixed 18 minutes later by someone else.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

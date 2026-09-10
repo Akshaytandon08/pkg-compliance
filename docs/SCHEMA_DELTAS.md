@@ -155,3 +155,43 @@ models) mean missed on every document by both models:
 **Unchanged:** the LLM still only *extracts*; every claim remains a
 pending-confirmation proposal judged by the deterministic engine, and corpus
 approval discipline is untouched.
+
+## 12. Temporal applicability: a requirement that does not yet apply — RESOLVED, implemented
+
+**Ruling (2026-09-10): implemented** (Commit 1). No migration: `trigger_date`,
+`later_of_condition` and `sunset_date` already exist on `checkpoints`; the gap was
+that the **evaluator ignored them at the point a verdict was decided**.
+
+**The gap.** `evaluability()` knew about `trigger_date`, but `evaluatePack` folded
+the result into the generic "caveat" bucket — so a requirement that does not yet
+apply was reported without its date, lumped in with drafts and contested rules,
+and (where the gate was bypassed) could be demanded as evidence and counted
+conditional. A rule you *cannot satisfy yet* is not an outstanding obligation, and
+calling it one misstates the screening.
+
+**The state.** A fifth verdict value, `upcoming`, decided in `evaluateCheckpoint`
+**before** evidence is considered, so no evidence state is derived for a rule that
+does not yet apply. It is a **temporal** state, not an outcome of the
+(designAssessment × evidenceState) rule table — `decideVerdict` can never return
+it, and a test pins that across all twelve pairs.
+
+| Property | Behaviour |
+|---|---|
+| Reason | `Applies from <date>`; with a later-of clause, `Applies from <date> or later, pending <act>` |
+| Counting | Own count; excluded from qualified/conditional/gap |
+| Severity | 0 — never escalates the overall verdict |
+| DoC eligibility | Never reaches it (the gate filters `disposition === "verdict"`) |
+| Report / passport | Own "Not yet applicable" heading; the passport **discloses** it — the public tier is the rule set, and "this applies to you from <date>" is what a reader needs |
+| Boundary | Inclusive: as-of == trigger date means it applies |
+
+**Persisted shapes take it as OPTIONAL.** `VerdictSummary` (activity snapshots) and
+`PassportPayload` (hash-chained, versioned) were written before this state
+existed; those records must still parse and compare. `verdictsDiffer` now compares
+the union of both key sets with an absent count reading as 0, so an older snapshot
+is not mistaken for a change.
+
+**Scope note:** the three rows this most affects — recyclability grade and
+recycled content (2030-01-01, both with later-of clauses) and green claims
+(2026-09-27) — are Batch 2 EU and live on **production**; a Batch-1-only database
+shows `upcoming: 0`. The test is corpus-independent by design (eval/README.md), so
+it holds either way.
