@@ -43,6 +43,8 @@ export type NewAssessment = {
   components: NewComponent[];
   /** Demonstration data — renders a visible tag; never a real screening. */
   demo?: boolean;
+  /** The obligated economic operator this screening is prepared for. */
+  organisationId?: number | null;
 };
 
 /** The corpus version stamped on a new assessment. */
@@ -69,6 +71,7 @@ export async function createAssessment(input: NewAssessment): Promise<number> {
         corpusVersion,
         asOf: input.asOf,
         demo: input.demo ?? false,
+        organisationId: input.organisationId ?? null,
       })
       .returning({ id: assessments.id });
 
@@ -129,6 +132,9 @@ export type LoadedAssessment = {
   corpusVersion: string;
   asOf: string;
   demo: boolean;
+  /** The organisation this screening is prepared for; null on every assessment
+   *  created before organisations existed, and on any created without one. */
+  organisationId: number | null;
   components: LoadedComponent[];
 };
 
@@ -184,6 +190,7 @@ export async function getAssessment(id: number): Promise<LoadedAssessment | null
     corpusVersion: a.corpusVersion,
     asOf: a.asOf,
     demo: a.demo,
+    organisationId: a.organisationId,
     components,
   };
 }

@@ -195,3 +195,51 @@ recycled content (2030-01-01, both with later-of clauses) and green claims
 (2026-09-27) — are Batch 2 EU and live on **production**; a Batch-1-only database
 shows `upcoming: 0`. The test is corpus-independent by design (eval/README.md), so
 it holds either way.
+
+## 13. A screening has no one it is prepared for — RESOLVED, implemented
+
+**The gap.** Every artefact this tool produces is addressed to a legal person and
+says nothing about who that is. A declaration of conformity names the declarant
+and is signed by them; an EPR register knows a registration number per Member
+State, not per pack; a report reads "prepared for" someone. Until now the only
+party the schema knew was the packaging itself. The consequence showed up three
+ways at once: the report header had no addressee, the passport's public tier
+could not state the declarant, and DoC draft element 2 (the declarant block) had
+to be typed by hand on every draft — the one field a reviewer is most likely to
+paste wrongly and least likely to re-read before signing.
+
+**The shape.** Two tables, and a nullable foreign key.
+
+| Table | Holds | Why not on `assessments` |
+|---|---|---|
+| `organisations` | legal_name, trading_name, country (ISO 3166-1 alpha-2), registered_address, primary_contact, role_default | One operator screens many packs; duplicating its legal name per assessment is how the legal name on two DoCs comes to disagree |
+| `org_registrations` | scheme, register_name, registration_number, jurisdiction, valid_from, valid_to | EPR registration is **per Member State**. A single column cannot hold a Dutch brand owner's German LUCID number and its Dutch Verpact number, and the passport must show both |
+
+`assessments.organisation_id` is **nullable**, `ON DELETE SET NULL`. Nullable
+because every existing assessment predates the organisation and none of them can
+be assigned one truthfully — a screening whose addressee is unknown must render
+as unknown, never as a guess. `SET NULL` rather than `CASCADE` because the
+assessment is the audit artefact: removing an operator record must not delete
+the screenings prepared for it (see CLAUDE.md, data governance 1).
+
+`role_default` is the operator's *usual* role, not the role for a given pack.
+Legal role stays a per-assessment determination from `legal_role_facts` — the
+same company is an importer for one pack and a distributor for another, and a
+stored default must never override the determined role. It seeds the form; it
+does not feed the engine.
+
+**Vocabulary as `text`, not `pgEnum`,** consistent with the rest of the schema:
+`scheme` and `register_name` grow every time a Member State is added, and that
+must not require a migration.
+
+**Demo packs.** The three seeded packs get fictional organisations carrying
+`SYNTHETIC-DEMO` **in the legal name itself**, not only in the `demo` flag. These
+names reach a draft DoC and the public passport's declarant block; a marker on
+the name survives a screenshot or an exported PDF that has been separated from
+its "Demonstration data" tag. Registration numbers and addresses are prefixed the
+same way, matching the existing evidence-reference convention.
+
+**Backward compatibility.** `PassportPayload` is hash-chained and versioned, so
+the declarant fields must be **optional** in the persisted shape: an older
+passport with no declarant block has to keep parsing and keep verifying against
+its stored hash.
