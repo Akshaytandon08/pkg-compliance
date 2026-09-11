@@ -198,43 +198,43 @@ test("humanise is a last resort that still reads as English", () => {
 
 // --- COMMIT 3: no development placeholder reaches a customer surface --------
 
-import { factorSourceLabel, SEED_ESTIMATE_TIER } from "../src/lib/report/labels.ts";
+import { NO_FACTOR_LABEL, factorSourceLabel, factorTierLabel } from "../src/lib/report/labels.ts";
 import { PCF_DISCLAIMER, SCREENING_DISCLAIMER } from "../src/lib/report/language.ts";
 
 // Words that belong in a backlog, not in front of a customer. "Placeholder" and
 // "replace with" describe OUR state of work; a reader wants to know what the
-// number is, not what we still intend to do about it.
-const DEV_PLACEHOLDER = /\bplaceholder\b|\breplace with\b|\bTODO\b|\bTBC\b|\bto be confirmed\b|\bcoming soon\b/i;
+// number is, not what we still intend to do about it. SEED-ESTIMATE joined them
+// in Sprint 9 — the tier and every row carrying it are gone.
+const DEV_PLACEHOLDER =
+  /\bplaceholder\b|\breplace with\b|\bTODO\b|\bTBC\b|\bto be confirmed\b|\bcoming soon\b|SEED-ESTIMATE/i;
 
-test("a seeded factor reads as indicative and names no source — it has none", () => {
-  const label = factorSourceLabel({
-    source: "No primary source — order-of-magnitude estimate",
-    dataQuality: SEED_ESTIMATE_TIER,
-  });
-  assert.equal(label, "Screening factor — indicative");
-  assert.doesNotMatch(label, DEV_PLACEHOLDER);
-});
-
-test("a SOURCED factor names its source and tier — that is what makes it checkable", () => {
+test("a factor names its publisher and dataset — that is what makes it checkable", () => {
   assert.equal(
-    factorSourceLabel({ source: "Ecoinvent 3.10", dataQuality: "secondary" }),
-    "Ecoinvent 3.10 · secondary",
+    factorSourceLabel({ source: "ecoinvent", sourceDataset: "ecoinvent 3.10 cut-off" }),
+    "ecoinvent / ecoinvent 3.10 cut-off",
   );
+  // A dataset equal to (or absent from) the publisher is not repeated.
+  assert.equal(factorSourceLabel({ source: "Fitsol", sourceDataset: null }), "Fitsol");
+  assert.equal(factorSourceLabel({ source: "Fitsol", sourceDataset: "Fitsol" }), "Fitsol");
 });
 
-test("the seeded factor CSV carries no instruction-to-ourselves in its source column", () => {
-  const csv = readFileSync(new URL("../reference/emission_factors_seed.csv", import.meta.url), "utf8");
-  for (const line of csv.trim().split("\n").slice(1)) {
-    const source = line.split(",")[4];
-    assert.doesNotMatch(source, DEV_PLACEHOLDER, `source column reads as a backlog note: ${source}`);
+test("tier labels read as English and carry no leftover SEED-ESTIMATE", () => {
+  assert.equal(factorTierLabel("primary"), "Primary (Fitsol)");
+  assert.equal(factorTierLabel("secondary_database"), "Secondary database");
+  assert.equal(factorTierLabel("none"), NO_FACTOR_LABEL);
+  for (const t of ["primary", "secondary_database", "none"]) {
+    assert.doesNotMatch(factorTierLabel(t), DEV_PLACEHOLDER);
   }
+});
+
+test("a material with no factor says so plainly", () => {
+  assert.equal(NO_FACTOR_LABEL, "No factor selected");
+  assert.doesNotMatch(NO_FACTOR_LABEL, DEV_PLACEHOLDER);
 });
 
 test("neither standing disclaimer describes our own unfinished work", () => {
   assert.doesNotMatch(PCF_DISCLAIMER, DEV_PLACEHOLDER);
   assert.doesNotMatch(SCREENING_DISCLAIMER, DEV_PLACEHOLDER);
-  // The PCF disclaimer must still say the factors are not sourced.
-  assert.match(PCF_DISCLAIMER, /indicative/i);
 });
 
 test("no rendered report or passport string carries a development placeholder", () => {
@@ -250,5 +250,20 @@ test("no rendered report or passport string carries a development placeholder", 
       .join("\n");
     const hit = DEV_PLACEHOLDER.exec(code);
     assert.equal(hit, null, `${file} renders "${hit?.[0]}"`);
+  }
+});
+
+test("SEED-ESTIMATE is gone from the whole source tree, not just the screen", () => {
+  // The tier was removed in migration 0039 along with every row that carried it.
+  // Anything still naming it is either dead code or a stale document.
+  for (const file of [
+    "../src/lib/engine/pcf.ts",
+    "../src/lib/vocab.ts",
+    "../src/db/factors.ts",
+    "../src/lib/report/labels.ts",
+    "../src/lib/report/language.ts",
+  ]) {
+    const src = readFileSync(new URL(file, import.meta.url), "utf8");
+    assert.doesNotMatch(src, /SEED-ESTIMATE/, `${file} still names the retired tier`);
   }
 });

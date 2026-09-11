@@ -87,7 +87,7 @@ export const evidenceRequestStatusEnum = pgEnum("evidence_request_status", [
 // The vocabularies live in a client-safe module (no Drizzle) and are re-exported
 // here so corpus code and UI code share one source of truth. EVIDENCE_TYPES
 // includes `conformity_declaration` (the operator's own DoC — SCHEMA_DELTAS #6).
-export { EVIDENCE_TYPES, LEGAL_ROLES, MATERIALS, PACKAGING_LEVELS } from "../lib/vocab.ts";
+export { EVIDENCE_TYPES, FACTOR_TIERS, LEGAL_ROLES, MATERIALS, PACKAGING_LEVELS } from "../lib/vocab.ts";
 
 export type Threshold = {
   parameter: string;
@@ -364,6 +364,10 @@ export const assessments = pgTable("assessments", {
   organisationId: integer("organisation_id").references(() => organisations.id, {
     onDelete: "set null",
   }),
+  // Set the first time the footprint is computed. Null means "never evaluated",
+  // which is what distinguishes it from "evaluated, and no factor was selected
+  // for any material" — the two must not look alike.
+  factorsPinnedAt: timestamp("factors_pinned_at", { withTimezone: true }),
 });
 
 export const assessmentComponents = pgTable("assessment_components", {
@@ -557,31 +561,94 @@ export const assessmentActivity = pgTable("assessment_activity", {
   meta: jsonb("meta").$type<Record<string, unknown>>(), // structured detail (ids, from/to counts)
 });
 
-// --- Emission factors (Sprint 3 / Stack D, screening-grade PCF) -----------
+// --- Emission factors (Stack D, screening-grade PCF) ----------------------
 // Reference data for the cradle-to-gate footprint: one factor per
-// (material, process). Material-production rows carry a per-kg factor; transport
-// rows a per-kg·km factor (unit column disambiguates). Every row records its
-// source, year, geography and data-quality tier so each figure on the report can
-// show its provenance. Seed rows carry data_quality 'SEED-ESTIMATE' and name no
-// source, because they have none — the report renders that tier as an indicative
-// screening factor rather than dressing it up as an authoritative one.
-export const emissionFactors = pgTable("emission_factors", {
-  id: serial("id").primaryKey(),
-  // Material vocab (corrugated|plastic|wood|metal) for production rows, or
-  // 'transport' for a transport-mode row.
-  material: text("material").notNull(),
-  // 'production' for a material row; the mode (road|sea|air) for transport.
-  process: text("process").notNull(),
-  // Numeric factor; unit given by `unit` (never mix units in one column).
-  factor: doublePrecision("factor").notNull(),
-  unit: text("unit").notNull(), // 'kgCO2e/kg' | 'kgCO2e/kg.km'
-  source: text("source").notNull(),
-  year: integer("year").notNull(),
-  geography: text("geography").notNull(),
-  // Provenance tier: 'SEED-ESTIMATE' (indicative, unsourced) | 'secondary' | 'primary'.
-  dataQuality: text("data_quality").notNull(),
-  notes: text("notes"),
-});
+// (material, process), CHOSEN BY A HUMAN and stored with the provenance that
+// makes the choice auditable. Nothing here is seeded automatically: a factor is
+// a claim about the physical world, and a number with no traceable origin is
+// worse than no number at all.
+//
+// Sprint 9 removed the `SEED-ESTIMATE` tier and every row that carried it. A
+// material with no selected factor now renders "No factor selected" and is
+// excluded from the total with a visible note — the honest outcome, rather than
+// an order-of-magnitude guess presented as an estimate.
+//
+// Rows are VERSIONED per (material, process): selecting a new factor appends a
+// version rather than overwriting, so an assessment that pinned version 1 keeps
+// rendering version 1 (see assessmentFactorPins).
+export const emissionFactors = pgTable(
+  "emission_factors",
+  {
+    id: serial("id").primaryKey(),
+    // Material vocab (corrugated|plastic|wood_solid|wood_processed|metal) for
+    // production rows, or 'transport' for a transport-mode row.
+    material: text("material").notNull(),
+    // 'production' for a material row; the mode (road|sea|air) for transport.
+    process: text("process").notNull(),
+    // Monotonic per (material, process). The highest version is the current one.
+    version: integer("version").notNull().default(1),
+    // Numeric factor; unit given by `unit` (never mix units in one column).
+    factor: doublePrecision("factor").notNull(),
+    unit: text("unit").notNull(), // 'kgCO2e/kg' | 'kgCO2e/kg.km'
+    // Provenance tier. See FACTOR_TIERS in src/lib/vocab.ts:
+    //   'primary'            — Fitsol's own measured/supplier data
+    //   'secondary_database' — a published LCA database (e.g. via Climatiq)
+    //   'none'               — the owner looked and chose nothing; the material
+    //                          renders "No factor selected" and is excluded.
+    tier: text("tier").notNull(),
+    // Publisher name as a reader would recognise it ("ecoinvent", "Fitsol").
+    source: text("source").notNull(),
+    // The specific dataset within that publisher ("ecoinvent 3.10 cut-off").
+    sourceDataset: text("source_dataset"),
+    // The provider's stable identifier for the activity, when it has one
+    // (Climatiq activity_id). Null for a Fitsol primary factor.
+    activityId: text("activity_id"),
+    region: text("region").notNull(), // ISO-3166 code or a provider region key
+    year: integer("year").notNull(),
+    // GWP set and system boundary, e.g. "AR6 GWP100, cradle-to-gate".
+    methodology: text("methodology"),
+    // When the value was pulled from the provider — a factor is a snapshot, and
+    // databases are revised.
+    retrievedAt: timestamp("retrieved_at", { withTimezone: true }),
+    // What the dataset's terms say about republishing the NUMBER. Recorded by
+    // the owner after reading them; prose, for a human to re-read later.
+    licenceNote: text("licence_note"),
+    // Whether those terms permit showing the factor VALUE on the PUBLIC
+    // passport. Separate from licenceNote on purpose: a licensing decision must
+    // not be inferred by parsing English. Default false — the passport shows the
+    // computed result and the source name, never the licensed value, until the
+    // owner has read the terms and said otherwise.
+    valueDisplayPermitted: boolean("value_display_permitted").notNull().default(false),
+    // Who chose this factor, and when. Selection is a human act (scripts/
+    // factors-select.ts), the same discipline as corpus approval.
+    selectedBy: text("selected_by").notNull(),
+    selectedAt: timestamp("selected_at", { withTimezone: true }).notNull().defaultNow(),
+    notes: text("notes"),
+  },
+  (t) => [unique("emission_factors_material_process_version").on(t.material, t.process, t.version)],
+);
+
+// Which factor rows an assessment was evaluated against. Pinned the first time
+// the footprint is computed, so a report re-rendered after the owner selects a
+// better factor still shows the number it showed — a screening is a dated
+// artefact, and a figure that silently moves is not reproducible.
+//
+// `assessments.factors_pinned_at` distinguishes "not yet pinned" from "pinned,
+// and there were no factors" — without it an empty pin set is ambiguous.
+export const assessmentFactorPins = pgTable(
+  "assessment_factor_pins",
+  {
+    assessmentId: integer("assessment_id")
+      .notNull()
+      .references(() => assessments.id, { onDelete: "cascade" }),
+    factorId: integer("factor_id")
+      .notNull()
+      .references(() => emissionFactors.id, { onDelete: "restrict" }),
+  },
+  (t) => [primaryKey({ columns: [t.assessmentId, t.factorId] })],
+);
+
+export type EmissionFactorRow = typeof emissionFactors.$inferSelect;
 
 // --- Passports (Sprint 3 / Stack C, public tier) --------------------------
 // A shareable public snapshot of an assessment's PUBLIC tier (pack name, material

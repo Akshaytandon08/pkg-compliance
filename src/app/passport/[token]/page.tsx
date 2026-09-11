@@ -2,7 +2,16 @@ import { notFound } from "next/navigation";
 import { getPassportByToken } from "@/db/passport";
 import { PCF_DISCLAIMER, SCREENING_DISCLAIMER } from "@/lib/report/language";
 import { StatusChip, toChipStatus } from "@/app/_components/StatusChip";
-import { RULE_REFERENCE_TOOLTIP, countryLabel, legalRoleLabel, ruleReference, verdictAriaLabel, verdictLabel } from "@/lib/report/labels";
+import {
+  RULE_REFERENCE_TOOLTIP,
+  countryLabel,
+  factorSourceLabel,
+  factorTierLabel,
+  legalRoleLabel,
+  ruleReference,
+  verdictAriaLabel,
+  verdictLabel,
+} from "@/lib/report/labels";
 import { Wordmark } from "@/app/_components/Wordmark";
 
 // Public tier — reached without the access gate (see src/proxy.ts). Renders only
@@ -182,8 +191,33 @@ export default async function PassportPage({ params }: PageProps<"/passport/[tok
         <p className="mt-1 text-xs leading-relaxed text-neutral-500">{PCF_DISCLAIMER}</p>
         {p.pcf.unresolvedComponents > 0 && (
           <p className="mt-1 text-xs text-amber-700">
-            {p.pcf.unresolvedComponents} component(s) excluded (no weight or emission factor).
+            {p.pcf.unresolvedComponents} component(s) excluded — no weight, or no emission factor
+            selected for the material. The figure above is therefore partial.
           </p>
+        )}
+        {/* Attribution for the datasets the figure rests on. The source NAME is
+            always shown: a number whose origin is secret is not evidence of
+            anything. The factor VALUE is the dataset owner's licensed content
+            and appears only where the terms were read and recorded as
+            permitting it. */}
+        {(p.pcf.factorSources?.length ?? 0) > 0 && (
+          <div className="mt-3 border-t border-neutral-100 pt-3">
+            <p className="text-xs font-medium text-neutral-600">Emission factors used</p>
+            <ul className="mt-1.5 space-y-1 text-xs text-neutral-500">
+              {p.pcf.factorSources!.map((f) => (
+                <li key={`${f.material}-${f.source}-${f.year}`}>
+                  <span className="font-medium text-neutral-700">{f.material}</span>
+                  {" — "}
+                  {factorSourceLabel(f)} · {f.region} · {f.year} · {factorTierLabel(f.tier)}
+                  {f.value != null && f.unit ? (
+                    <span className="font-mono"> · {f.value} {f.unit}</span>
+                  ) : (
+                    <span className="italic"> · value not republished under the dataset licence</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
 

@@ -4,19 +4,41 @@
 // factor. Every figure carries the factor's source + data-quality tier so the
 // report can show provenance. A component with no weight or no matching factor
 // is left UNRESOLVED (never silently zeroed) and excluded from the total.
+//
+// Sprint 9: there is no longer any fallback factor. A material the owner has not
+// selected a factor for resolves to NOTHING — `no_factor` — and the report says
+// "No factor selected". The previous behaviour (a seeded order-of-magnitude
+// guess) made every pack look costed when none of them were.
 
-import { MATERIAL_PARENT } from "../vocab.ts";
+import { MATERIAL_PARENT, type FactorTier } from "../vocab.ts";
 
 export type EmissionFactor = {
+  id: number;
   material: string;
   process: string;
+  /** Version within (material, process). Pinned per assessment. */
+  version: number;
   factor: number;
   unit: string;
+  tier: FactorTier;
   source: string;
+  sourceDataset: string | null;
+  activityId: string | null;
+  region: string;
   year: number;
-  geography: string;
-  dataQuality: string;
+  methodology: string | null;
+  /** What the dataset's terms say about republishing the value. */
+  licenceNote: string | null;
+  /** Whether those terms permit showing the VALUE on the public passport. */
+  valueDisplayPermitted: boolean;
 };
+
+/** A row on tier `none` records that the owner searched and chose nothing. It is
+ *  NOT a factor: it resolves exactly like an absent row, and exists so the
+ *  decision is visible in the store rather than inferred from a gap. */
+export function isUsableFactor(f: EmissionFactor | null | undefined): f is EmissionFactor {
+  return !!f && f.tier !== "none";
+}
 
 export type PcfComponentInput = {
   line: string;
@@ -51,14 +73,19 @@ export type PackFootprint = {
   unresolved: string[]; // component names lacking a weight or a factor
 };
 
-/** Production factor for a material, if one exists. */
+/** Production factor for a material, if the owner has selected a usable one. */
 function productionFactor(factors: EmissionFactor[], material: string): EmissionFactor | null {
   const exact = factors.find((f) => f.material === material && f.process === "production");
-  if (exact) return exact;
-  // Fall back to the parent material's factor (e.g. wood_solid → wood) until
-  // subtype-specific factors exist. Keeps the screening estimate resolved.
+  if (isUsableFactor(exact)) return exact;
+  // An explicit `none` on the exact material is a DECISION and stops here — it
+  // must not be quietly rescued by the parent category's factor.
+  if (exact) return null;
+  // Otherwise fall back to the parent material (e.g. wood_solid → wood) when a
+  // subtype-specific factor has not been selected.
   const parent = MATERIAL_PARENT[material];
-  return parent ? factors.find((f) => f.material === parent && f.process === "production") ?? null : null;
+  if (!parent) return null;
+  const inherited = factors.find((f) => f.material === parent && f.process === "production");
+  return isUsableFactor(inherited) ? inherited : null;
 }
 
 export function computePackFootprint(
@@ -93,7 +120,7 @@ export function computePackFootprint(
   let transport: TransportLeg | null = null;
   if (inboundTransport && inboundTransport.km > 0 && resolvedMassKg > 0) {
     const factor = factors.find((f) => f.material === "transport" && f.process === inboundTransport.mode);
-    if (factor) {
+    if (isUsableFactor(factor)) {
       const kgCo2e = resolvedMassKg * inboundTransport.km * factor.factor;
       transport = { mode: inboundTransport.mode, km: inboundTransport.km, massKg: resolvedMassKg, factor, kgCo2e };
       total += kgCo2e;
