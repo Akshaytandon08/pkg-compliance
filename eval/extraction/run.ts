@@ -30,11 +30,17 @@ async function runModel(model: string, docs: ManifestDoc[]): Promise<{ report: M
   for (const doc of docs) {
     const bytes = new Uint8Array(readFileSync(doc.absPath));
     const scanned = doc.tier === "C" || doc.tier === "D";
-    let result: ExtractionResult & { safeguardMode?: string; extraCalls?: number };
+    let result: ExtractionResult & { safeguardMode?: string; extraCalls?: number; majorityResolved?: number; dropoutRecovered?: number };
     try {
       // Grounding for text-layer documents, two-pass agreement for image-only.
       const safe = await extractWithSafeguards(provider, { docClass: doc.class, bytes, contentType: doc.contentType, scanned });
-      result = { ...safe, safeguardMode: safe.safeguards.mode, extraCalls: safe.safeguards.extraCalls };
+      result = {
+        ...safe,
+        safeguardMode: safe.safeguards.mode,
+        extraCalls: safe.safeguards.extraCalls,
+        majorityResolved: safe.safeguards.majorityResolved ?? 0,
+        dropoutRecovered: safe.safeguards.dropoutRetry?.recovered ? 1 : 0,
+      };
     } catch (err) {
       result = { status: "failed", provider: "anthropic", model, promptVersion: "?", claims: [], usage: { inputTokens: 0, outputTokens: 0 }, latencyMs: 0, error: err instanceof Error ? err.message : String(err) };
     }
@@ -59,7 +65,9 @@ function printReport(report: ModelReport): void {
   const lg = report.legibility;
   console.log(`    Per-field legibility:                         clear ${lg.clear}, partially_obscured ${lg.partially_obscured}, illegible ${lg.illegible}, unreported ${lg.unreported}`);
   console.log(`    Post-validator rejections:                    type-mismatch ${report.typeMismatches}, ungrounded ${report.ungrounded}, pass-disagreement ${report.passDisagreement}`);
-  console.log(`    Extra API calls (two-pass on image-only docs): ${report.extraCalls}`);
+  console.log(`    Extra API calls (2nd/3rd passes, retries):    ${report.extraCalls}`);
+  console.log(`    Values rescued by 2-of-3 majority:            ${report.majorityResolved}   (vs ${report.passDisagreement} still withheld)`);
+  console.log(`    Dropout retries that recovered:               ${report.dropoutRecovered}`);
   console.log(`    Refusals (distinct from extracted-nothing):   ${report.refusals}`);
   console.log(`    Usable-document rate:                         ${pct(report.usableRate)}`);
   console.log(`    Median latency:                               ${report.medianLatencyMs} ms`);
@@ -84,11 +92,16 @@ function flagValue(name: string): string | undefined {
   return i >= 0 && rawArgs[i + 1] && !rawArgs[i + 1].startsWith("--") ? rawArgs[i + 1] : undefined;
 }
 const classFilter = flagValue("class");
+// --docs=16,17,18 and --tier=C,D keep a targeted test to exactly the documents it
+// needs. Paying for a whole class to exercise three documents is how a budget
+// disappears into runs nobody asked for.
+const docFilter = flagValue("docs")?.split(",").map((d) => d.trim()).filter(Boolean);
+const tierFilter = flagValue("tier")?.split(",").map((t) => t.trim().toUpperCase()).filter(Boolean);
 // --runs=N repeats the whole set N times per model. Acceptance for silent errors
 // is the UNION across runs (a single clean run proves nothing when the count is
 // nondeterministic), and N runs also give field-accuracy variance.
 const runsPerModel = Math.max(1, Number(flagValue("runs") ?? 1));
-const consumed = new Set([classFilter, runsPerModel > 1 ? String(runsPerModel) : undefined].filter(Boolean) as string[]);
+const consumed = new Set([classFilter, flagValue("docs"), flagValue("tier"), runsPerModel > 1 ? String(runsPerModel) : undefined].filter(Boolean) as string[]);
 const bare = rawArgs.filter((a) => !a.startsWith("--") && !consumed.has(a));
 const models = bare.length > 0 ? bare : DEFAULT_MODELS;
 
@@ -96,6 +109,14 @@ let docs = loadExtractionSet();
 if (!docs) {
   console.error("Extraction set not found at reference/extraction-set-synthetic/ — STOP. Nothing composed.");
   process.exit(2);
+}
+if (docFilter) {
+  docs = docs.filter((d) => docFilter.some((prefix) => d.file.startsWith(prefix)));
+  console.log(`DOC FILTER: ${docFilter.join(",")} — ${docs.length} document(s).`);
+}
+if (tierFilter) {
+  docs = docs.filter((d) => tierFilter.includes(d.tier));
+  console.log(`TIER FILTER: ${tierFilter.join(",")} — ${docs.length} document(s).`);
 }
 if (classFilter) {
   docs = docs.filter((d) => d.class === classFilter);
@@ -130,16 +151,30 @@ mkdirSync(RESULTS_DIR, { recursive: true });
 const stamp = new Date().toISOString().replace(/[:.]/g, "-");
 const summary: Record<string, unknown>[] = [];
 
-// COST DISCIPLINE: API spend is the constraint. Track cumulative spend across
-// every run in this invocation, print it after each, and STOP rather than
-// silently blow past the ceiling.
-const SPEND_CEILING_USD = 12;
-let cumulativeSpendUsd = 0;
+// COST DISCIPLINE: API spend is the constraint. The ceiling is CUMULATIVE across
+// invocations, so the ledger is persisted — an in-process counter resets every
+// time the script is run and therefore cannot enforce a cumulative budget at all.
+// Override the ceiling with SPEND_CEILING_USD; reset the ledger by deleting it.
+const SPEND_CEILING_USD = Number(process.env.SPEND_CEILING_USD ?? 8);
+const LEDGER_PATH = `${RESULTS_DIR}.spend-ledger.json`;
+
+function readLedger(): { totalUsd: number; runs: number } {
+  try {
+    return JSON.parse(readFileSync(LEDGER_PATH, "utf8")) as { totalUsd: number; runs: number };
+  } catch {
+    return { totalUsd: 0, runs: 0 };
+  }
+}
+let cumulativeSpendUsd = readLedger().totalUsd;
+console.log(`Spend ledger: $${cumulativeSpendUsd.toFixed(4)} already recorded (ceiling $${SPEND_CEILING_USD}).`);
+
 function recordSpend(report: ModelReport): boolean {
-  cumulativeSpendUsd += report.totalCostUsd;
-  console.log(`    RUNNING COST: $${report.totalCostUsd.toFixed(4)} this run — $${cumulativeSpendUsd.toFixed(4)} cumulative (ceiling $${SPEND_CEILING_USD})`);
+  const ledger = readLedger();
+  cumulativeSpendUsd = ledger.totalUsd + report.totalCostUsd;
+  writeFileSync(LEDGER_PATH, JSON.stringify({ totalUsd: cumulativeSpendUsd, runs: ledger.runs + 1 }, null, 2));
+  console.log(`    RUNNING COST: $${report.totalCostUsd.toFixed(4)} this run — $${cumulativeSpendUsd.toFixed(4)} CUMULATIVE (ceiling $${SPEND_CEILING_USD})`);
   if (cumulativeSpendUsd > SPEND_CEILING_USD) {
-    console.error(`\nSTOPPING: cumulative spend $${cumulativeSpendUsd.toFixed(2)} exceeded the $${SPEND_CEILING_USD} ceiling for this prompt version. Reporting what completed.`);
+    console.error(`\nSTOPPING: cumulative spend $${cumulativeSpendUsd.toFixed(2)} exceeded the $${SPEND_CEILING_USD} ceiling. Reporting what completed.`);
     return false;
   }
   return true;
@@ -155,7 +190,8 @@ for (const model of models) {
     const withinBudget = recordSpend(report);
     // Persist each run with prompt_version pinned per document class.
     const persist = { evaluated_at: stamp, run, runs_total: runsPerModel, model, class_filter: classFilter ?? null, prompt_versions: promptVersions, report, per_document: scores };
-    const tag = `${classFilter ? `${model}_${classFilter}` : model}${runsPerModel > 1 ? `_run${run}` : ""}`;
+    const scope = classFilter ?? (docFilter ? `docs-${docFilter.join("-")}` : undefined) ?? (tierFilter ? `tier-${tierFilter.join("")}` : undefined);
+    const tag = `${scope ? `${model}_${scope}` : model}${runsPerModel > 1 ? `_run${run}` : ""}`;
     writeFileSync(`${RESULTS_DIR}${stamp}_${tag}.json`, JSON.stringify(persist, null, 2));
     if (!withinBudget) break;
   }

@@ -78,12 +78,14 @@ export interface DocScore {
   passDisagreement: number;
   safeguardMode: string;
   extraCalls: number;
+  majorityResolved: number;
+  dropoutRecovered: number;
   rawClaims: ExtractedClaimDraft[]; // persisted so Part 2 can re-score offline
 }
 
 export function scoreDoc(
   doc: ManifestDoc,
-  result: ExtractionResult & { safeguardMode?: string; extraCalls?: number },
+  result: ExtractionResult & { safeguardMode?: string; extraCalls?: number; majorityResolved?: number; dropoutRecovered?: number },
 ): DocScore {
   const claims = result.claims;
   const expected = extractableClaims(doc);
@@ -148,6 +150,8 @@ export function scoreDoc(
     passDisagreement,
     safeguardMode: result.safeguardMode ?? "none",
     extraCalls: result.extraCalls ?? 0,
+    majorityResolved: result.majorityResolved ?? 0,
+    dropoutRecovered: result.dropoutRecovered ?? 0,
     rawClaims: claims,
   };
 }
@@ -178,6 +182,8 @@ export interface ModelReport {
   ungrounded: number;
   passDisagreement: number;
   extraCalls: number;
+  majorityResolved: number;
+  dropoutRecovered: number;
   refusals: number;
   usableRate: number;
   medianLatencyMs: number;
@@ -242,6 +248,8 @@ export function aggregate(model: string, scores: DocScore[]): ModelReport {
     ungrounded: scores.reduce((a, s2) => a + s2.ungrounded, 0),
     passDisagreement: scores.reduce((a, s2) => a + s2.passDisagreement, 0),
     extraCalls: scores.reduce((a, s2) => a + s2.extraCalls, 0),
+    majorityResolved: scores.reduce((a, s2) => a + s2.majorityResolved, 0),
+    dropoutRecovered: scores.reduce((a, s2) => a + s2.dropoutRecovered, 0),
     refusals: scores.filter((s) => s.status === "refused").length,
     usableRate: scores.length ? scores.filter((s) => s.usable).length / scores.length : 0,
     medianLatencyMs: median(scores.map((s) => s.latencyMs)),

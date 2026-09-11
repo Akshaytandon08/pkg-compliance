@@ -842,3 +842,99 @@ unprovable — see [flag-groundtruth-proposal.md](flag-groundtruth-proposal.md))
 improves the flag score only modestly. So the stale ground truth explains *part*
 of the false-positive gap, not all of it; the rest is genuine over-flagging that
 still needs work.
+
+---
+
+# Commits 6–7: two mechanisms, opposite outcomes (2026-09-11)
+
+> Synthetic-ceiling figures. Acceptance is measured only on the product owner's
+> real, PII-scrubbed set. Sampling cannot be pinned on these models, so every
+> figure is reported per run with its spread, never as a single number.
+
+## Commit 6 — retry-on-empty: implemented, **does not recover the dropout**
+
+A text-layer document returning < 3 claims with status `succeeded` is retried
+once (`DROPOUT_RETRY` logged with before/after counts). It fires only on failure,
+so the healthy path costs nothing; a discarded retry is still charged, because
+understating spend would defeat the budget ceiling.
+
+Docs 16/17/18, sonnet, 3 runs:
+
+| | doc 16 | doc 17 | doc 18 |
+|---|--:|--:|--:|
+| run 1 | 11/14 | 10/14 | refused |
+| run 2 | **0/14** | 10/14 | 12/16 |
+| run 3 | **0/14** | 10/14 | 12/16 |
+
+`DROPOUT_RETRY` fired twice, both on doc 16 (`textLayerChars=1414`), and recovered
+**neither** (1→1, 0→0). **Dropout incidence 3/9 before, 3/9 after.**
+
+**The finding:** retrying an *identical* request reproduces the *identical*
+near-empty answer. The failure is stable per (document, prompt) within a run even
+though it varies between runs. Recovery therefore needs a **varied** retry — a
+user-turn nudge, or reordering the pages — which changes the prompt and so
+belongs to a prompt-version bump. **Deferred past Tuesday**; the mechanism stays
+in place so the variation has somewhere to land.
+
+A `refused` result is deliberately not retried: refusals return before the
+text-layer branch, per the "status succeeded" condition.
+
+## Commit 7 — majority tiebreak: **reduces withholding; accuracy gain not established**
+
+On a two-pass disagreement over a verdict-driving value a third pass runs and
+2-of-3 carries; only a genuine three-way split is withheld. The third pass is
+bought **only** when the first two disagree. **On by default.**
+
+Image tiers C/D, 10 documents, sonnet, 3 runs. Baseline is the *same 10
+documents* recomputed offline from persisted claims — no new API calls:
+
+| | accuracy | withheld | silent | usable | extra calls |
+|---|--:|--:|--:|--:|--:|
+| baseline run 1 | 54.9% | 23 | 0 | 100% | 10 |
+| baseline run 2 | 60.8% | 21 | 0 | 100% | 10 |
+| baseline run 3 | 61.4% | 10 | 0 | 100% | 10 |
+| **baseline mean** | **59.0%** | 54 total | **0** | | 30 |
+| tiebreak run 1 | 69.3% | 10 | 0 | 100% | 18 |
+| tiebreak run 2 | *17.0%* | *3* | *1* | *30%* | *6* |
+| tiebreak run 3 | 54.2% | 13 | 0 | 100% | 18 |
+| **tiebreak mean (clean runs 1+3)** | **61.8%** | 23 | **0** | 100% | 36 |
+
+**Run 2 is not a result.** Seven of its ten documents returned status `failed` —
+API errors, not model behaviour — which is why it cost $0.20 against ~$0.75 for a
+real run. Run 3 returned to 100% usable, so it was a transient outage. Its
+"silent error" is an artefact: the scope-transfer detector fires when a
+document's expected flags include `flag_scope_mismatch` and the extraction
+produced *no claims at all*, so there was no value to be wrong about. Counting it
+would be measuring the outage.
+
+**Conclusion.** Withholding falls (23/21 → 10/13) and silent errors stay at 0 on
+clean runs, so the mechanism does what it was built to do: most disagreements are
+one bad read against two good ones, not genuine ambiguity. But a 2.8-point mean
+gain sits inside a 15-point run-to-run spread, so the **accuracy** improvement is
+**not established** by this test. Cost: extra calls 10 → 18 per clean run,
+$0.077/doc.
+
+## Why N > 1 runs, concretely
+
+After run 1 alone the tiebreak read as **69.3%, +10.3 points over baseline**.
+Reporting there would have been an overclaim: run 3 came in at 54.2%, below two
+of the three baseline runs, and the honest mean is 61.8% against 59.0% — inside
+the noise. One run is an anecdote.
+
+## Provisional default model: **sonnet**; opus comparison **outstanding**
+
+Opus at the current prompt version was **not** run. Reasons, recorded so the gap
+is visible rather than implied:
+
+1. **Frugality** — a full-set opus run costs ~$2.75 against $2.32 of remaining
+   budget. Launching it would have been cut off mid-run by the ledger: money
+   spent, no comparison produced.
+2. **API instability** — the transient failures that wrecked run 2 above would
+   have made a single opus run unreadable, and there is no budget for a repeat.
+3. **No demo dependency** — nothing in the Tuesday demo turns on the model
+   choice; sonnet is the current default and stays so.
+
+The only opus data at prompt 1.3.0 is a 10-document gate (68.7% accuracy, 0
+silent errors, 100% usable, $0.098/doc), which is one class of one run and not a
+basis for a recommendation. **Opus variance is measured at the real-document
+acceptance run**, where the comparison actually decides something.
