@@ -12,7 +12,8 @@ export type ObligationEntry = {
   citation: string;
   cadenceLabel: string;
   // ISO date of the next occurrence on/after the as-of date, or null when the
-  // statutory anchor is not yet confirmed (cadence known, date to be confirmed).
+  // rule sets a cadence but no fixed anchor date — the obligation recurs, the
+  // date does not come from the instrument.
   nextDue: string | null;
 };
 

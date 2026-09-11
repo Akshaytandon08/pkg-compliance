@@ -562,8 +562,9 @@ export const assessmentActivity = pgTable("assessment_activity", {
 // (material, process). Material-production rows carry a per-kg factor; transport
 // rows a per-kg·km factor (unit column disambiguates). Every row records its
 // source, year, geography and data-quality tier so each figure on the report can
-// show its provenance. Seed rows are marked data_quality 'SEED-ESTIMATE' — a
-// clearly-labelled placeholder, never dressed up as an authoritative source.
+// show its provenance. Seed rows carry data_quality 'SEED-ESTIMATE' and name no
+// source, because they have none — the report renders that tier as an indicative
+// screening factor rather than dressing it up as an authoritative one.
 export const emissionFactors = pgTable("emission_factors", {
   id: serial("id").primaryKey(),
   // Material vocab (corrugated|plastic|wood|metal) for production rows, or
@@ -577,7 +578,7 @@ export const emissionFactors = pgTable("emission_factors", {
   source: text("source").notNull(),
   year: integer("year").notNull(),
   geography: text("geography").notNull(),
-  // Provenance tier: 'SEED-ESTIMATE' (placeholder) | 'secondary' | 'primary'.
+  // Provenance tier: 'SEED-ESTIMATE' (indicative, unsourced) | 'secondary' | 'primary'.
   dataQuality: text("data_quality").notNull(),
   notes: text("notes"),
 });

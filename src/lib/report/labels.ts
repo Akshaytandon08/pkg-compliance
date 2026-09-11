@@ -337,3 +337,24 @@ export function preparedForLine(org: {
     .filter(Boolean)
     .join(" · ");
 }
+
+// --- emission factors -------------------------------------------------------
+
+/** The tier that means "we have no sourced factor for this material, only an
+ *  order-of-magnitude estimate". Seeded rows carry it; a real factor does not. */
+export const SEED_ESTIMATE_TIER = "SEED-ESTIMATE";
+
+/**
+ * How a factor's provenance reads on the report.
+ *
+ * A SOURCED factor names its source and tier, because that is what makes the
+ * number checkable. A seeded estimate names NEITHER — there is no source to
+ * name, and printing an internal instruction to ourselves ("replace with
+ * Fitsol/primary EF") in a customer's provenance column tells them nothing about
+ * their packaging and everything about our backlog. It says what the number is:
+ * indicative, not sourced.
+ */
+export function factorSourceLabel(factor: { source: string; dataQuality: string }): string {
+  if (factor.dataQuality === SEED_ESTIMATE_TIER) return "Screening factor — indicative";
+  return `${factor.source} · ${factor.dataQuality}`;
+}

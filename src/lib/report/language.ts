@@ -73,5 +73,5 @@ export const DEMO_DATA_LABEL = "Demonstration data";
 // tokens ("audit-grade", "verified carbon footprint") — see findLanguageViolations.
 export const PCF_DISCLAIMER =
   "Screening-grade estimate, ISO 14067-aligned methodology — not audit-level and " +
-  "not independently assured. Figures use placeholder emission factors; each shows " +
-  "its source and data-quality tier.";
+  "not independently assured. Emission factors are indicative unless a sourced " +
+  "factor is shown; each row states which it is.";

@@ -17,7 +17,7 @@ import { PCF_DISCLAIMER, SCREENING_DISCLAIMER } from "@/lib/report/language";
 import { StatusChip, toChipStatus } from "@/app/_components/StatusChip";
 import { Breadcrumbs } from "@/app/_components/Breadcrumbs";
 import { getAllGuidance } from "@/db/guidance";
-import { RULE_REFERENCE_TOOLTIP, preparedForLine, ruleReference } from "@/lib/report/labels";
+import { RULE_REFERENCE_TOOLTIP, factorSourceLabel, preparedForLine, ruleReference } from "@/lib/report/labels";
 import { buildRuleRows, toEvidenceRelied, type ClaimSummary } from "@/lib/report/ruleRows";
 import { RuleTable } from "./RuleTable";
 import { EvidenceList } from "./EvidenceList";
@@ -112,7 +112,7 @@ function FootprintCard({ footprint }: { footprint: ReturnType<typeof computePack
                 <td className="py-1 pr-3">{c.line}. {c.name}</td>
                 <td className="py-1 pr-3 whitespace-nowrap">{c.massKg != null ? `${Number((c.massKg).toPrecision(3))} kg` : "—"}</td>
                 <td className="py-1 pr-3 whitespace-nowrap">{c.factor ? `${c.factor.factor} ${c.factor.unit}` : "—"}</td>
-                <td className="py-1 pr-3">{c.factor ? `${c.factor.source} · ${c.factor.dataQuality}` : "—"}</td>
+                <td className="py-1 pr-3">{c.factor ? factorSourceLabel(c.factor) : "—"}</td>
                 <td className="py-1 pr-3 text-right whitespace-nowrap">
                   {c.kgCo2e != null
                     ? Number(c.kgCo2e.toPrecision(3))
@@ -127,7 +127,7 @@ function FootprintCard({ footprint }: { footprint: ReturnType<typeof computePack
                 <td className="py-1 pr-3">Inbound transport ({footprint.transport.mode}, {footprint.transport.km} km)</td>
                 <td className="py-1 pr-3 whitespace-nowrap">{Number(footprint.transport.massKg.toPrecision(3))} kg</td>
                 <td className="py-1 pr-3 whitespace-nowrap">{footprint.transport.factor.factor} {footprint.transport.factor.unit}</td>
-                <td className="py-1 pr-3">{footprint.transport.factor.source} · {footprint.transport.factor.dataQuality}</td>
+                <td className="py-1 pr-3">{factorSourceLabel(footprint.transport.factor)}</td>
                 <td className="py-1 pr-3 text-right whitespace-nowrap">{Number(footprint.transport.kgCo2e.toPrecision(3))}</td>
               </tr>
             )}
@@ -484,7 +484,7 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
                 <div className="text-right text-xs">
                   <p className="font-medium text-neutral-700 dark:text-neutral-300">{o.cadenceLabel}</p>
                   <p className="text-neutral-500">
-                    {o.nextDue ? `Next due ${o.nextDue}` : "Next due date to be confirmed"}
+                    {o.nextDue ? `Next due ${o.nextDue}` : "No fixed due date in the rule"}
                   </p>
                 </div>
               </li>
