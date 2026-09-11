@@ -2,6 +2,17 @@ import type { ExtractedClaimDraft, ExtractionResult } from "../../src/lib/extrac
 import type { ManifestDoc, ExpectedClaim } from "./manifest.ts";
 import { deriveFlags, detectSilentErrors, type SilentError } from "./flags.ts";
 import { strictMatch, canonicalMatch, normText, type MatchKind } from "./canonical.ts";
+import { readFileSync, existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+// COMMIT 3 — optional v2 expected-flag overlay. Present only as a PROPOSAL: it is
+// scored alongside the manifest's legacy flags so the effect of accepting it is
+// visible, but it is never ground truth until the owner folds it in.
+const OVERLAY_PATH = fileURLToPath(new URL("./expected-flags-v2.json", import.meta.url));
+const FLAG_OVERLAY: Record<string, string[]> | null = existsSync(OVERLAY_PATH)
+  ? (JSON.parse(readFileSync(OVERLAY_PATH, "utf8")) as Record<string, string[]>)
+  : null;
+export const hasFlagOverlay = FLAG_OVERLAY !== null;
 
 // Per-model pricing (USD per 1M tokens), verified against the current Claude API
 // reference (see prompts/README.md). Used only to report cost/doc on the harness.
@@ -53,6 +64,8 @@ export interface DocScore {
   derivedFlags: string[];
   falsePositiveFlags: string[]; // derived − expected, per doc (the 20 sonnet FPs)
   flagExactMatch: boolean;
+  /** Same comparison against the proposed v2 expected flags (null when absent). */
+  flagExactMatchV2: boolean | null;
   silentErrors: SilentError[];
   latencyMs: number;
   inputTokens: number;
@@ -60,10 +73,18 @@ export interface DocScore {
   /** Per-field legibility self-reports and post-validator rejections (Part 3a). */
   legibility: { clear: number; partially_obscured: number; illegible: number; unreported: number };
   typeMismatches: number;
+  /** Commit 2 safeguard catches for this document. */
+  ungrounded: number;
+  passDisagreement: number;
+  safeguardMode: string;
+  extraCalls: number;
   rawClaims: ExtractedClaimDraft[]; // persisted so Part 2 can re-score offline
 }
 
-export function scoreDoc(doc: ManifestDoc, result: ExtractionResult): DocScore {
+export function scoreDoc(
+  doc: ManifestDoc,
+  result: ExtractionResult & { safeguardMode?: string; extraCalls?: number },
+): DocScore {
   const claims = result.claims;
   const expected = extractableClaims(doc);
 
@@ -87,6 +108,8 @@ export function scoreDoc(doc: ManifestDoc, result: ExtractionResult): DocScore {
   const expSet = new Set(expectedFlags);
   const falsePositiveFlags = derived.filter((f) => !expSet.has(f));
   const flagExactMatch = derived.join("|") === expectedFlags.join("|");
+  const v2 = FLAG_OVERLAY?.[doc.file];
+  const flagExactMatchV2 = v2 ? derived.join("|") === [...v2].sort().join("|") : null;
   const silentErrors = detectSilentErrors(doc, claims, flags);
 
   const legibility = { clear: 0, partially_obscured: 0, illegible: 0, unreported: 0 };
@@ -97,6 +120,8 @@ export function scoreDoc(doc: ManifestDoc, result: ExtractionResult): DocScore {
     else legibility.unreported++;
   }
   const typeMismatches = claims.filter((c) => c.validation === "type_mismatch").length;
+  const ungrounded = claims.filter((c) => c.validation === "ungrounded").length;
+  const passDisagreement = claims.filter((c) => c.validation === "pass_disagreement").length;
 
   return {
     file: doc.file,
@@ -112,12 +137,17 @@ export function scoreDoc(doc: ManifestDoc, result: ExtractionResult): DocScore {
     derivedFlags: derived,
     falsePositiveFlags,
     flagExactMatch,
+    flagExactMatchV2,
     silentErrors,
     latencyMs: result.latencyMs,
     inputTokens: result.usage.inputTokens,
     outputTokens: result.usage.outputTokens,
     legibility,
     typeMismatches,
+    ungrounded,
+    passDisagreement,
+    safeguardMode: result.safeguardMode ?? "none",
+    extraCalls: result.extraCalls ?? 0,
     rawClaims: claims,
   };
 }
@@ -135,6 +165,8 @@ export interface ModelReport {
   fieldAccuracyStrict: number; // exact-only baseline
   byTier: Record<string, TierAccuracy>;
   flagExactRate: number; // docs whose derived flag-set exactly equals expected
+  /** Same rate against the proposed v2 flags; null when no overlay is present. */
+  flagExactRateV2: number | null;
   flagTP: number;
   flagFP: number;
   flagFN: number;
@@ -143,6 +175,9 @@ export interface ModelReport {
   /** Summed per-field legibility reports and post-validator rejections. */
   legibility: { clear: number; partially_obscured: number; illegible: number; unreported: number };
   typeMismatches: number;
+  ungrounded: number;
+  passDisagreement: number;
+  extraCalls: number;
   refusals: number;
   usableRate: number;
   medianLatencyMs: number;
@@ -185,6 +220,10 @@ export function aggregate(model: string, scores: DocScore[]): ModelReport {
     fieldAccuracyStrict: fieldTotal ? fieldMatchedStrict / fieldTotal : 0,
     byTier,
     flagExactRate: scores.length ? scores.filter((s) => s.flagExactMatch).length / scores.length : 0,
+    flagExactRateV2:
+      scores.length && scores.some((s) => s.flagExactMatchV2 !== null)
+        ? scores.filter((s) => s.flagExactMatchV2).length / scores.length
+        : null,
     flagTP: tp,
     flagFP: fp,
     flagFN: fn,
@@ -200,6 +239,9 @@ export function aggregate(model: string, scores: DocScore[]): ModelReport {
       { clear: 0, partially_obscured: 0, illegible: 0, unreported: 0 },
     ),
     typeMismatches: scores.reduce((a, s2) => a + s2.typeMismatches, 0),
+    ungrounded: scores.reduce((a, s2) => a + s2.ungrounded, 0),
+    passDisagreement: scores.reduce((a, s2) => a + s2.passDisagreement, 0),
+    extraCalls: scores.reduce((a, s2) => a + s2.extraCalls, 0),
     refusals: scores.filter((s) => s.status === "refused").length,
     usableRate: scores.length ? scores.filter((s) => s.usable).length / scores.length : 0,
     medianLatencyMs: median(scores.map((s) => s.latencyMs)),

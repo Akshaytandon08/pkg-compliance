@@ -67,9 +67,16 @@ export function deriveFlags(doc: ManifestDoc, claims: ExtractedClaimDraft[], req
     if (illegible) add("flag_low_confidence", `field "${illegible.parameter ?? illegible.claimType}" reported ${illegible.legibility}`);
   }
   if (!flags.has("flag_low_confidence")) {
-    const mismatch = claims.find((c) => c.validation === "type_mismatch");
-    if (mismatch) {
-      add("flag_low_confidence", `post-validator rejected "${mismatch.rejectedValue}" on "${mismatch.parameter ?? mismatch.claimType}" as the wrong type`);
+    // Any post-validator rejection — wrong type, ungrounded snippet, or two
+    // passes disagreeing — means a value was withheld and a human must look.
+    const rejected = claims.find((c) => c.validation && c.validation !== "ok");
+    if (rejected) {
+      const why = rejected.validation === "ungrounded"
+        ? "could not be located in the document text"
+        : rejected.validation === "pass_disagreement"
+          ? "was read differently by two independent passes"
+          : "was the wrong type for the field";
+      add("flag_low_confidence", `post-validator rejected "${rejected.rejectedValue}" on "${rejected.parameter ?? rejected.claimType}": it ${why}`);
     }
   }
 

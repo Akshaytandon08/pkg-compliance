@@ -80,12 +80,16 @@ export type PackReport = {
   packagingUnit: CheckpointCard[];
   organisation: CheckpointCard[];
   caveats: CheckpointCard[];
+  /** Requirements that exist but do not yet apply as of `asOf` — informational,
+   *  never counted as qualified/conditional/gap and never blocking. */
+  upcoming: CheckpointCard[];
   counts: {
     qualified: number;
     conditional: number;
     gap: number;
     not_applicable: number;
     caveat: number;
+    upcoming: number;
   };
   overall: { verdict: Verdict | "pending"; evaluatedCount: number };
 };
@@ -125,12 +129,15 @@ function gateForReport(cp: ProductionCheckpoint, asOf: string): Gate {
         caveat: { label: "Under legal challenge", reason: ev.reason },
       };
     case "upcoming":
-      return { kind: "caveat", caveat: { label: "Not yet in force", reason: ev.reason } };
+      // Corpus status says not-yet-in-force. Evaluate so the temporal gate in
+      // evaluateCheckpoint renders it as an `upcoming` row with its date.
+      return { kind: "evaluate" };
     case "in_force":
-      // in_force but out of window: forward flag before trigger; hidden after sunset.
-      return ev.reason.startsWith("Applies from")
-        ? { kind: "caveat", caveat: { label: "Not yet in force", reason: ev.reason } }
-        : { kind: "hidden" };
+      // in_force but out of window. Before its trigger date it is `upcoming` —
+      // handled by evaluateCheckpoint's temporal gate, not as a generic caveat,
+      // so it gets its own count and its own "Applies from …" reason. After
+      // sunset it is hidden.
+      return ev.reason.startsWith("Applies from") ? { kind: "evaluate" } : { kind: "hidden" };
     default:
       return { kind: "hidden" }; // superseded
   }
@@ -139,6 +146,7 @@ function gateForReport(cp: ProductionCheckpoint, asOf: string): Gate {
 const SEVERITY: Record<Verdict, number> = {
   qualified: 1,
   not_applicable: 0,
+  upcoming: 0, // a future requirement never escalates today's overall verdict
   conditional: 2,
   gap: 3,
 };
@@ -173,7 +181,8 @@ export function evaluatePack(input: EvaluatePackInput): PackReport {
   const packagingUnit: CheckpointCard[] = [];
   const organisation: CheckpointCard[] = [];
   const caveats: CheckpointCard[] = [];
-  const counts = { qualified: 0, conditional: 0, gap: 0, not_applicable: 0, caveat: 0 };
+  const upcoming: CheckpointCard[] = [];
+  const counts = { qualified: 0, conditional: 0, gap: 0, not_applicable: 0, caveat: 0, upcoming: 0 };
 
   const baseCard = (cp: ProductionCheckpoint): Omit<CheckpointCard, "outcome"> => ({
     checkpointId: cp.id,
@@ -191,6 +200,7 @@ export function evaluatePack(input: EvaluatePackInput): PackReport {
   const tally = (outcome: CheckpointOutcome) => {
     if (outcome.disposition === "verdict" && outcome.verdict) counts[outcome.verdict]++;
     else if (outcome.disposition === "not_applicable") counts.not_applicable++;
+    else if (outcome.disposition === "upcoming") counts.upcoming++;
     else counts.caveat++;
   };
 
@@ -224,6 +234,8 @@ export function evaluatePack(input: EvaluatePackInput): PackReport {
           material: component.material,
           asOf,
           notApplicableReason: cp.notApplicableReason,
+          triggerDate: cp.triggerDate,
+          laterOfCondition: cp.laterOfCondition,
         });
         const card: CheckpointCard = {
           ...baseCard(cp),
@@ -232,6 +244,7 @@ export function evaluatePack(input: EvaluatePackInput): PackReport {
           outcome,
         };
         if (outcome.disposition === "caveat") caveats.push(card);
+        else if (outcome.disposition === "upcoming") upcoming.push(card);
         else sectionByLine.get(component.line)?.cards.push(card);
         tally(outcome);
       }
@@ -245,9 +258,12 @@ export function evaluatePack(input: EvaluatePackInput): PackReport {
         bomMaterials,
         asOf,
         notApplicableReason: cp.notApplicableReason,
+        triggerDate: cp.triggerDate,
+        laterOfCondition: cp.laterOfCondition,
       });
       const card: CheckpointCard = { ...baseCard(cp), outcome };
       if (outcome.disposition === "caveat") caveats.push(card);
+      else if (outcome.disposition === "upcoming") upcoming.push(card);
       else if (cp.subject === "packaging_unit") packagingUnit.push(card);
       else organisation.push(card);
       tally(outcome);
@@ -269,6 +285,7 @@ export function evaluatePack(input: EvaluatePackInput): PackReport {
     packagingUnit,
     organisation,
     caveats,
+    upcoming,
     counts,
     overall: { verdict: overallVerdict, evaluatedCount: evaluatedVerdicts.length },
   };

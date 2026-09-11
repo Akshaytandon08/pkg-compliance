@@ -62,6 +62,7 @@ interface RawClaim {
   issue_date?: string;
   expiry?: string;
   scope_text?: string;
+  source_snippet?: string;
   legibility?: string;
   confidence: number;
   provenance: { page: number; span?: [number, number]; bbox?: [number, number, number, number] };
@@ -79,6 +80,7 @@ function toDraft(c: RawClaim): ExtractedClaimDraft {
     issueDate: c.issue_date ?? null,
     expiry: c.expiry ?? null,
     scopeText: c.scope_text ?? null,
+    sourceSnippet: c.source_snippet ?? null,
     legibility: (LEGIBILITY as readonly string[]).includes(c.legibility ?? "")
       ? (c.legibility as ExtractedClaimDraft["legibility"])
       : null,

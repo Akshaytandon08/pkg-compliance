@@ -455,6 +455,7 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
   const sections = [
     { id: "summary", label: "Summary" },
     ...(report.caveats.length > 0 ? [{ id: "caveats", label: "Pending & caveats" }] : []),
+    ...(report.upcoming.length > 0 ? [{ id: "upcoming", label: "Not yet applicable" }] : []),
     { id: "components", label: "Components" },
     ...(report.packagingUnit.length > 0 ? [{ id: "packaging-unit", label: "Packaging unit" }] : []),
     ...(report.organisation.length > 0 ? [{ id: "organisation", label: "Organisation" }] : []),
@@ -510,6 +511,7 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
         <Count n={report.counts.conditional} label="Conditional" href="#components" />
         <Count n={report.counts.gap} label="Gap" href="#components" />
         <Count n={report.counts.not_applicable} label="N/A" href="#components" />
+        <Count n={report.counts.upcoming} label="Upcoming" href={report.upcoming.length > 0 ? "#upcoming" : "#components"} />
         <Count n={report.counts.caveat} label="Caveats" href={report.caveats.length > 0 ? "#caveats" : "#components"} />
       </div>
 
@@ -548,6 +550,36 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
               <CaveatCard key={`${c.checkpointId}-${i}`} card={c} />
             ))}
           </div>
+        </section>
+      )}
+
+      {/* Not yet applicable — informational. These requirements exist but their
+          trigger date is after this assessment's as-of date, so they cannot be
+          satisfied today and are excluded from the qualified/conditional/gap
+          counts. They never block anything. */}
+      {report.upcoming.length > 0 && (
+        <section id="upcoming" className="scroll-mt-14">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-500">
+            Not yet applicable ({report.upcoming.length})
+          </h2>
+          <p className="mb-3 text-xs text-neutral-500">
+            These requirements are in the corpus but do not apply as of {report.asOf}. They are shown so the
+            date is visible in advance; they are not gaps and do not affect the verdict counts or the
+            declaration-of-conformity gate.
+          </p>
+          <ul className="space-y-2">
+            {report.upcoming.map((c, i) => (
+              <li key={`${c.checkpointId}-${i}`} className="rounded-md border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900/40">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <p className="font-mono text-xs text-neutral-500">{c.checkpointId}@{c.version}</p>
+                  <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+                    {c.outcome?.detail}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm text-neutral-700 dark:text-neutral-200">{c.requirementText}</p>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 

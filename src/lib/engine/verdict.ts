@@ -13,7 +13,12 @@
 
 export type DesignAssessment = "no_inherent_risk" | "at_risk" | "non_compliant";
 export type EvidenceState = "complete" | "insufficient" | "absent" | "expired";
-export type Verdict = "qualified" | "conditional" | "gap" | "not_applicable";
+// `upcoming` is a TEMPORAL state, not an outcome of the rule table below: the
+// requirement exists but does not yet apply as of the assessment date. It is
+// decided before evidence is ever considered (see evaluateCheckpoint), is
+// reported informationally with its own count, and never blocks anything —
+// decideVerdict must never return it.
+export type Verdict = "qualified" | "conditional" | "gap" | "not_applicable" | "upcoming";
 export type Risk = "low" | "medium" | "high";
 
 export type VerdictInput = {

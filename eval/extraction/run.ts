@@ -11,6 +11,7 @@
 import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { AnthropicExtractionProvider } from "../../src/lib/extraction/index.ts";
+import { extractWithSafeguards } from "../../src/lib/extraction/safeguards.ts";
 import type { ExtractionResult } from "../../src/lib/extraction/types.ts";
 import { loadExtractionSet, validateHashes, type ManifestDoc } from "./manifest.ts";
 import { scoreDoc, aggregate, type DocScore, type ModelReport } from "./score.ts";
@@ -29,9 +30,11 @@ async function runModel(model: string, docs: ManifestDoc[]): Promise<{ report: M
   for (const doc of docs) {
     const bytes = new Uint8Array(readFileSync(doc.absPath));
     const scanned = doc.tier === "C" || doc.tier === "D";
-    let result: ExtractionResult;
+    let result: ExtractionResult & { safeguardMode?: string; extraCalls?: number };
     try {
-      result = await provider.extract({ docClass: doc.class, bytes, contentType: doc.contentType, scanned });
+      // Grounding for text-layer documents, two-pass agreement for image-only.
+      const safe = await extractWithSafeguards(provider, { docClass: doc.class, bytes, contentType: doc.contentType, scanned });
+      result = { ...safe, safeguardMode: safe.safeguards.mode, extraCalls: safe.safeguards.extraCalls };
     } catch (err) {
       result = { status: "failed", provider: "anthropic", model, promptVersion: "?", claims: [], usage: { inputTokens: 0, outputTokens: 0 }, latencyMs: 0, error: err instanceof Error ? err.message : String(err) };
     }
@@ -49,10 +52,14 @@ function printReport(report: ModelReport): void {
   const tiers = Object.keys(report.byTier).sort();
   console.log(`    By tier (canonical):                          ${tiers.map((t) => `${t} ${pct(report.byTier[t].total ? report.byTier[t].matched / report.byTier[t].total : 0)}`).join("  ")}`);
   console.log(`    Flag exact-set match rate:                    ${pct(report.flagExactRate)}   (TP ${report.flagTP} / FP ${report.flagFP} / FN ${report.flagFN})`);
+  if (report.flagExactRateV2 !== null) {
+    console.log(`      …against PROPOSED v2 expected flags:        ${pct(report.flagExactRateV2)}   (proposal only — not ground truth)`);
+  }
   console.log(`    Silent errors:                                ${report.silentErrorCount}   ← wrong/guessed value, unflagged`);
   const lg = report.legibility;
   console.log(`    Per-field legibility:                         clear ${lg.clear}, partially_obscured ${lg.partially_obscured}, illegible ${lg.illegible}, unreported ${lg.unreported}`);
-  console.log(`    Post-validator type-mismatch rejections:      ${report.typeMismatches}`);
+  console.log(`    Post-validator rejections:                    type-mismatch ${report.typeMismatches}, ungrounded ${report.ungrounded}, pass-disagreement ${report.passDisagreement}`);
+  console.log(`    Extra API calls (two-pass on image-only docs): ${report.extraCalls}`);
   console.log(`    Refusals (distinct from extracted-nothing):   ${report.refusals}`);
   console.log(`    Usable-document rate:                         ${pct(report.usableRate)}`);
   console.log(`    Median latency:                               ${report.medianLatencyMs} ms`);
@@ -68,12 +75,22 @@ function printReport(report: ModelReport): void {
 // live (Part 3: prompt v2 iterates one class at a time). --class also tags the
 // persisted filename so a partial re-run does not overwrite a full-set run.
 const rawArgs = process.argv.slice(2);
-const classFilter = rawArgs.find((a) => a.startsWith("--class="))?.slice("--class=".length);
+// Accept both `--class=x` and `--class x` (and the same for --runs), so the form
+// in the runbook works as written.
+function flagValue(name: string): string | undefined {
+  const eq = rawArgs.find((a) => a.startsWith(`--${name}=`));
+  if (eq) return eq.slice(name.length + 3);
+  const i = rawArgs.indexOf(`--${name}`);
+  return i >= 0 && rawArgs[i + 1] && !rawArgs[i + 1].startsWith("--") ? rawArgs[i + 1] : undefined;
+}
+const classFilter = flagValue("class");
 // --runs=N repeats the whole set N times per model. Acceptance for silent errors
 // is the UNION across runs (a single clean run proves nothing when the count is
 // nondeterministic), and N runs also give field-accuracy variance.
-const runsPerModel = Math.max(1, Number(rawArgs.find((a) => a.startsWith("--runs="))?.slice("--runs=".length) ?? 1));
-const models = rawArgs.filter((a) => !a.startsWith("--")).length > 0 ? rawArgs.filter((a) => !a.startsWith("--")) : DEFAULT_MODELS;
+const runsPerModel = Math.max(1, Number(flagValue("runs") ?? 1));
+const consumed = new Set([classFilter, runsPerModel > 1 ? String(runsPerModel) : undefined].filter(Boolean) as string[]);
+const bare = rawArgs.filter((a) => !a.startsWith("--") && !consumed.has(a));
+const models = bare.length > 0 ? bare : DEFAULT_MODELS;
 
 let docs = loadExtractionSet();
 if (!docs) {
@@ -113,6 +130,21 @@ mkdirSync(RESULTS_DIR, { recursive: true });
 const stamp = new Date().toISOString().replace(/[:.]/g, "-");
 const summary: Record<string, unknown>[] = [];
 
+// COST DISCIPLINE: API spend is the constraint. Track cumulative spend across
+// every run in this invocation, print it after each, and STOP rather than
+// silently blow past the ceiling.
+const SPEND_CEILING_USD = 12;
+let cumulativeSpendUsd = 0;
+function recordSpend(report: ModelReport): boolean {
+  cumulativeSpendUsd += report.totalCostUsd;
+  console.log(`    RUNNING COST: $${report.totalCostUsd.toFixed(4)} this run — $${cumulativeSpendUsd.toFixed(4)} cumulative (ceiling $${SPEND_CEILING_USD})`);
+  if (cumulativeSpendUsd > SPEND_CEILING_USD) {
+    console.error(`\nSTOPPING: cumulative spend $${cumulativeSpendUsd.toFixed(2)} exceeded the $${SPEND_CEILING_USD} ceiling for this prompt version. Reporting what completed.`);
+    return false;
+  }
+  return true;
+}
+
 for (const model of models) {
   const runReports: ModelReport[] = [];
   for (let run = 1; run <= runsPerModel; run++) {
@@ -120,10 +152,12 @@ for (const model of models) {
     const { report, scores, promptVersions } = await runModel(model, docs);
     printReport(report);
     runReports.push(report);
+    const withinBudget = recordSpend(report);
     // Persist each run with prompt_version pinned per document class.
     const persist = { evaluated_at: stamp, run, runs_total: runsPerModel, model, class_filter: classFilter ?? null, prompt_versions: promptVersions, report, per_document: scores };
     const tag = `${classFilter ? `${model}_${classFilter}` : model}${runsPerModel > 1 ? `_run${run}` : ""}`;
     writeFileSync(`${RESULTS_DIR}${stamp}_${tag}.json`, JSON.stringify(persist, null, 2));
+    if (!withinBudget) break;
   }
 
   // Across-run acceptance: silent errors are the UNION (deduped), and accuracy is
