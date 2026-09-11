@@ -27,6 +27,32 @@ export interface DoCDraftInputs {
   components: { line: string; name: string; material: string; composition?: string | null; weightGrams?: number | null }[];
   language: string; // "en" first; others get a translation-to-verify notice
   generatedDate: string; // ISO date
+  /** The organisation the screening is prepared for. Pre-fills Annex VIII
+   *  element 2 (declarant identity). Absent → the field stays blank, as before. */
+  organisation?: {
+    legalName: string;
+    tradingName?: string | null;
+    country: string;
+    registeredAddress?: string | null;
+    registrations?: { jurisdiction: string; registerName?: string | null; registrationNumber: string }[];
+  } | null;
+}
+
+/** Annex VIII element 2 text from the organisation record: legal name (trading
+ *  name in brackets when it differs), registered address, country, and any
+ *  producer registration numbers. Returns undefined when there is no
+ *  organisation — the field then renders blank, exactly as before. */
+function declarantText(org: DoCDraftInputs["organisation"]): string | undefined {
+  if (!org) return undefined;
+  const name = org.tradingName && org.tradingName !== org.legalName
+    ? `${org.legalName} (trading as ${org.tradingName})`
+    : org.legalName;
+  const parts = [name, org.registeredAddress, org.country].filter(Boolean) as string[];
+  const regs = (org.registrations ?? []).map(
+    (r) => `${r.jurisdiction}: ${r.registrationNumber}${r.registerName ? ` (${r.registerName})` : ""}`,
+  );
+  if (regs.length) parts.push(`Producer registration — ${regs.join("; ")}`);
+  return parts.join(" · ");
 }
 
 function el(template: DocTemplateRecord, ref: string) {
@@ -71,7 +97,13 @@ export function buildDoCDraft(input: DoCDraftInputs): DraftDocument {
       facts.packaging_branded ? "packaging is branded by the manufacturer" : undefined,
       facts.custom_vs_standardised ? `${facts.custom_vs_standardised} packaging` : undefined,
     ].filter(Boolean) as string[];
-    blocks.push({ type: "field", label: `manufacturer name and address${known.length ? ` (screening notes: ${known.join("; ")})` : ""}, and authorised representative if any` });
+    const label = `manufacturer name and address${known.length ? ` (screening notes: ${known.join("; ")})` : ""}, and authorised representative if any`;
+    // Pre-filled from the organisation record when there is one. It stays a
+    // HIGHLIGHTED field carrying "confirm before signing": what this tool holds
+    // is what someone typed into an intake form, and element 2 is the declarant
+    // identity on a legal instrument. The signer confirms it; the tool does not
+    // assert it.
+    blocks.push({ type: "field", label, value: declarantText(input.organisation) });
   }
 
   // Element 3 — fixed statement (sole responsibility of the manufacturer).

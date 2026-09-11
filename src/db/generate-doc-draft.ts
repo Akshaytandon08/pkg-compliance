@@ -1,4 +1,5 @@
 import { getAssessment, loadCorpusAsOf } from "./assessments.ts";
+import { getOrganisation } from "./organisations.ts";
 import { evaluatePack, type PackReport } from "../lib/engine/pack.ts";
 import { loadApprovedDocTemplate } from "./doc-templates.ts";
 import { storeDraft, type StoredDraft } from "./doc-drafts.ts";
@@ -99,6 +100,10 @@ export async function generateDoCDraft(
   const qualified = report.counts.qualified;
   const changelog = `Generated from corpus ${report.corpusVersion}; ${assessment.components.length} component(s), ${qualified} qualified requirement(s), as of ${assessment.asOf}.`;
 
+  // Element 2 (declarant identity) pre-fills from the organisation record when
+  // the assessment has one; otherwise the field renders blank as before.
+  const organisation = assessment.organisationId ? await getOrganisation(assessment.organisationId) : null;
+
   const drafts: StoredDraft[] = [];
   for (const language of langs) {
     const model = buildDoCDraft({
@@ -110,6 +115,7 @@ export async function generateDoCDraft(
       components: assessment.components.map((c) => ({ line: c.line, name: c.name, material: c.material, composition: c.composition, weightGrams: c.weightGrams })),
       language,
       generatedDate,
+      organisation,
     });
     let docx: Buffer;
     let pdf: Buffer;

@@ -21,6 +21,12 @@ export const FITSOL_BRAND: BrandTokens = {
   wordmark: "Fitsol",
 };
 
+// Prefixes for a highlighted fill-in field. One pair, used by both renderers, so
+// the .docx and the .pdf of the same draft can never say different things about
+// whether a value still needs checking.
+export const FIELD_PREFIX_BLANK = "» To complete by the manufacturer: ";
+export const FIELD_PREFIX_FILLED = "» Pre-filled from the organisation record — CONFIRM BEFORE SIGNING: ";
+
 export type DocBlock =
   | { type: "wordmark" } // Fitsol brand mark + green accent rule (header)
   | { type: "title"; text: string }

@@ -292,3 +292,48 @@ export function describeThreshold(t: {
   const parts = [t.parameter, symbol, t.value, t.unit].filter((p) => p !== null && p !== undefined && p !== "");
   return parts.join(" ").trim();
 }
+
+// --- the organisation a screening is prepared for ---------------------------
+
+const LEGAL_ROLE_LABEL: Record<string, string> = {
+  manufacturer: "Manufacturer",
+  importer: "Importer",
+  distributor: "Distributor",
+  epr_producer: "EPR producer",
+};
+
+/** "epr_producer" → "EPR producer". Unknown roles fall back to humanise(). */
+export function legalRoleLabel(role: string): string {
+  return LEGAL_ROLE_LABEL[role] ?? humanise(role);
+}
+
+/** "DE" → "Germany". Falls back to the code itself, which is still meaningful —
+ *  never to an empty string or a guess. */
+export function countryLabel(code: string): string {
+  const c = code.trim().toUpperCase();
+  if (c.length !== 2) return code;
+  try {
+    const name = new Intl.DisplayNames(["en"], { type: "region" }).of(c);
+    // ZZ is the reserved "unknown region" code and resolves to the words
+    // "Unknown Region" — which reads like data rather than like a bad code. Show
+    // the code itself instead; a reader can at least see what was entered.
+    return !name || /^unknown/i.test(name) ? c : name;
+  } catch {
+    return c;
+  }
+}
+
+/**
+ * "Prepared for" identity line: legal name · country · role. Parts the record
+ * does not hold are OMITTED rather than filled with a placeholder — a compliance
+ * document that invents an operator's role is worse than one that is silent.
+ */
+export function preparedForLine(org: {
+  legalName: string;
+  country: string;
+  roleDefault?: string | null;
+}): string {
+  return [org.legalName, countryLabel(org.country), org.roleDefault ? legalRoleLabel(org.roleDefault) : null]
+    .filter(Boolean)
+    .join(" · ");
+}
