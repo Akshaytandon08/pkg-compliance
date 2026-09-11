@@ -30,11 +30,17 @@ async function runModel(model: string, docs: ManifestDoc[]): Promise<{ report: M
   for (const doc of docs) {
     const bytes = new Uint8Array(readFileSync(doc.absPath));
     const scanned = doc.tier === "C" || doc.tier === "D";
-    let result: ExtractionResult & { safeguardMode?: string; extraCalls?: number };
+    let result: ExtractionResult & { safeguardMode?: string; extraCalls?: number; majorityResolved?: number; dropoutRecovered?: number };
     try {
       // Grounding for text-layer documents, two-pass agreement for image-only.
       const safe = await extractWithSafeguards(provider, { docClass: doc.class, bytes, contentType: doc.contentType, scanned });
-      result = { ...safe, safeguardMode: safe.safeguards.mode, extraCalls: safe.safeguards.extraCalls };
+      result = {
+        ...safe,
+        safeguardMode: safe.safeguards.mode,
+        extraCalls: safe.safeguards.extraCalls,
+        majorityResolved: safe.safeguards.majorityResolved ?? 0,
+        dropoutRecovered: safe.safeguards.dropoutRetry?.recovered ? 1 : 0,
+      };
     } catch (err) {
       result = { status: "failed", provider: "anthropic", model, promptVersion: "?", claims: [], usage: { inputTokens: 0, outputTokens: 0 }, latencyMs: 0, error: err instanceof Error ? err.message : String(err) };
     }
@@ -59,7 +65,9 @@ function printReport(report: ModelReport): void {
   const lg = report.legibility;
   console.log(`    Per-field legibility:                         clear ${lg.clear}, partially_obscured ${lg.partially_obscured}, illegible ${lg.illegible}, unreported ${lg.unreported}`);
   console.log(`    Post-validator rejections:                    type-mismatch ${report.typeMismatches}, ungrounded ${report.ungrounded}, pass-disagreement ${report.passDisagreement}`);
-  console.log(`    Extra API calls (two-pass on image-only docs): ${report.extraCalls}`);
+  console.log(`    Extra API calls (2nd/3rd passes, retries):    ${report.extraCalls}`);
+  console.log(`    Values rescued by 2-of-3 majority:            ${report.majorityResolved}   (vs ${report.passDisagreement} still withheld)`);
+  console.log(`    Dropout retries that recovered:               ${report.dropoutRecovered}`);
   console.log(`    Refusals (distinct from extracted-nothing):   ${report.refusals}`);
   console.log(`    Usable-document rate:                         ${pct(report.usableRate)}`);
   console.log(`    Median latency:                               ${report.medianLatencyMs} ms`);
