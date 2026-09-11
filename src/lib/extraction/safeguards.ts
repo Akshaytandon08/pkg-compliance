@@ -41,6 +41,12 @@ function sameValue(a: string | null | undefined, b: string | null | undefined): 
   return na === nb;
 }
 
+/** A text-layer document that returns almost nothing has dropped out: the model
+ *  answered "succeeded" with an empty or near-empty claim set even though the
+ *  document demonstrably has text. Observed on tiers A/B at 0-2 claims where a
+ *  healthy read gives ~19. Below this many claims we retry once. */
+export const DROPOUT_CLAIM_FLOOR = 3;
+
 export interface SafeguardCounts {
   /** Verdict-driving values rejected because their quoted span is not in the document. */
   ungrounded: number;
@@ -50,6 +56,10 @@ export interface SafeguardCounts {
   mode: "grounding" | "two_pass" | "none";
   /** Extra API calls this document cost beyond one. */
   extraCalls: number;
+  /** Set when a near-empty text-layer read was retried (Commit 6). */
+  dropoutRetry?: { claimsBefore: number; claimsAfter: number; recovered: boolean };
+  /** Values a third pass settled by 2-of-3 majority (Commit 7). */
+  majorityResolved?: number;
 }
 
 /** Reject any verdict-driving value whose quoted snippet is absent from the text. */
@@ -97,6 +107,53 @@ export function reconcilePasses(
   return { claims, disagreements };
 }
 
+/**
+ * Majority vote across N reads of the same document (Commit 7). Two passes can
+ * only ever say "these disagree" — which is safe but throws away a value even
+ * when one read was simply wrong and the other two agree. A third pass turns the
+ * common case into a decision: 2-of-3 carries, and only a genuine three-way
+ * split is withheld.
+ *
+ * Structure follows the first pass; only verdict-driving values are voted on.
+ */
+export function reconcileMajority(passes: ExtractedClaimDraft[][]): {
+  claims: ExtractedClaimDraft[];
+  resolved: number;
+  split: number;
+} {
+  const byField = passes.map((p) => {
+    const m = new Map<string, ExtractedClaimDraft>();
+    for (const c of p) m.set(fieldKey(c), c);
+    return m;
+  });
+  let resolved = 0;
+  let split = 0;
+  const claims = passes[0].map((c) => {
+    if (c.value == null || !isVerdictDriving(c)) return c;
+    const key = fieldKey(c);
+    // Tally normalised values, remembering one original spelling for each.
+    const tally = new Map<string, { count: number; original: string }>();
+    for (const m of byField) {
+      const v = m.get(key)?.value;
+      if (v == null) continue;
+      const norm = v.toLowerCase().replace(/\s+/g, " ").trim();
+      const entry = tally.get(norm) ?? { count: 0, original: v };
+      entry.count++;
+      tally.set(norm, entry);
+    }
+    let best: { count: number; original: string } | undefined;
+    for (const e of tally.values()) if (!best || e.count > best.count) best = e;
+    if (best && best.count >= 2) {
+      resolved++;
+      // Adopt the majority reading, which may not be this pass's own.
+      return best.original === c.value ? c : { ...c, value: best.original };
+    }
+    split++;
+    return { ...c, value: null, rejectedValue: c.value, validation: "pass_disagreement" as const };
+  });
+  return { claims, resolved, split };
+}
+
 export interface SafeguardedResult extends ExtractionResult {
   safeguards: SafeguardCounts;
 }
@@ -109,8 +166,12 @@ export interface SafeguardedResult extends ExtractionResult {
 export async function extractWithSafeguards(
   provider: ExtractionProvider,
   input: ExtractionInput,
+  /** Injected for tests: the real text-layer reader needs a real PDF, and the
+   *  branch it selects is the whole point of this function. */
+  deps: { readTextLayer?: typeof extractTextLayer } = {},
 ): Promise<SafeguardedResult> {
-  const textLayer = await extractTextLayer(input.bytes, input.contentType);
+  const readTextLayer = deps.readTextLayer ?? extractTextLayer;
+  const textLayer = await readTextLayer(input.bytes, input.contentType);
   const first = await provider.extract(input);
 
   if (first.status !== "succeeded") {
@@ -118,8 +179,39 @@ export async function extractWithSafeguards(
   }
 
   if (textLayer) {
-    const { claims, ungrounded } = groundClaims(first.claims, textLayer);
-    return { ...first, claims, safeguards: { ungrounded, passDisagreement: 0, mode: "grounding", extraCalls: 0 } };
+    // RETRY-ON-EMPTY (Commit 6). A document with a real text layer that comes
+    // back with almost no claims has dropped out, not been read. Retrying is
+    // cheap because it fires only on failure — the healthy path costs nothing —
+    // and it targets the actual cause of the mill_declaration instability, which
+    // two-pass could never reach (two-pass is image-only).
+    let chosen = first;
+    let dropoutRetry: SafeguardCounts["dropoutRetry"];
+    let extraCalls = 0;
+    // Tokens spent across every call made for this document. A retry costs money
+    // even when its result is discarded, so it is always counted — understating
+    // spend would quietly defeat the budget ceiling.
+    const usage = { inputTokens: first.usage.inputTokens, outputTokens: first.usage.outputTokens };
+    if (first.claims.length < DROPOUT_CLAIM_FLOOR) {
+      const retry = await provider.extract(input);
+      extraCalls = 1;
+      usage.inputTokens += retry.usage.inputTokens;
+      usage.outputTokens += retry.usage.outputTokens;
+      const before = first.claims.length;
+      const after = retry.status === "succeeded" ? retry.claims.length : 0;
+      // Keep the better read. A retry that also drops out leaves the original.
+      if (retry.status === "succeeded" && retry.claims.length > first.claims.length) chosen = retry;
+      dropoutRetry = { claimsBefore: before, claimsAfter: after, recovered: after >= DROPOUT_CLAIM_FLOOR };
+      console.warn(
+        `DROPOUT_RETRY textLayerChars=${textLayer.length} claimsBefore=${before} claimsAfter=${after} recovered=${dropoutRetry.recovered}`,
+      );
+    }
+    const { claims, ungrounded } = groundClaims(chosen.claims, textLayer);
+    return {
+      ...chosen,
+      claims,
+      usage,
+      safeguards: { ungrounded, passDisagreement: 0, mode: "grounding", extraCalls, dropoutRetry },
+    };
   }
 
   // Image-only: no text to ground against, so read it twice.
@@ -139,15 +231,49 @@ export async function extractWithSafeguards(
       safeguards: { ungrounded: 0, passDisagreement: disagreements, mode: "two_pass", extraCalls: 1 },
     };
   }
-  const { claims, disagreements } = reconcilePasses(first.claims, second.claims);
+  // Two passes tell us WHETHER they disagree. Only if they do is a third pass
+  // worth paying for — on a document both reads agree on it would buy nothing.
+  const twoPass = reconcilePasses(first.claims, second.claims);
+  const usage = {
+    inputTokens: first.usage.inputTokens + second.usage.inputTokens,
+    outputTokens: first.usage.outputTokens + second.usage.outputTokens,
+  };
+  if (twoPass.disagreements === 0) {
+    return {
+      ...first,
+      claims: twoPass.claims,
+      usage,
+      latencyMs: first.latencyMs + second.latencyMs,
+      safeguards: { ungrounded: 0, passDisagreement: 0, mode: "two_pass", extraCalls: 1, majorityResolved: 0 },
+    };
+  }
+
+  const third = await provider.extract(input);
+  usage.inputTokens += third.usage.inputTokens;
+  usage.outputTokens += third.usage.outputTokens;
+  if (third.status !== "succeeded") {
+    // No third opinion available — fall back to withholding every disputed value.
+    return {
+      ...first,
+      claims: twoPass.claims,
+      usage,
+      latencyMs: first.latencyMs + second.latencyMs + third.latencyMs,
+      safeguards: { ungrounded: 0, passDisagreement: twoPass.disagreements, mode: "two_pass", extraCalls: 2, majorityResolved: 0 },
+    };
+  }
+  const majority = reconcileMajority([first.claims, second.claims, third.claims]);
   return {
     ...first,
-    claims,
-    usage: {
-      inputTokens: first.usage.inputTokens + second.usage.inputTokens,
-      outputTokens: first.usage.outputTokens + second.usage.outputTokens,
+    claims: majority.claims,
+    usage,
+    latencyMs: first.latencyMs + second.latencyMs + third.latencyMs,
+    safeguards: {
+      ungrounded: 0,
+      passDisagreement: majority.split,
+      mode: "two_pass",
+      extraCalls: 2,
+      // Values a lone third read rescued from being withheld.
+      majorityResolved: Math.max(0, twoPass.disagreements - majority.split),
     },
-    latencyMs: first.latencyMs + second.latencyMs,
-    safeguards: { ungrounded: 0, passDisagreement: disagreements, mode: "two_pass", extraCalls: 1 },
   };
 }

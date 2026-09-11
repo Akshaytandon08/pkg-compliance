@@ -97,3 +97,109 @@ test("metadata is not cross-checked across passes", () => {
   assert.equal(disagreements, 0);
   assert.equal(claims[0].value, "SYN/1");
 });
+
+// --- Commit 6: retry-on-empty (offline, fake provider) ----------------------
+
+import { extractWithSafeguards, DROPOUT_CLAIM_FLOOR } from "../src/lib/extraction/safeguards.ts";
+import type { ExtractionProvider, ExtractionResult } from "../src/lib/extraction/types.ts";
+
+function result(claims: number, tokens = 100): ExtractionResult {
+  return {
+    status: "succeeded", provider: "fake", model: "fake", promptVersion: "t",
+    claims: Array.from({ length: claims }, (_, i) => claim({ parameter: `p${i}`, value: `${i}`, sourceSnippet: `p${i}` })),
+    usage: { inputTokens: tokens, outputTokens: tokens }, latencyMs: 1,
+  };
+}
+/** A provider that returns a scripted sequence of results, one per call. */
+function scripted(...results: ExtractionResult[]): ExtractionProvider & { calls: number } {
+  let i = 0;
+  return {
+    name: "fake", model: "fake", calls: 0,
+    async extract() { this.calls = ++i; return results[Math.min(i - 1, results.length - 1)]; },
+  } as ExtractionProvider & { calls: number };
+}
+const pdf = { docClass: "mill_declaration" as const, bytes: new Uint8Array([1]), contentType: "application/pdf" as const, scanned: false };
+
+const withText = (text: string) => ({ readTextLayer: async () => text });
+
+test("a near-empty read of a text-layer document is retried once and recovers", async () => {
+  const provider = scripted(result(0), result(5));
+  const out = await extractWithSafeguards(provider, pdf, withText("p0 p1 p2 p3 p4 ".repeat(40)));
+  assert.equal(provider.calls, 2, "the dropout must trigger exactly one retry");
+  assert.equal(out.safeguards.extraCalls, 1);
+  assert.deepEqual(out.safeguards.dropoutRetry, { claimsBefore: 0, claimsAfter: 5, recovered: true });
+  assert.equal(out.claims.length, 5, "the better read is kept");
+  // Both calls are paid for, even though one result was discarded.
+  assert.equal(out.usage.inputTokens, 200);
+});
+
+test("a healthy read is never retried — the retry costs nothing on the happy path", async () => {
+  const provider = scripted(result(DROPOUT_CLAIM_FLOOR));
+  const out = await extractWithSafeguards(provider, pdf, withText("p0 p1 p2 p3 p4 ".repeat(40)));
+  assert.equal(provider.calls, 1);
+  assert.equal(out.safeguards.extraCalls, 0);
+  assert.equal(out.safeguards.dropoutRetry, undefined);
+});
+
+test("a retry that also drops out keeps the original and is still charged", async () => {
+  const provider = scripted(result(2), result(0));
+  const out = await extractWithSafeguards(provider, pdf, withText("p0 p1 p2 ".repeat(40)));
+  assert.equal(out.claims.length, 2, "the original (better) read is kept");
+  assert.equal(out.safeguards.dropoutRetry?.recovered, false);
+  assert.equal(out.usage.inputTokens, 200, "the discarded retry is still paid for");
+});
+
+// --- Commit 7: majority tiebreak --------------------------------------------
+
+import { reconcileMajority } from "../src/lib/extraction/safeguards.ts";
+
+const img = { docClass: "mill_declaration" as const, bytes: new Uint8Array([1]), contentType: "image/jpeg" as const, scanned: true };
+const noText = { readTextLayer: async () => null };
+
+test("2-of-3 agreement carries the value", () => {
+  const a = [claim({ value: "55" })], b = [claim({ value: "25" })], c = [claim({ value: "55" })];
+  const out = reconcileMajority([a, b, c]);
+  assert.equal(out.claims[0].value, "55");
+  assert.equal(out.resolved, 1);
+  assert.equal(out.split, 0);
+});
+
+test("the majority reading wins even when the first pass was the odd one out", () => {
+  const a = [claim({ value: "25" })], b = [claim({ value: "55" })], c = [claim({ value: "55" })];
+  const out = reconcileMajority([a, b, c]);
+  assert.equal(out.claims[0].value, "55", "adopts the majority, not pass 1");
+});
+
+test("a genuine three-way split is still withheld", () => {
+  const a = [claim({ value: "25" })], b = [claim({ value: "55" })], c = [claim({ value: "95" })];
+  const out = reconcileMajority([a, b, c]);
+  assert.equal(out.claims[0].value, null);
+  assert.equal(out.claims[0].validation, "pass_disagreement");
+  assert.equal(out.split, 1);
+});
+
+test("a third pass is only paid for when the first two disagree", async () => {
+  const agree = scripted(result(3), result(3));
+  const outAgree = await extractWithSafeguards(agree, img, noText);
+  assert.equal(agree.calls, 2, "agreement must not buy a third opinion");
+  assert.equal(outAgree.safeguards.extraCalls, 1);
+
+  // Disagreeing values on a verdict-driving field → third pass.
+  const r1: ExtractionResult = { ...result(1), claims: [claim({ value: "25" })] };
+  const r2: ExtractionResult = { ...result(1), claims: [claim({ value: "55" })] };
+  const r3: ExtractionResult = { ...result(1), claims: [claim({ value: "55" })] };
+  const disagree = scripted(r1, r2, r3);
+  const out = await extractWithSafeguards(disagree, img, noText);
+  assert.equal(disagree.calls, 3);
+  assert.equal(out.safeguards.extraCalls, 2);
+  assert.equal(out.claims[0].value, "55", "rescued by 2-of-3");
+  assert.equal(out.safeguards.majorityResolved, 1);
+  assert.equal(out.safeguards.passDisagreement, 0);
+});
+
+test("metadata is never voted on", () => {
+  const m = (v: string) => [claim({ claimType: "document_reference", parameter: "ref", value: v })];
+  const out = reconcileMajority([m("A"), m("B"), m("C")]);
+  assert.equal(out.claims[0].value, "A");
+  assert.equal(out.split, 0);
+});
