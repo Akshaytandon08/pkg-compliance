@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { getAssessment, loadCorpusAsOf } from "@/db/assessments";
 import { getOrganisation } from "@/db/organisations";
-import { loadEmissionFactors } from "@/db/factors";
+import { pinnedFactorSet } from "@/db/factors";
 import { listClaimsForAssessment } from "@/db/claims";
 import { doCDraftEligibility } from "@/db/generate-doc-draft";
 import { listDrafts } from "@/db/doc-drafts";
@@ -17,7 +17,7 @@ import { PCF_DISCLAIMER, SCREENING_DISCLAIMER } from "@/lib/report/language";
 import { StatusChip, toChipStatus } from "@/app/_components/StatusChip";
 import { Breadcrumbs } from "@/app/_components/Breadcrumbs";
 import { getAllGuidance } from "@/db/guidance";
-import { RULE_REFERENCE_TOOLTIP, factorSourceLabel, preparedForLine, ruleReference } from "@/lib/report/labels";
+import { NO_FACTOR_LABEL, RULE_REFERENCE_TOOLTIP, factorSourceLabel, preparedForLine, ruleReference } from "@/lib/report/labels";
 import { buildRuleRows, toEvidenceRelied, type ClaimSummary } from "@/lib/report/ruleRows";
 import { RuleTable } from "./RuleTable";
 import { EvidenceList } from "./EvidenceList";
@@ -112,13 +112,13 @@ function FootprintCard({ footprint }: { footprint: ReturnType<typeof computePack
                 <td className="py-1 pr-3">{c.line}. {c.name}</td>
                 <td className="py-1 pr-3 whitespace-nowrap">{c.massKg != null ? `${Number((c.massKg).toPrecision(3))} kg` : "—"}</td>
                 <td className="py-1 pr-3 whitespace-nowrap">{c.factor ? `${c.factor.factor} ${c.factor.unit}` : "—"}</td>
-                <td className="py-1 pr-3">{c.factor ? factorSourceLabel(c.factor) : "—"}</td>
+                <td className="py-1 pr-3">{c.factor ? factorSourceLabel(c.factor) : NO_FACTOR_LABEL}</td>
                 <td className="py-1 pr-3 text-right whitespace-nowrap">
                   {c.kgCo2e != null
                     ? Number(c.kgCo2e.toPrecision(3))
                     : c.unresolvedReason === "no_weight"
                       ? "no weight"
-                      : "no factor"}
+                      : "excluded"}
                 </td>
               </tr>
             ))}
@@ -136,7 +136,9 @@ function FootprintCard({ footprint }: { footprint: ReturnType<typeof computePack
       </div>
       {footprint.unresolved.length > 0 && (
         <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
-          Excluded from the total (no weight or no emission factor on file): {footprint.unresolved.join(", ")}.
+          Excluded from the total: {footprint.unresolved.join(", ")}. A component is excluded when it
+          has no weight, or when no emission factor has been selected for its material — the total
+          below is therefore a partial figure, not a whole-pack one.
         </p>
       )}
     </section>
@@ -233,7 +235,9 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
   // organisations existed — the header then says so rather than inventing one.
   const organisation = assessment.organisationId ? await getOrganisation(assessment.organisationId) : null;
 
-  const factors = await loadEmissionFactors();
+  // PINNED at first evaluation: re-opening this report after the owner selects a
+  // better factor must not silently move the number that was reported.
+  const factors = await pinnedFactorSet(assessment.id);
   const footprint = computePackFootprint(
     assessment.components.map((c) => ({ line: c.line, name: c.name, material: c.material, weightGrams: c.weightGrams })),
     factors,

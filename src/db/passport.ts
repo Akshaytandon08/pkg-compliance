@@ -4,7 +4,7 @@ import { db } from "./index.ts";
 import { passports } from "./schema.ts";
 import { getAssessment, loadCorpusAsOf, type LoadedAssessment } from "./assessments.ts";
 import { getOrganisation } from "./organisations.ts";
-import { loadEmissionFactors } from "./factors.ts";
+import { pinnedFactorSet } from "./factors.ts";
 import { evaluatePack } from "../lib/engine/pack.ts";
 import { computePackFootprint } from "../lib/engine/pcf.ts";
 
@@ -98,7 +98,7 @@ function splitCitation(citation: string): { text: string; url: string | null } {
 export async function buildPassportPayload(assessment: LoadedAssessment): Promise<PassportPayload> {
   const corpus = await loadCorpusAsOf(assessment.corpusVersion); // in_force only — no drafts
   const org = assessment.organisationId ? await getOrganisation(assessment.organisationId) : null;
-  const factors = await loadEmissionFactors();
+  const factors = await pinnedFactorSet(assessment.id);
   const report = evaluatePack({
     checkpoints: corpus,
     context: assessment.context,

@@ -16,7 +16,6 @@ draft DoC.
 ```bash
 docker compose up -d          # Postgres (host port 5433)
 npm run db:migrate            # ensure schema is current
-npm run seed:factors          # emission factors for the footprint
 npm run seed:demo-suite       # (re)seed three packs + three organisations — idempotent
 npm run dev                   # http://localhost:3000
 ```
@@ -65,11 +64,20 @@ expected, since that is the document the next segment drafts. PFAS shows **N/A**
 (non-food).
 
 Then the **Cradle-to-gate footprint (screening-grade)** card: per-component mass ×
-emission factor with a pack total. Every row states its provenance — a sourced
-factor names its source and data-quality tier; an unsourced one reads **"Screening
-factor — indicative"** and names nothing, because there is nothing to name. Say it
-plainly: these are indicative factors, this is a screening estimate, it is not
-audit-level and not independently assured, and **no LLM touches the number**.
+emission factor with a pack total. Every row states its provenance — publisher and
+dataset, region, year and tier. A material the owner has not selected a factor for
+reads **"No factor selected"**, is excluded from the total, and the card says the
+total is therefore partial.
+
+> **Before the demo:** the seeded order-of-magnitude factors were removed in
+> Sprint 9. Until the owner runs `npm run factors:select` for the demo materials,
+> this card shows "No factor selected" on every row and a zero total. Shortlist
+> with `npm run factors:candidates -- --all`, then select. That is the honest
+> state, and it is a better thing to show than a number nobody chose — but decide
+> which you want before you are in front of the customer.
+
+Say it plainly: this is a screening estimate, it is not audit-level and not
+independently assured, and **no LLM touches the number**.
 
 ## 4 — The draft declaration of conformity (4 min)
 

@@ -6,6 +6,19 @@ Correct behaviour when asked to approve/reject/verify: **print the exact command
 
 (Recorded incident: on 2026-08-11 Claude executed the batch-1 `corpus:approve` pass on the user's explicit instruction. That was wrong under this rule. The approvals stand; the rule prevents recurrence. See the plan's Decision log.)
 
+# Emission-factor selection — HUMAN-ONLY
+
+`npm run factors:select` is **HUMAN-ONLY**, for the same reason and under the same
+rule as the corpus commands above. Choosing which emission factor represents a
+customer's material is a modelling judgement that gets printed next to their
+product and carried into a public passport; it is a human act of sign-off, not a
+task to save time on. Instruction wording does not override this.
+
+Correct behaviour when asked to select a factor: **print the exact command(s)**
+for the owner to run themselves, and stop. Read-only tooling is fine to run:
+`npm run factors:candidates` (Climatiq search — writes nothing) and
+`npm run factors:list` (the store's audit view).
+
 # Migrations — one branch adds, the second renumbers
 
 Drizzle migrations are numbered sequentially (`0034_…`, `0035_…`) with a shared

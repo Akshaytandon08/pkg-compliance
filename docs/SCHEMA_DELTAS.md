@@ -243,3 +243,61 @@ same way, matching the existing evidence-reference convention.
 the declarant fields must be **optional** in the persisted shape: an older
 passport with no declarant block has to keep parsing and keep verifying against
 its stored hash.
+
+## 14. An emission factor had no provenance and nobody had chosen it — RESOLVED, implemented
+
+**The gap.** `emission_factors` held a number, a free-text `source`, a year, a
+geography and a tier. Every row in it was seeded: tier `SEED-ESTIMATE`, source
+"placeholder — replace with Fitsol/primary EF", value an order of magnitude. That
+was honest in its labelling and wrong in its effect — every pack rendered a
+complete-looking footprint that nobody had chosen, from a number nobody could
+trace, and the total summed legs of exactly that kind.
+
+Three things the old shape could not express: **which dataset** a value came from
+(`ecoinvent 3.10 cut-off` is checkable; `ecoinvent` is not), **when it was
+pulled** (databases are revised, and a factor is a snapshot), and **who decided**
+it should represent this material.
+
+**The shape.**
+
+| Added | Why |
+|---|---|
+| `source_dataset`, `activity_id` | The publisher plus the specific row within it. `activity_id` is the provider's stable identifier, so a reviewer can re-open the exact record |
+| `region` (replaces `geography`), `year` | Applicability of the value. Renamed because every provider calls it region |
+| `methodology` | GWP set and system boundary — two factors for "corrugated" are not comparable without it |
+| `retrieved_at` | A factor is a dated snapshot of a database, not a constant |
+| `licence_note`, `value_display_permitted` | What the dataset's terms say about republishing the value, and whether they permit it on the PUBLIC passport |
+| `selected_by`, `selected_at` | Selection is a human act. The row records whose |
+| `version` | Selecting a new factor APPENDS; it never overwrites |
+| `tier` (replaces `data_quality`) | `primary` \| `secondary_database` \| `none` |
+
+**`SEED-ESTIMATE` is removed, and so are its rows** (migration `0039`). A material
+with no selected factor now renders **"No factor selected"** and is excluded from
+the total with a visible note saying the total is therefore partial. A number
+nobody can trace is worse than no number: the first looks like an answer.
+
+**`none` is a decision, not a gap.** A row on tier `none` records that the owner
+searched and chose nothing. It resolves exactly like an absent row — and it
+deliberately blocks the parent-material fallback, so an explicit "no factor for
+`wood_processed`" is not quietly rescued by the `wood` factor.
+
+**`primary` outranks `secondary_database`, regardless of version.** Fitsol's own
+measured data beats a published average even when the average was selected later.
+Recency is not authority.
+
+**Pinning: `assessment_factor_pins` + `assessments.factors_pinned_at`.** A
+screening is a dated artefact, so a report re-opened after the owner selects a
+better factor must still show the number it reported. The first evaluation pins
+the exact factor rows it used; every later render reads those rows back. The
+timestamp column exists because an empty pin set is otherwise ambiguous —
+"never evaluated" and "evaluated, and nothing was selected" must not look alike,
+or the second would silently re-pin later. The pin FK is `ON DELETE RESTRICT`: a
+factor an assessment was evaluated against cannot be deleted out from under it.
+
+**Two migrations, not one.** `0039` deletes the rows and drops the legacy columns;
+`0040` adds the provenance columns and the pin table. That order is what lets
+`tier`, `region` and `selected_by` be `NOT NULL` without a fabricated backfill —
+there is no honest value to put in them for a row that was never chosen by anyone.
+
+**Vocabulary as `text`, not `pgEnum`** (`FACTOR_TIERS` in `src/lib/vocab.ts`),
+consistent with the rest of the schema.

@@ -1,15 +1,19 @@
 // Screening-grade PCF: deterministic arithmetic, pinned against the golden pack.
-// Uses a local copy of the SEED-ESTIMATE factors (the harness pin) so the golden
-// pack's expected footprint is fixed — if the seed factors change, this test is
-// updated deliberately.
+// The factors here are a LOCAL FIXTURE, not the store — the arithmetic is what is
+// being pinned, so it must not move when the owner selects a different factor.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { computePackFootprint, type EmissionFactor } from "../src/lib/engine/pcf.ts";
 
-const ef = (material: string, process: string, factor: number, unit: string): EmissionFactor => ({
-  material, process, factor, unit,
-  source: "SEED-ESTIMATE (placeholder — replace with Fitsol/primary EF)",
-  year: 2024, geography: "GLOBAL", dataQuality: "SEED-ESTIMATE",
+let nextId = 1;
+const ef = (
+  material: string, process: string, factor: number, unit: string,
+  over: Partial<EmissionFactor> = {},
+): EmissionFactor => ({
+  id: nextId++, material, process, version: 1, factor, unit,
+  tier: "secondary_database", source: "Fixture DB", sourceDataset: "fixture 1.0",
+  activityId: `fixture-${material}-${process}`, region: "GLOBAL", year: 2024,
+  methodology: "cradle-to-gate", licenceNote: null, valueDisplayPermitted: false, ...over,
 });
 
 const FACTORS: EmissionFactor[] = [
@@ -41,7 +45,7 @@ test("golden pack cradle-to-gate footprint is pinned (7.865 kg CO2e)", () => {
   // Spot-check the heaviest leg (the wood pallet).
   const pallet = fp.components.find((c) => c.material === "wood")!;
   near(pallet.kgCo2e!, 6.0, "pallet");
-  assert.equal(pallet.factor?.dataQuality, "SEED-ESTIMATE");
+  assert.equal(pallet.factor?.tier, "secondary_database");
 });
 
 test("a component with no weight is unresolved, not zeroed", () => {

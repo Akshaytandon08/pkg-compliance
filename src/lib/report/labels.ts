@@ -340,21 +340,28 @@ export function preparedForLine(org: {
 
 // --- emission factors -------------------------------------------------------
 
-/** The tier that means "we have no sourced factor for this material, only an
- *  order-of-magnitude estimate". Seeded rows carry it; a real factor does not. */
-export const SEED_ESTIMATE_TIER = "SEED-ESTIMATE";
+/** What a material with no selected factor reads as. Sprint 9 removed the seeded
+ *  order-of-magnitude tier, so this is now a real and common state: the honest
+ *  answer is that nobody has chosen a factor, not a number nobody can trace. */
+export const NO_FACTOR_LABEL = "No factor selected";
+
+const TIER_LABEL: Record<string, string> = {
+  primary: "Primary (Fitsol)",
+  secondary_database: "Secondary database",
+  none: NO_FACTOR_LABEL,
+};
+
+/** "secondary_database" → "Secondary database". */
+export function factorTierLabel(tier: string): string {
+  return TIER_LABEL[tier] ?? humanise(tier);
+}
 
 /**
- * How a factor's provenance reads on the report.
- *
- * A SOURCED factor names its source and tier, because that is what makes the
- * number checkable. A seeded estimate names NEITHER — there is no source to
- * name, and printing an internal instruction to ourselves ("replace with
- * Fitsol/primary EF") in a customer's provenance column tells them nothing about
- * their packaging and everything about our backlog. It says what the number is:
- * indicative, not sourced.
+ * How a factor's provenance reads on the report: the publisher, and the dataset
+ * within it when they differ. A factor is only checkable if a reader can find
+ * the row it came from, which is what the dataset name is for.
  */
-export function factorSourceLabel(factor: { source: string; dataQuality: string }): string {
-  if (factor.dataQuality === SEED_ESTIMATE_TIER) return "Screening factor — indicative";
-  return `${factor.source} · ${factor.dataQuality}`;
+export function factorSourceLabel(factor: { source: string; sourceDataset?: string | null }): string {
+  if (!factor.sourceDataset || factor.sourceDataset === factor.source) return factor.source;
+  return `${factor.source} / ${factor.sourceDataset}`;
 }

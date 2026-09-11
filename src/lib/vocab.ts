@@ -41,6 +41,13 @@ export const LEGAL_ROLES = [
   "epr_producer",
 ] as const;
 
+// Emission-factor provenance tiers. `none` is a RECORDED DECISION — the owner
+// searched and chose nothing — not the absence of a row; either way the material
+// renders "No factor selected" and is excluded from the footprint total.
+// `primary` (Fitsol's own data) outranks `secondary_database` when both exist.
+export const FACTOR_TIERS = ["primary", "secondary_database", "none"] as const;
+export type FactorTier = (typeof FACTOR_TIERS)[number];
+
 export const PACKAGING_LEVELS = [
   "sales",
   "inner",
