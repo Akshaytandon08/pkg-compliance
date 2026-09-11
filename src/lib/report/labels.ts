@@ -292,3 +292,69 @@ export function describeThreshold(t: {
   const parts = [t.parameter, symbol, t.value, t.unit].filter((p) => p !== null && p !== undefined && p !== "");
   return parts.join(" ").trim();
 }
+
+// --- the organisation a screening is prepared for ---------------------------
+
+const LEGAL_ROLE_LABEL: Record<string, string> = {
+  manufacturer: "Manufacturer",
+  importer: "Importer",
+  distributor: "Distributor",
+  epr_producer: "EPR producer",
+};
+
+/** "epr_producer" → "EPR producer". Unknown roles fall back to humanise(). */
+export function legalRoleLabel(role: string): string {
+  return LEGAL_ROLE_LABEL[role] ?? humanise(role);
+}
+
+/** "DE" → "Germany". Falls back to the code itself, which is still meaningful —
+ *  never to an empty string or a guess. */
+export function countryLabel(code: string): string {
+  const c = code.trim().toUpperCase();
+  if (c.length !== 2) return code;
+  try {
+    const name = new Intl.DisplayNames(["en"], { type: "region" }).of(c);
+    // ZZ is the reserved "unknown region" code and resolves to the words
+    // "Unknown Region" — which reads like data rather than like a bad code. Show
+    // the code itself instead; a reader can at least see what was entered.
+    return !name || /^unknown/i.test(name) ? c : name;
+  } catch {
+    return c;
+  }
+}
+
+/**
+ * "Prepared for" identity line: legal name · country · role. Parts the record
+ * does not hold are OMITTED rather than filled with a placeholder — a compliance
+ * document that invents an operator's role is worse than one that is silent.
+ */
+export function preparedForLine(org: {
+  legalName: string;
+  country: string;
+  roleDefault?: string | null;
+}): string {
+  return [org.legalName, countryLabel(org.country), org.roleDefault ? legalRoleLabel(org.roleDefault) : null]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+// --- emission factors -------------------------------------------------------
+
+/** The tier that means "we have no sourced factor for this material, only an
+ *  order-of-magnitude estimate". Seeded rows carry it; a real factor does not. */
+export const SEED_ESTIMATE_TIER = "SEED-ESTIMATE";
+
+/**
+ * How a factor's provenance reads on the report.
+ *
+ * A SOURCED factor names its source and tier, because that is what makes the
+ * number checkable. A seeded estimate names NEITHER — there is no source to
+ * name, and printing an internal instruction to ourselves ("replace with
+ * Fitsol/primary EF") in a customer's provenance column tells them nothing about
+ * their packaging and everything about our backlog. It says what the number is:
+ * indicative, not sourced.
+ */
+export function factorSourceLabel(factor: { source: string; dataQuality: string }): string {
+  if (factor.dataQuality === SEED_ESTIMATE_TIER) return "Screening factor — indicative";
+  return `${factor.source} · ${factor.dataQuality}`;
+}

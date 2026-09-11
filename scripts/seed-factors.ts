@@ -1,7 +1,8 @@
 // Seeds the emission_factors reference table from reference/emission_factors_seed.csv.
 // Idempotent: replaces the whole table each run (reference data, not user data).
-// Every seeded row is data_quality 'SEED-ESTIMATE' — a clearly-labelled
-// placeholder, never an invented authoritative source.
+// Every seeded row is data_quality 'SEED-ESTIMATE' and names no source, because
+// it has none. The report renders that tier as "Screening factor — indicative"
+// rather than naming a source it cannot name (see labels.ts factorSourceLabel).
 //   Run:  node --env-file=.env scripts/seed-factors.ts
 import { readFileSync } from "node:fs";
 import { db } from "../src/db/index.ts";
@@ -33,5 +34,5 @@ if (rows.some((r) => !Number.isFinite(r.factor) || !Number.isInteger(r.year))) {
 
 await db.delete(emissionFactors);
 await db.insert(emissionFactors).values(rows);
-console.log(`Seeded ${rows.length} emission factors (all SEED-ESTIMATE placeholders).`);
+console.log(`Seeded ${rows.length} emission factors (all SEED-ESTIMATE — indicative, unsourced).`);
 process.exit(0);

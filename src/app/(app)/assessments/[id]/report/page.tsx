@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { getAssessment, loadCorpusAsOf } from "@/db/assessments";
+import { getOrganisation } from "@/db/organisations";
 import { loadEmissionFactors } from "@/db/factors";
 import { listClaimsForAssessment } from "@/db/claims";
 import { doCDraftEligibility } from "@/db/generate-doc-draft";
@@ -16,7 +17,7 @@ import { PCF_DISCLAIMER, SCREENING_DISCLAIMER } from "@/lib/report/language";
 import { StatusChip, toChipStatus } from "@/app/_components/StatusChip";
 import { Breadcrumbs } from "@/app/_components/Breadcrumbs";
 import { getAllGuidance } from "@/db/guidance";
-import { RULE_REFERENCE_TOOLTIP, ruleReference } from "@/lib/report/labels";
+import { RULE_REFERENCE_TOOLTIP, factorSourceLabel, preparedForLine, ruleReference } from "@/lib/report/labels";
 import { buildRuleRows, toEvidenceRelied, type ClaimSummary } from "@/lib/report/ruleRows";
 import { RuleTable } from "./RuleTable";
 import { EvidenceList } from "./EvidenceList";
@@ -111,7 +112,7 @@ function FootprintCard({ footprint }: { footprint: ReturnType<typeof computePack
                 <td className="py-1 pr-3">{c.line}. {c.name}</td>
                 <td className="py-1 pr-3 whitespace-nowrap">{c.massKg != null ? `${Number((c.massKg).toPrecision(3))} kg` : "—"}</td>
                 <td className="py-1 pr-3 whitespace-nowrap">{c.factor ? `${c.factor.factor} ${c.factor.unit}` : "—"}</td>
-                <td className="py-1 pr-3">{c.factor ? `${c.factor.source} · ${c.factor.dataQuality}` : "—"}</td>
+                <td className="py-1 pr-3">{c.factor ? factorSourceLabel(c.factor) : "—"}</td>
                 <td className="py-1 pr-3 text-right whitespace-nowrap">
                   {c.kgCo2e != null
                     ? Number(c.kgCo2e.toPrecision(3))
@@ -126,7 +127,7 @@ function FootprintCard({ footprint }: { footprint: ReturnType<typeof computePack
                 <td className="py-1 pr-3">Inbound transport ({footprint.transport.mode}, {footprint.transport.km} km)</td>
                 <td className="py-1 pr-3 whitespace-nowrap">{Number(footprint.transport.massKg.toPrecision(3))} kg</td>
                 <td className="py-1 pr-3 whitespace-nowrap">{footprint.transport.factor.factor} {footprint.transport.factor.unit}</td>
-                <td className="py-1 pr-3">{footprint.transport.factor.source} · {footprint.transport.factor.dataQuality}</td>
+                <td className="py-1 pr-3">{factorSourceLabel(footprint.transport.factor)}</td>
                 <td className="py-1 pr-3 text-right whitespace-nowrap">{Number(footprint.transport.kgCo2e.toPrecision(3))}</td>
               </tr>
             )}
@@ -228,6 +229,10 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
   const bomMaterials = [...new Set(assessment.components.map((c) => c.material))];
   const obligations = buildObligationCalendar(corpus, assessment.context, bomMaterials, assessment.asOf);
 
+  // Who the screening is prepared FOR. Null on every assessment created before
+  // organisations existed — the header then says so rather than inventing one.
+  const organisation = assessment.organisationId ? await getOrganisation(assessment.organisationId) : null;
+
   const factors = await loadEmissionFactors();
   const footprint = computePackFootprint(
     assessment.components.map((c) => ({ line: c.line, name: c.name, material: c.material, weightGrams: c.weightGrams })),
@@ -261,8 +266,16 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
       <div id="summary" className="scroll-mt-4 rounded-lg border border-n50 bg-card p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-n800">{assessment.packName}</h1>
-            <p className="text-sm text-n500">Qualification screening report</p>
+            {/* The party carrying the obligation leads: a compliance document is
+                addressed to a legal person, and that is the first thing its
+                reader looks for. The pack is what was screened, not who for. */}
+            <p className="text-xs font-medium uppercase tracking-wide text-n500">Prepared for</p>
+            <h1 className="mt-0.5 text-xl font-semibold tracking-tight text-n800">
+              {organisation ? preparedForLine(organisation) : "No organisation recorded"}
+            </h1>
+            <p className="text-sm text-n500">
+              Qualification screening report — {assessment.packName}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             {assessment.demo && <StatusChip status="demo" />}
@@ -274,6 +287,11 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
           <div>As of: <span className="font-medium text-n700">{report.asOf}</span></div>
           <div>Assessment #{assessment.id}</div>
         </dl>
+        {/* Fitsol prepared the screening; it does not own the obligation and
+            does not certify anything. Byline, not headline. */}
+        <p className="mt-2 text-xs text-n500">
+          Prepared by <span className="font-medium text-n700">Fitsol</span> — screening tool operator.
+        </p>
         <p className="mt-3 border-t border-n50 pt-3 text-xs leading-relaxed text-n500">
           {SCREENING_DISCLAIMER}
         </p>
@@ -466,7 +484,7 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
                 <div className="text-right text-xs">
                   <p className="font-medium text-neutral-700 dark:text-neutral-300">{o.cadenceLabel}</p>
                   <p className="text-neutral-500">
-                    {o.nextDue ? `Next due ${o.nextDue}` : "Next due date to be confirmed"}
+                    {o.nextDue ? `Next due ${o.nextDue}` : "No fixed due date in the rule"}
                   </p>
                 </div>
               </li>

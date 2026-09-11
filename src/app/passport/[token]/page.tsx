@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getPassportByToken } from "@/db/passport";
 import { PCF_DISCLAIMER, SCREENING_DISCLAIMER } from "@/lib/report/language";
 import { StatusChip, toChipStatus } from "@/app/_components/StatusChip";
-import { RULE_REFERENCE_TOOLTIP, ruleReference, verdictAriaLabel, verdictLabel } from "@/lib/report/labels";
+import { RULE_REFERENCE_TOOLTIP, countryLabel, legalRoleLabel, ruleReference, verdictAriaLabel, verdictLabel } from "@/lib/report/labels";
 import { Wordmark } from "@/app/_components/Wordmark";
 
 // Public tier — reached without the access gate (see src/proxy.ts). Renders only
@@ -58,6 +58,13 @@ export default async function PassportPage({ params }: PageProps<"/passport/[tok
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Packaging compliance passport</p>
             <h1 className="mt-0.5 text-xl font-semibold tracking-tight">{p.packName}</h1>
+            {p.declarant && (
+              <p className="mt-0.5 text-sm text-neutral-600">
+                Declared by <span className="font-medium text-neutral-800">{p.declarant.legalName}</span>
+                {` · ${countryLabel(p.declarant.country)}`}
+                {p.declarant.role ? ` · ${legalRoleLabel(p.declarant.role)}` : ""}
+              </p>
+            )}
           </div>
           <StatusChip status={toChipStatus(p.overallVerdict)} />
         </div>
@@ -70,6 +77,31 @@ export default async function PassportPage({ params }: PageProps<"/passport/[tok
           {SCREENING_DISCLAIMER}
         </p>
       </div>
+
+      {/* Declarant registrations — per Member State. A producer register is a
+          PUBLIC register; showing the number here is how a reader checks the
+          operator is registered where it places packaging. Address and contact
+          details stay out of the public tier. */}
+      {p.declarant && (p.declarant.registrations?.length ?? 0) > 0 && (
+        <div className="rounded-lg border border-neutral-200 bg-white p-5">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+            Producer registrations
+          </h2>
+          <p className="mt-1 text-xs text-neutral-500">
+            Registration numbers held by {p.declarant.legalName}, per Member State. This screening
+            does not check them against the register.
+          </p>
+          <ul className="mt-3 space-y-1.5 text-sm">
+            {p.declarant.registrations!.map((r) => (
+              <li key={`${r.jurisdiction}-${r.registrationNumber}`} className="flex flex-wrap items-baseline gap-x-2">
+                <span className="font-medium">{countryLabel(r.jurisdiction)}</span>
+                <span className="font-mono text-xs text-neutral-700">{r.registrationNumber}</span>
+                <span className="text-xs text-neutral-500">{r.registerName ?? r.scheme}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
         <Count n={p.counts.qualified} label="Qualified" href="#cp-qualified" />

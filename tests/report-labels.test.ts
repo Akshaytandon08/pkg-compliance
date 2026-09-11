@@ -195,3 +195,60 @@ test("rendered HTML contains no enum token outside the muted reference line", li
 test("humanise is a last resort that still reads as English", () => {
   assert.equal(humanise("some_unmapped_token"), "Some unmapped token");
 });
+
+// --- COMMIT 3: no development placeholder reaches a customer surface --------
+
+import { factorSourceLabel, SEED_ESTIMATE_TIER } from "../src/lib/report/labels.ts";
+import { PCF_DISCLAIMER, SCREENING_DISCLAIMER } from "../src/lib/report/language.ts";
+
+// Words that belong in a backlog, not in front of a customer. "Placeholder" and
+// "replace with" describe OUR state of work; a reader wants to know what the
+// number is, not what we still intend to do about it.
+const DEV_PLACEHOLDER = /\bplaceholder\b|\breplace with\b|\bTODO\b|\bTBC\b|\bto be confirmed\b|\bcoming soon\b/i;
+
+test("a seeded factor reads as indicative and names no source — it has none", () => {
+  const label = factorSourceLabel({
+    source: "No primary source — order-of-magnitude estimate",
+    dataQuality: SEED_ESTIMATE_TIER,
+  });
+  assert.equal(label, "Screening factor — indicative");
+  assert.doesNotMatch(label, DEV_PLACEHOLDER);
+});
+
+test("a SOURCED factor names its source and tier — that is what makes it checkable", () => {
+  assert.equal(
+    factorSourceLabel({ source: "Ecoinvent 3.10", dataQuality: "secondary" }),
+    "Ecoinvent 3.10 · secondary",
+  );
+});
+
+test("the seeded factor CSV carries no instruction-to-ourselves in its source column", () => {
+  const csv = readFileSync(new URL("../reference/emission_factors_seed.csv", import.meta.url), "utf8");
+  for (const line of csv.trim().split("\n").slice(1)) {
+    const source = line.split(",")[4];
+    assert.doesNotMatch(source, DEV_PLACEHOLDER, `source column reads as a backlog note: ${source}`);
+  }
+});
+
+test("neither standing disclaimer describes our own unfinished work", () => {
+  assert.doesNotMatch(PCF_DISCLAIMER, DEV_PLACEHOLDER);
+  assert.doesNotMatch(SCREENING_DISCLAIMER, DEV_PLACEHOLDER);
+  // The PCF disclaimer must still say the factors are not sourced.
+  assert.match(PCF_DISCLAIMER, /indicative/i);
+});
+
+test("no rendered report or passport string carries a development placeholder", () => {
+  for (const file of [
+    "../src/app/(app)/assessments/[id]/report/page.tsx",
+    "../src/app/passport/[token]/page.tsx",
+  ]) {
+    const src = readFileSync(new URL(file, import.meta.url), "utf8");
+    // JSX text and string literals only — a code comment is not a customer surface.
+    const code = src
+      .split("\n")
+      .filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*") && !l.trim().startsWith("/*"))
+      .join("\n");
+    const hit = DEV_PLACEHOLDER.exec(code);
+    assert.equal(hit, null, `${file} renders "${hit?.[0]}"`);
+  }
+});

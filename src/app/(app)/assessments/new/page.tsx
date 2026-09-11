@@ -13,6 +13,7 @@ import {
   SPEC_DEFINED_BY,
 } from "@/lib/vocab";
 import { Breadcrumbs } from "@/app/_components/Breadcrumbs";
+import { OrganisationPicker } from "./OrganisationPicker";
 
 const input =
   "w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm shadow-sm focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900";
@@ -86,6 +87,7 @@ export default function NewAssessmentPage() {
   const [customVsStd, setCustomVsStd] = useState<string>(CUSTOM_VS_STANDARDISED[0]);
   const [specDefinedBy, setSpecDefinedBy] = useState<string>(SPEC_DEFINED_BY[0]);
   const [assessorName, setAssessorName] = useState("");
+  const [organisationId, setOrganisationId] = useState<number | null>(null);
 
   const [components, setComponents] = useState<ComponentRow[]>([emptyComponent()]);
 
@@ -120,6 +122,7 @@ export default function NewAssessmentPage() {
       packName,
       description: description || null,
       asOf,
+      organisationId,
       context: {
         destination_markets: allMarkets,
         destination_member_states: allDestinations,
@@ -200,6 +203,15 @@ export default function NewAssessmentPage() {
           are parsed — evidence is recorded as metadata only.
         </p>
       </div>
+
+      {/* Who the screening is FOR. First, because it is the first thing the
+          report says and the party every downstream artefact is addressed to. */}
+      <section className={card}>
+        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-neutral-500">
+          Organisation
+        </h2>
+        <OrganisationPicker value={organisationId} onChange={setOrganisationId} />
+      </section>
 
       {/* Assessment context */}
       <section className={card}>

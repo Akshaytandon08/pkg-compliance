@@ -16,8 +16,9 @@
 //   Run:  node --env-file=.env scripts/seed-demo-suite.ts
 import { inArray } from "drizzle-orm";
 import { db } from "../src/db/index.ts";
-import { assessments } from "../src/db/schema.ts";
+import { assessments, organisations } from "../src/db/schema.ts";
 import { createAssessment, type NewAssessment } from "../src/db/assessments.ts";
+import { createOrganisation, type NewOrganisation } from "../src/db/organisations.ts";
 
 const GOLDEN = "Client A — traction-cell (demo)";
 const CARTON = "Demo — corrugated export carton";
@@ -31,6 +32,76 @@ const supplierDeclaration = (component: string, material: string) => ({
   scopeComponents: [component],
   scopeMaterials: [material],
 });
+
+// The obligated economic operator each pack is screened FOR. A screening is
+// always prepared for a named legal person — that is what a declaration of
+// conformity is signed by and what an EPR register knows — so the demo packs
+// carry one rather than leaving the report header blank.
+//
+// SYNTHETIC-DEMO appears in the legal name itself, not only in the demo flag.
+// These names reach a draft declaration of conformity and the public passport's
+// declarant block, which are precisely the artefacts that must never be mistaken
+// for a real one; a marker on the name survives a screenshot or a PDF that has
+// been separated from its "Demonstration data" tag.
+const orgs: Record<string, NewOrganisation> = {
+  [GOLDEN]: {
+    legalName: `Meridian Cell Technologies Private Limited (${SD})`,
+    tradingName: "Meridian Cell",
+    country: "IN",
+    registeredAddress: `${SD} — Plot 14, Hosur Industrial Area, Karnataka 635109, India`,
+    primaryContact: "compliance@example.invalid",
+    // Non-EU manufacturer shipping into DE with no EU establishment: no EPR
+    // registration on file, which is part of what this pack demonstrates.
+    roleDefault: "manufacturer",
+    demo: true,
+  },
+  [CARTON]: {
+    legalName: `Rheinsolt Verpackungswerke GmbH (${SD})`,
+    tradingName: "Rheinsolt",
+    country: "DE",
+    registeredAddress: `${SD} — Industriestraße 8, 47051 Duisburg, Germany`,
+    primaryContact: "verpackung@example.invalid",
+    roleDefault: "epr_producer",
+    demo: true,
+    registrations: [
+      {
+        scheme: "epr_packaging",
+        registerName: "LUCID (Zentrale Stelle Verpackungsregister)",
+        registrationNumber: `${SD}-DE4102938475610`,
+        jurisdiction: "DE",
+        validFrom: "2024-01-15",
+      },
+    ],
+  },
+  [POUCH]: {
+    // A Dutch brand owner placing on the German market: establishment and EPR
+    // obligation sit in different Member States, which is the case the
+    // per-Member-State registration list exists for.
+    legalName: `Kestrel Foods Europe B.V. (${SD})`,
+    tradingName: "Kestrel Foods",
+    country: "NL",
+    registeredAddress: `${SD} — Havenweg 22, 3011 AB Rotterdam, Netherlands`,
+    primaryContact: "qa@example.invalid",
+    roleDefault: "epr_producer",
+    demo: true,
+    registrations: [
+      {
+        scheme: "epr_packaging",
+        registerName: "LUCID (Zentrale Stelle Verpackungsregister)",
+        registrationNumber: `${SD}-DE5820394857261`,
+        jurisdiction: "DE",
+        validFrom: "2023-06-01",
+      },
+      {
+        scheme: "epr_packaging",
+        registerName: "Stichting Verpact (Mijn Verpact)",
+        registrationNumber: `${SD}-NL-VPT-88214`,
+        jurisdiction: "NL",
+        validFrom: "2022-03-01",
+      },
+    ],
+  },
+};
 
 const packs: NewAssessment[] = [
   // 1. The anonymised golden run — evidence mostly absent (blocked by missing
@@ -220,10 +291,21 @@ const packs: NewAssessment[] = [
 // components + evidence), then recreate. demo data only — never touches a real
 // pack, whose name would not match.
 await db.delete(assessments).where(inArray(assessments.packName, [GOLDEN, CARTON, POUCH]));
+// Organisations are deleted second: assessments.organisation_id is ON DELETE SET
+// NULL, so removing them first would orphan rather than cascade.
+await db.delete(organisations).where(
+  inArray(
+    organisations.legalName,
+    Object.values(orgs).map((o) => o.legalName),
+  ),
+);
 
 for (const pack of packs) {
-  const id = await createAssessment(pack);
-  console.log(`Seeded demo #${id} — "${pack.packName}" (demo=true).`);
+  const organisationId = await createOrganisation(orgs[pack.packName]);
+  const id = await createAssessment({ ...pack, organisationId });
+  console.log(
+    `Seeded demo #${id} — "${pack.packName}" (demo=true), prepared for org #${organisationId}.`,
+  );
 }
 console.log("\nThree demo packs seeded. Open / to run the demo (see docs/DEMO_SCRIPT.md).");
 process.exit(0);

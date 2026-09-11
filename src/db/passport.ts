@@ -3,6 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "./index.ts";
 import { passports } from "./schema.ts";
 import { getAssessment, loadCorpusAsOf, type LoadedAssessment } from "./assessments.ts";
+import { getOrganisation } from "./organisations.ts";
 import { loadEmissionFactors } from "./factors.ts";
 import { evaluatePack } from "../lib/engine/pack.ts";
 import { computePackFootprint } from "../lib/engine/pcf.ts";
@@ -54,6 +55,21 @@ export type PassportPayload = {
   overallVerdict: string;
   checkpoints: PassportCheckpoint[];
   pcf: { totalKgCo2e: number; unit: string; resolvedComponents: number; unresolvedComponents: number };
+  // The obligated economic operator this passport is published for. OPTIONAL for
+  // the same reason as `upcoming`: passports are persisted and hash-chained, so
+  // versions minted before organisations existed carry no declarant and must
+  // still parse and verify. Absent means "not recorded", never "none".
+  //
+  // Identity and registration numbers only. An EPR registration number is a
+  // public register entry — that is what a register is for — while the operator's
+  // address and contact are NOT disclosed here: the public tier discloses the
+  // rule set and who carries it, not a company's correspondence details.
+  declarant?: {
+    legalName: string;
+    country: string;
+    role?: string | null;
+    registrations?: { jurisdiction: string; scheme: string; registerName?: string | null; registrationNumber: string }[];
+  };
 };
 
 // `upcoming` ranks with not_applicable: a requirement that does not yet apply must
@@ -81,6 +97,7 @@ function splitCitation(citation: string): { text: string; url: string | null } {
 
 export async function buildPassportPayload(assessment: LoadedAssessment): Promise<PassportPayload> {
   const corpus = await loadCorpusAsOf(assessment.corpusVersion); // in_force only — no drafts
+  const org = assessment.organisationId ? await getOrganisation(assessment.organisationId) : null;
   const factors = await loadEmissionFactors();
   const report = evaluatePack({
     checkpoints: corpus,
@@ -170,6 +187,23 @@ export async function buildPassportPayload(assessment: LoadedAssessment): Promis
     counts: report.counts,
     overallVerdict: report.overall.verdict,
     checkpoints,
+    // Omitted entirely when there is no organisation on file, so a passport with
+    // no declarant hashes exactly as it did before this field existed.
+    ...(org
+      ? {
+          declarant: {
+            legalName: org.legalName,
+            country: org.country,
+            role: org.roleDefault,
+            registrations: org.registrations.map((r) => ({
+              jurisdiction: r.jurisdiction,
+              scheme: r.scheme,
+              registerName: r.registerName,
+              registrationNumber: r.registrationNumber,
+            })),
+          },
+        }
+      : {}),
     pcf: {
       // Rounded to 3 sig figs so float noise never perturbs the content hash.
       totalKgCo2e: Number(footprint.totalKgCo2e.toPrecision(3)),
@@ -185,7 +219,16 @@ function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
   if (value && typeof value === "object") {
     const obj = value as Record<string, unknown>;
-    return `{${Object.keys(obj).sort().map((k) => `${JSON.stringify(k)}:${canonical(obj[k])}`).join(",")}}`;
+    // A key whose value is undefined is treated as ABSENT, exactly as JSON does.
+    // Optional fields are added to this payload over time (`upcoming`,
+    // `declarant`), and a caller that spreads one in as undefined must hash the
+    // same as an older payload that never had the key — otherwise the chain
+    // breaks on a field carrying no information.
+    return `{${Object.keys(obj)
+      .filter((k) => obj[k] !== undefined)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${canonical(obj[k])}`)
+      .join(",")}}`;
   }
   return JSON.stringify(value);
 }
@@ -207,6 +250,8 @@ function describeChange(prev: PassportPayload, next: PassportPayload): string {
   if (prev.pcf.totalKgCo2e !== next.pcf.totalKgCo2e)
     bits.push(`footprint ${prev.pcf.totalKgCo2e} → ${next.pcf.totalKgCo2e} kg CO2e`);
   if (prev.corpusVersion !== next.corpusVersion) bits.push(`corpus ${prev.corpusVersion} → ${next.corpusVersion}`);
+  if (prev.declarant?.legalName !== next.declarant?.legalName)
+    bits.push(`declarant ${prev.declarant?.legalName ?? "none"} → ${next.declarant?.legalName ?? "none"}`);
   return bits.length ? `Regenerated — ${bits.join("; ")}.` : "Regenerated — content changed.";
 }
 

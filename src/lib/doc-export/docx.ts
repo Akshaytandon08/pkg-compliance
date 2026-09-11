@@ -14,6 +14,7 @@ import {
   TextRun,
   WidthType,
 } from "docx";
+import { FIELD_PREFIX_BLANK, FIELD_PREFIX_FILLED } from "./model.ts";
 import type { DocBlock, DraftDocument } from "./model.ts";
 import { docxBrandFonts } from "./fonts.ts";
 
@@ -32,12 +33,15 @@ function heading(text: string, brand: DraftDocument["brand"]): Paragraph {
 }
 
 function fieldParagraph(label: string, value: string | undefined, brand: DraftDocument["brand"]): Paragraph {
+  const filled = !!value && value.length > 0;
   return new Paragraph({
     spacing: { before: 40, after: 80 },
-    shading: { type: ShadingType.CLEAR, fill: "D7F0E8" }, // p50 highlight — editable
+    shading: { type: ShadingType.CLEAR, fill: "D7F0E8" }, // p50 highlight — editable either way
     children: [
-      new TextRun({ text: "» To complete by the manufacturer: ", bold: true, color: brand.teal, size: 18 }),
-      new TextRun({ text: value && value.length > 0 ? value : label, italics: !value, color: brand.n600, size: 18 }),
+      // A pre-filled field stays highlighted and says "confirm before signing":
+      // the value came from an intake form, not from the register.
+      new TextRun({ text: filled ? FIELD_PREFIX_FILLED : FIELD_PREFIX_BLANK, bold: true, color: brand.teal, size: 18 }),
+      new TextRun({ text: filled ? value : label, italics: !filled, color: brand.n600, size: 18 }),
     ],
   });
 }

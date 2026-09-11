@@ -1,4 +1,5 @@
 import PDFDocument from "pdfkit";
+import { FIELD_PREFIX_BLANK, FIELD_PREFIX_FILLED } from "./model.ts";
 import type { DocBlock, DraftDocument } from "./model.ts";
 import { registerPdfBrandFonts, type BrandFontNames } from "./fonts.ts";
 
@@ -141,7 +142,10 @@ function renderBlock(doc: PDFKit.PDFDocument, block: DocBlock, brand: DraftDocum
 
 function renderField(doc: PDFKit.PDFDocument, label: string, brand: DraftDocument["brand"], f: BrandFontNames, placeholder = true) {
   doc.moveDown(0.15);
-  doc.font(f.bold).fontSize(9).fillColor(hex(brand.teal)).text("» To complete by the manufacturer: ", { continued: true });
+  // A PRE-FILLED field must not read like a blank one. What the tool holds came
+  // from an intake form, and this is a legal instrument — so a filled field says
+  // "confirm before signing", not "to complete".
+  doc.font(f.bold).fontSize(9).fillColor(hex(brand.teal)).text(placeholder ? FIELD_PREFIX_BLANK : FIELD_PREFIX_FILLED, { continued: true });
   doc.font(placeholder ? f.italic : f.regular).fillColor(hex(brand.n600)).text(label);
   doc.moveDown(0.25);
 }

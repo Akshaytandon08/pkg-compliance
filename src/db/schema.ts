@@ -358,6 +358,12 @@ export const assessments = pgTable("assessments", {
   // the public passport render a visible "Demonstration data" tag — a synthetic
   // pack must never be mistaken for a real screening.
   demo: boolean("demo").notNull().default(false),
+  // The obligated economic operator this screening is prepared FOR. Nullable:
+  // assessments created before organisations existed have none, and the intake
+  // must not be blocked on capturing one.
+  organisationId: integer("organisation_id").references(() => organisations.id, {
+    onDelete: "set null",
+  }),
 });
 
 export const assessmentComponents = pgTable("assessment_components", {
@@ -556,8 +562,9 @@ export const assessmentActivity = pgTable("assessment_activity", {
 // (material, process). Material-production rows carry a per-kg factor; transport
 // rows a per-kg·km factor (unit column disambiguates). Every row records its
 // source, year, geography and data-quality tier so each figure on the report can
-// show its provenance. Seed rows are marked data_quality 'SEED-ESTIMATE' — a
-// clearly-labelled placeholder, never dressed up as an authoritative source.
+// show its provenance. Seed rows carry data_quality 'SEED-ESTIMATE' and name no
+// source, because they have none — the report renders that tier as an indicative
+// screening factor rather than dressing it up as an authoritative one.
 export const emissionFactors = pgTable("emission_factors", {
   id: serial("id").primaryKey(),
   // Material vocab (corrugated|plastic|wood|metal) for production rows, or
@@ -571,7 +578,7 @@ export const emissionFactors = pgTable("emission_factors", {
   source: text("source").notNull(),
   year: integer("year").notNull(),
   geography: text("geography").notNull(),
-  // Provenance tier: 'SEED-ESTIMATE' (placeholder) | 'secondary' | 'primary'.
+  // Provenance tier: 'SEED-ESTIMATE' (indicative, unsourced) | 'secondary' | 'primary'.
   dataQuality: text("data_quality").notNull(),
   notes: text("notes"),
 });
@@ -682,3 +689,50 @@ export const documentDrafts = pgTable(
   // enforced structurally by the type itself (a CHECK against 'issued' is not even
   // expressible, since the literal is not a valid enum member).
 );
+
+// --- Organisations (Sprint 8) ---------------------------------------------
+// The obligated economic operator a screening is prepared FOR. Until now a report
+// named the pack but never the party carrying the obligation — the first thing a
+// reader of a compliance document looks for, and the party a Declaration of
+// Conformity is drawn up BY.
+//
+// Vocabularies (role_default, country, scheme) are TEXT, not enums, for the same
+// reason as the rest of this schema: a new role must not require a migration.
+export const organisations = pgTable("organisations", {
+  id: serial("id").primaryKey(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  legalName: text("legal_name").notNull(),
+  // The name it trades under, when that differs from the registered name.
+  tradingName: text("trading_name"),
+  country: text("country").notNull(), // ISO 3166-1 alpha-2
+  registeredAddress: text("registered_address"),
+  // Free text: a name, or a role mailbox. Deliberately NOT split into
+  // name/email/phone columns — a screening does not need a CRM, and every extra
+  // personal-data column is one more thing to justify holding.
+  primaryContact: text("primary_contact"),
+  // Default legal role (src/lib/vocab.ts LEGAL_ROLES). A given assessment's
+  // context can still derive a different role; this is the starting point.
+  roleDefault: text("role_default"),
+  // Fictional organisation seeded for the demo suite. Drives the same
+  // "Demonstration data" labelling as assessments.demo.
+  demo: boolean("demo").notNull().default(false),
+});
+
+// A producer/EPR registration held by an organisation, per jurisdiction. One row
+// per (scheme, jurisdiction): an operator placing packaging in five Member States
+// holds five registrations, and the passport discloses them per Member State.
+export const orgRegistrations = pgTable("org_registrations", {
+  id: serial("id").primaryKey(),
+  organisationId: integer("organisation_id")
+    .notNull()
+    .references(() => organisations.id, { onDelete: "cascade" }),
+  scheme: text("scheme").notNull(), // e.g. "EPR", "packaging register"
+  registerName: text("register_name"), // e.g. "LUCID", "SYDEREP"
+  registrationNumber: text("registration_number").notNull(),
+  jurisdiction: text("jurisdiction").notNull(), // ISO 3166-1 alpha-2 (Member State)
+  validFrom: date("valid_from"),
+  validTo: date("valid_to"),
+});
+
+export type OrganisationRow = typeof organisations.$inferSelect;
+export type OrgRegistrationRow = typeof orgRegistrations.$inferSelect;
