@@ -1888,7 +1888,9 @@
     "evaluation_date": "2026-09-08",
     "document_id": "SYN-25",
     "page_count": 1,
-    "expected_flags": [],
+    "expected_flags": [
+      "flag_low_confidence"
+    ],
     "interpretation_checks": [
       "Do not add 55 to the 25+75 input formulation",
       "Do not infer finished dry constituent shares",

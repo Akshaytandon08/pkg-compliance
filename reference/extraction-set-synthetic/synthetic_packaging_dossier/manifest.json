@@ -708,7 +708,8 @@
     "client_request_reference": "TEST-REQ-05",
     "additional_traps": [],
     "expected_flags": [
-      "flag_issuer"
+      "flag_issuer",
+      "flag_low_confidence"
     ],
     "secondary_expected_behaviours": [],
     "authored_claims_policy": "Expected claims record authored source values. A value marked obscured must not be scored as an extraction failure when the pipeline abstains and flags review.",
@@ -2350,6 +2351,7 @@
     "client_request_reference": "TEST-REQ-10",
     "additional_traps": [],
     "expected_flags": [
+      "flag_low_confidence",
       "flag_unit_conversion"
     ],
     "secondary_expected_behaviours": [],
@@ -2755,7 +2757,9 @@
     "requested_scope": "Solid-wood export crate SEC90",
     "client_request_reference": "TEST-REQ-12",
     "additional_traps": [],
-    "expected_flags": [],
+    "expected_flags": [
+      "flag_low_confidence"
+    ],
     "secondary_expected_behaviours": [],
     "authored_claims_policy": "Expected claims record authored source values. A value marked obscured must not be scored as an extraction failure when the pipeline abstains and flags review.",
     "obscured_fields": [],
@@ -3391,7 +3395,8 @@
     "client_request_reference": "TEST-REQ-15",
     "additional_traps": [],
     "expected_flags": [
-      "flag_expired"
+      "flag_expired",
+      "flag_low_confidence"
     ],
     "secondary_expected_behaviours": [],
     "authored_claims_policy": "Expected claims record authored source values. A value marked obscured must not be scored as an extraction failure when the pipeline abstains and flags review.",
@@ -4463,6 +4468,7 @@
     "client_request_reference": "TEST-REQ-20",
     "additional_traps": [],
     "expected_flags": [
+      "flag_low_confidence",
       "flag_scope_mismatch"
     ],
     "secondary_expected_behaviours": [],

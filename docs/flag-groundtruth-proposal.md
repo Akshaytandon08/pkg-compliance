@@ -1,3 +1,32 @@
+# Flag ground truth — owner decision, 2026-09-11
+
+**RESOLVED.** The owner accepted six of the seven proposed rows and rejected one.
+The accepted rows are now APPLIED to the manifests; the side-by-side overlay
+(`eval/extraction/expected-flags-v2.json`) has been deleted, so the harness again
+reports a single flag score against ground truth.
+
+| Document | Decision |
+|---|---|
+| 05_supplier_declaration_D.jpg | **accepted** |
+| 10_lab_test_report_D.jpg | **accepted** |
+| 12_heat_treatment_certificate_B.pdf | **accepted** |
+| 15_heat_treatment_certificate_D.jpg | **accepted** |
+| 20_mill_declaration_D.jpg | **accepted** |
+| 25_presswood_as-1210_D.jpg | **accepted** |
+| 16_mill_declaration_A.pdf | **REJECTED** |
+
+**Why 16 was rejected (owner):** it is a clean Tier-A document. An ungrounded
+snippet there is a *model defect*, not a gap in the ground truth — so raising
+`flag_low_confidence` on it must keep scoring as a FALSE POSITIVE. Note doc 12
+was justified the same way (ungrounded) and was accepted: the distinction is the
+cleanliness of the source, not the mechanism that fired.
+
+Document files are unchanged, so every SHA-256 still validates (confirmed).
+
+---
+
+*The original proposal, as generated, follows.*
+
 # Proposed expected_flags additions (NOT APPLIED — for owner acceptance)
 
 Source runs: `claude-sonnet-5` @ 2026-09-10T08-22-56-288Z (3 run(s)); prompt {"supplier_declaration":"1.3.0","lab_test_report":"1.3.0","heat_treatment_certificate":"1.3.0","mill_declaration":"1.3.0"}.
