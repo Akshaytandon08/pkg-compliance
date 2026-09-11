@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getPassportByToken } from "@/db/passport";
 import { PCF_DISCLAIMER, SCREENING_DISCLAIMER } from "@/lib/report/language";
 import { StatusChip, toChipStatus } from "@/app/_components/StatusChip";
+import { RULE_REFERENCE_TOOLTIP, ruleReference, verdictAriaLabel, verdictLabel } from "@/lib/report/labels";
 import { Wordmark } from "@/app/_components/Wordmark";
 
 // Public tier — reached without the access gate (see src/proxy.ts). Renders only
@@ -100,10 +101,19 @@ export default async function PassportPage({ params }: PageProps<"/passport/[tok
                   {rows.map((c) => (
                     <li key={`${c.checkpointId}-${c.version}`} className="rounded-md border border-neutral-100 p-3">
                       <div className="flex flex-wrap items-start justify-between gap-2">
-                        <p className="font-mono text-xs text-neutral-500">{c.checkpointId}@{c.version}</p>
+                        <p
+                          className="font-mono text-xs text-n600"
+                          title={RULE_REFERENCE_TOOLTIP}
+                        >
+                          {ruleReference(c.checkpointId, c.version)}
+                        </p>
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-neutral-500">{c.reasonCategory}</span>
-                          <StatusChip status={toChipStatus(c.verdict)} label={c.verdict.replace(/_/g, " ")} />
+                          <StatusChip
+                            status={toChipStatus(c.verdict)}
+                            label={verdictLabel(c.verdict)}
+                            ariaLabel={verdictAriaLabel(c.verdict, c.requirement)}
+                          />
                         </div>
                       </div>
                       <p className="mt-1 text-sm text-neutral-700">{c.requirement}</p>
