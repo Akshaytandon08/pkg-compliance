@@ -54,7 +54,32 @@ export type PassportPayload = {
   counts: { qualified: number; conditional: number; gap: number; not_applicable: number; caveat: number; upcoming?: number };
   overallVerdict: string;
   checkpoints: PassportCheckpoint[];
-  pcf: { totalKgCo2e: number; unit: string; resolvedComponents: number; unresolvedComponents: number };
+  pcf: {
+    totalKgCo2e: number;
+    unit: string;
+    resolvedComponents: number;
+    unresolvedComponents: number;
+    // Which datasets the COMPUTED RESULT rests on. Optional for the same reason
+    // as `declarant` and `upcoming`: passports are hash-chained, and a version
+    // minted before this existed must still parse and still verify.
+    //
+    // The source NAME is ours to publish — saying which dataset a figure came
+    // from is attribution, and a figure whose origin is secret is not evidence
+    // of anything. The factor VALUE is the dataset owner's licensed content, so
+    // it appears here ONLY when the owner has read that dataset's terms and
+    // recorded that they permit it (emission_factors.value_display_permitted).
+    factorSources?: {
+      material: string;
+      source: string;
+      sourceDataset: string | null;
+      region: string;
+      year: number;
+      tier: string;
+      /** Present only when the dataset's terms permit republishing the value. */
+      value?: number;
+      unit?: string;
+    }[];
+  };
   // The obligated economic operator this passport is published for. OPTIONAL for
   // the same reason as `upcoming`: passports are persisted and hash-chained, so
   // versions minted before organisations existed carry no declarant and must
@@ -177,6 +202,28 @@ export async function buildPassportPayload(assessment: LoadedAssessment): Promis
     .sort((a, b) => VERDICT_RANK[b.verdict] - VERDICT_RANK[a.verdict] || a.checkpointId.localeCompare(b.checkpointId));
 
   const resolved = footprint.components.filter((c) => c.kgCo2e != null).length;
+
+  // The datasets the published total actually rests on, deduplicated and sorted
+  // so the content hash is order-independent. Attribution is always disclosed;
+  // the licensed VALUE only where the owner recorded that the terms allow it.
+  const usedFactors = new Map<number, { material: string; f: NonNullable<(typeof footprint.components)[number]["factor"]> }>();
+  for (const c of footprint.components) {
+    if (c.kgCo2e != null && c.factor) usedFactors.set(c.factor.id, { material: c.material, f: c.factor });
+  }
+  if (footprint.transport) {
+    usedFactors.set(footprint.transport.factor.id, { material: "transport", f: footprint.transport.factor });
+  }
+  const factorSources = [...usedFactors.values()]
+    .map(({ material, f }) => ({
+      material,
+      source: f.source,
+      sourceDataset: f.sourceDataset,
+      region: f.region,
+      year: f.year,
+      tier: f.tier as string,
+      ...(f.valueDisplayPermitted ? { value: f.factor, unit: f.unit } : {}),
+    }))
+    .sort((a, b) => a.material.localeCompare(b.material) || a.source.localeCompare(b.source));
   return {
     disclosureModel: "v2",
     packName: assessment.packName,
@@ -210,6 +257,9 @@ export async function buildPassportPayload(assessment: LoadedAssessment): Promis
       unit: "kg CO2e",
       resolvedComponents: resolved,
       unresolvedComponents: footprint.unresolved.length,
+      // Omitted when the total rests on nothing, so a passport for a pack with
+      // no selected factors hashes as it did before this field existed.
+      ...(factorSources.length > 0 ? { factorSources } : {}),
     },
   };
 }

@@ -10,14 +10,21 @@ import { listDrafts } from "@/db/doc-drafts";
 import { languageOptionsFor } from "@/lib/doc-export/languages";
 import { signDownload, downloadPath } from "@/lib/storage";
 import { DoCDraftPanel } from "./DoCDraftPanel";
-import { computePackFootprint } from "@/lib/engine/pcf";
+import { computePackFootprint, type EmissionFactor } from "@/lib/engine/pcf";
 import { evaluatePack, type CheckpointCard, type ComponentInput } from "@/lib/engine/pack";
 import { buildObligationCalendar } from "@/lib/report/obligations";
 import { PCF_DISCLAIMER, SCREENING_DISCLAIMER } from "@/lib/report/language";
 import { StatusChip, toChipStatus } from "@/app/_components/StatusChip";
 import { Breadcrumbs } from "@/app/_components/Breadcrumbs";
 import { getAllGuidance } from "@/db/guidance";
-import { NO_FACTOR_LABEL, RULE_REFERENCE_TOOLTIP, factorSourceLabel, preparedForLine, ruleReference } from "@/lib/report/labels";
+import {
+  NO_FACTOR_LABEL,
+  RULE_REFERENCE_TOOLTIP,
+  factorSourceLabel,
+  factorTierLabel,
+  preparedForLine,
+  ruleReference,
+} from "@/lib/report/labels";
 import { buildRuleRows, toEvidenceRelied, type ClaimSummary } from "@/lib/report/ruleRows";
 import { RuleTable } from "./RuleTable";
 import { EvidenceList } from "./EvidenceList";
@@ -85,34 +92,64 @@ function kg(n: number): string {
   return `${Number(n.toPrecision(3))} kg CO₂e`;
 }
 
+function FactorCells({ factor }: { factor: EmissionFactor | null }) {
+  if (!factor) {
+    return (
+      <>
+        <td className="py-1 pr-3 whitespace-nowrap text-neutral-400">—</td>
+        <td className="py-1 pr-3 text-amber-700 dark:text-amber-300" colSpan={2}>
+          {NO_FACTOR_LABEL}
+        </td>
+      </>
+    );
+  }
+  return (
+    <>
+      <td className="py-1 pr-3 whitespace-nowrap">{factor.factor} {factor.unit}</td>
+      <td className="py-1 pr-3">
+        {factorSourceLabel(factor)}
+        <span className="block text-neutral-500">
+          {factor.region} · {factor.year}
+          {factor.methodology ? ` · ${factor.methodology}` : ""}
+        </span>
+      </td>
+      <td className="py-1 pr-3 whitespace-nowrap">{factorTierLabel(factor.tier)}</td>
+    </>
+  );
+}
+
 function FootprintCard({ footprint }: { footprint: ReturnType<typeof computePackFootprint> }) {
+  const partial = footprint.unresolved.length > 0;
   return (
     <section className="rounded-lg border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
           Cradle-to-gate footprint (screening-grade)
         </h2>
-        <div className="text-lg font-semibold">{kg(footprint.totalKgCo2e)}</div>
+        <div className="text-lg font-semibold">
+          {kg(footprint.totalKgCo2e)}
+          {partial && <span className="ml-2 text-xs font-normal text-amber-700 dark:text-amber-300">{" "}partial</span>}
+        </div>
       </div>
       <p className="mt-1 text-xs leading-relaxed text-neutral-500">{PCF_DISCLAIMER}</p>
       <div className="mt-3 overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="text-left text-neutral-500">
             <tr>
-              <th className="py-1 pr-3 font-medium">Component</th>
-              <th className="py-1 pr-3 font-medium">Mass</th>
-              <th className="py-1 pr-3 font-medium">Factor</th>
-              <th className="py-1 pr-3 font-medium">Source · tier</th>
-              <th className="py-1 pr-3 text-right font-medium">kg CO₂e</th>
+              <th className="py-1 pr-3 font-medium" scope="col">Component</th>
+              <th className="py-1 pr-3 font-medium" scope="col">Mass</th>
+              <th className="py-1 pr-3 font-medium" scope="col">Factor</th>
+              <th className="py-1 pr-3 font-medium" scope="col">Dataset · region · year</th>
+              <th className="py-1 pr-3 font-medium" scope="col">Tier</th>
+              <th className="py-1 pr-3 text-right font-medium" scope="col">kg CO₂e</th>
             </tr>
           </thead>
           <tbody>
             {footprint.components.map((c) => (
-              <tr key={c.line} className="border-t border-neutral-100 dark:border-neutral-800/60">
+              <tr key={c.line} className="border-t border-neutral-100 align-top dark:border-neutral-800/60">
                 <td className="py-1 pr-3">{c.line}. {c.name}</td>
                 <td className="py-1 pr-3 whitespace-nowrap">{c.massKg != null ? `${Number((c.massKg).toPrecision(3))} kg` : "—"}</td>
-                <td className="py-1 pr-3 whitespace-nowrap">{c.factor ? `${c.factor.factor} ${c.factor.unit}` : "—"}</td>
-                <td className="py-1 pr-3">{c.factor ? factorSourceLabel(c.factor) : NO_FACTOR_LABEL}</td>
+                <FactorCells factor={c.factor} />
                 <td className="py-1 pr-3 text-right whitespace-nowrap">
                   {c.kgCo2e != null
                     ? Number(c.kgCo2e.toPrecision(3))
@@ -123,22 +160,21 @@ function FootprintCard({ footprint }: { footprint: ReturnType<typeof computePack
               </tr>
             ))}
             {footprint.transport && (
-              <tr className="border-t border-neutral-100 dark:border-neutral-800/60">
+              <tr className="border-t border-neutral-100 align-top dark:border-neutral-800/60">
                 <td className="py-1 pr-3">Inbound transport ({footprint.transport.mode}, {footprint.transport.km} km)</td>
                 <td className="py-1 pr-3 whitespace-nowrap">{Number(footprint.transport.massKg.toPrecision(3))} kg</td>
-                <td className="py-1 pr-3 whitespace-nowrap">{footprint.transport.factor.factor} {footprint.transport.factor.unit}</td>
-                <td className="py-1 pr-3">{factorSourceLabel(footprint.transport.factor)}</td>
+                <FactorCells factor={footprint.transport.factor} />
                 <td className="py-1 pr-3 text-right whitespace-nowrap">{Number(footprint.transport.kgCo2e.toPrecision(3))}</td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
-      {footprint.unresolved.length > 0 && (
+      {partial && (
         <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
           Excluded from the total: {footprint.unresolved.join(", ")}. A component is excluded when it
           has no weight, or when no emission factor has been selected for its material — the total
-          below is therefore a partial figure, not a whole-pack one.
+          above is therefore a partial figure, not a whole-pack one.
         </p>
       )}
     </section>
