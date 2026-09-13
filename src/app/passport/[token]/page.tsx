@@ -8,6 +8,7 @@ import {
   factorSourceLabel,
   factorTierLabel,
   formatFactorValue,
+  issuerTypeLabel,
   legalRoleLabel,
   materialLabel,
   ruleName,
@@ -92,13 +93,6 @@ const QUIET_GROUPS: {
   },
 ];
 
-const ISSUER_TYPE_LABEL: Record<string, string> = {
-  manufacturer_qa: "manufacturer's own quality function",
-  accredited_lab: "accredited laboratory",
-  treatment_provider: "treatment provider",
-  mill: "mill's own quality function",
-};
-
 /** One rule. Collapsed: verdict + plain name. Expanded: what meets it and who
  *  stands behind that, in the order a sceptical reader asks. */
 function RuleRow({ c }: { c: PassportCheckpoint }) {
@@ -131,7 +125,7 @@ function RuleRow({ c }: { c: PassportCheckpoint }) {
                       <span className="text-neutral-400">Issued by </span>
                       {d.issuerName}
                       {d.issuerType && (
-                        <span className="text-neutral-400"> — {ISSUER_TYPE_LABEL[d.issuerType] ?? d.issuerType}</span>
+                        <span className="text-neutral-400"> — {issuerTypeLabel(d.issuerType)}</span>
                       )}
                       {d.accreditationRef && (
                         <span className="block text-neutral-500">Accreditation: {d.accreditationRef}</span>
@@ -147,10 +141,11 @@ function RuleRow({ c }: { c: PassportCheckpoint }) {
         {c.keyValue && (
           <Field label="Key value">
             <span className="font-medium text-neutral-800">
-              {c.keyValue.parameter} {c.keyValue.measured}
+              {c.keyValue.measured}
               {c.keyValue.measuredUnit ? ` ${c.keyValue.measuredUnit}` : ""}
             </span>
             <span className="text-neutral-500"> against {c.keyValue.limitText}</span>
+            <span className="block text-neutral-400">{c.keyValue.parameter}</span>
           </Field>
         )}
 
@@ -452,7 +447,7 @@ export default async function PassportPage({ params }: PageProps<"/passport/[tok
                           <span className="font-medium text-neutral-800">{a.evidenceTypeLabel}</span>
                           {a.issuerName && <span> — {a.issuerName}</span>}
                           {a.issuerType && (
-                            <span className="text-neutral-400"> ({ISSUER_TYPE_LABEL[a.issuerType] ?? a.issuerType})</span>
+                            <span className="text-neutral-400"> ({issuerTypeLabel(a.issuerType)})</span>
                           )}
                           {a.issuedDate && <span className="text-neutral-400"> · {a.issuedDate}</span>}
                           {a.accreditationRef && (

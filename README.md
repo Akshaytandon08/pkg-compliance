@@ -92,10 +92,12 @@ Verify: the preview build log must **not** contain `PREVIEW_DATABASE_URL is unse
 
 **Migrations are wired into deploy:** the `vercel-build` script runs `drizzle-kit migrate && next build`, so the hosted DB is migrated on every deployment. (Set the platform Build Command to `npm run vercel-build` if it is not auto-detected.)
 
-**Seed the demo pack against the hosted DB** (one-off, from a machine with the prod URL):
+**Seed the demo packs against the hosted DB** (from a machine with the prod URL).
+The writer prints its target and refuses a remote database without `--remote`, so
+a shell holding a stale `DATABASE_URL` cannot write to production unnoticed:
 
 ```bash
-DATABASE_URL="<prod-postgres-url>" node scripts/seed-demo.ts
+DATABASE_URL="<prod-postgres-url>" npm run seed:demo-suite -- --remote
 ```
 
 **The corpus approval CLIs stay local.** `corpus:review` / `:approve` / `:reject` are `scripts/*.ts` run by a human against a database — they are **not** web routes and are never exposed on the hosted surface. Approving/promoting a checkpoint or guidance row remains a local, human-run action.

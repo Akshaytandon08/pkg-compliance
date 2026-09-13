@@ -1,13 +1,21 @@
 import { createHash, randomBytes } from "node:crypto";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db } from "./index.ts";
-import { checkpoints, passports } from "./schema.ts";
+import {
+  checkpointApprovals,
+  checkpoints,
+  corpusVersions,
+  evidenceDocuments,
+  extractedClaims,
+  extractionRuns,
+  passports,
+} from "./schema.ts";
 import { getAssessment, loadCorpusAsOf, type EvidenceRecord, type LoadedAssessment } from "./assessments.ts";
 import { getOrganisation } from "./organisations.ts";
 import { pinnedFactorSet } from "./factors.ts";
 import { evaluatePack, type CheckpointCard, type ProductionCheckpoint } from "../lib/engine/pack.ts";
 import type { EvidenceDocument } from "../lib/engine/evaluate.ts";
-import { evidenceTypeLabel } from "../lib/report/labels.ts";
+import { describeThreshold, evidenceTypeLabel } from "../lib/report/labels.ts";
 import { computePackFootprint } from "../lib/engine/pcf.ts";
 
 // The PUBLIC tier of an assessment (disclosure model v2). The rule set is public
@@ -47,6 +55,8 @@ export type PassportCheckpoint = {
 
   /** What actually satisfies the rule. Empty for a rule nothing satisfies yet. */
   proof?: {
+    /** Joins to the evidence record; not rendered. */
+    docId: string;
     evidenceType: string;
     evidenceTypeLabel: string;
     reference: string | null;
@@ -197,6 +207,7 @@ function passportDetail(
   recordByDocId: Map<string, EvidenceRecord>,
   corpusByKey: Map<string, ProductionCheckpoint>,
   verificationByKey: Map<string, { name: string; verifiedOn: string }>,
+  confirmedClaims: ConfirmedClaim[],
 ): Partial<PassportCheckpoint> {
   const key = `${card.checkpointId}@${card.version}`;
   const corpus = corpusByKey.get(key);
@@ -211,6 +222,7 @@ function passportDetail(
           .map((d) => {
             const rec = recordByDocId.get(d.docId);
             return {
+              docId: d.docId,
               evidenceType: d.type,
               evidenceTypeLabel: evidenceTypeLabel(d.type),
               reference: rec?.reference ?? null,
@@ -229,14 +241,50 @@ function passportDetail(
   // types.
   const ruleVerifiedBy = verificationByKey.get(key) ?? null;
 
+  // KEY VALUE — a measured figure against the rule's own limit. Shown only where
+  // BOTH exist: a confirmed claim for a parameter this rule sets a threshold on.
+  // An unconfirmed claim never appears; "human-confirmed before it affects a
+  // verdict" applies to what a reader is shown, not only to what the engine uses.
+  // NOT gated on the verdict. A passport row is the WORST verdict across the
+  // components a rule touches, so gating on `qualified` hid a measured value
+  // behind a different component's missing paperwork. The measurement is a fact
+  // about the packaging either way, and "17.0 against a 100 limit" is exactly
+  // what a reader wants when the row says Conditional.
+  const threshold = corpus?.thresholds?.[0] ?? null;
+  const match = threshold
+    ? confirmedClaims.find((c) => sameParameter(c.parameter, threshold.parameter) && c.value)
+    : undefined;
+  const keyValue =
+    match && threshold
+      ? {
+          parameter: threshold.parameter,
+          measured: match.value!,
+          measuredUnit: match.unit,
+          // The limit WITHOUT the parameter: the parameter is already the field's
+          // own subject, and "Pb+Cd+Hg+Cr(VI) sum 17.0 mg/kg against Pb+Cd+Hg+Cr(VI)
+          // sum ≤ 100 mg/kg" reads as a stutter.
+          limitText: describeThreshold({ ...threshold, parameter: null }),
+        }
+      : null;
+
+  // WHO CONFIRMED THE EVIDENCE — from the confirmed claim, which records both the
+  // person and the moment.
+  //
+  // A MANUAL evidence record has no equivalent: `assessment_evidence` carries no
+  // entered-by column, so for those rows this stays null rather than attributing
+  // the record to whoever happens to be nearby. Adding the column is a schema
+  // change and a decision for the owner; inventing attribution on a public page
+  // is not a shortcut worth taking.
+  const evidenceConfirmedBy =
+    match?.confirmedBy && match.confirmedAt
+      ? { name: match.confirmedBy, confirmedOn: match.confirmedAt.toISOString().slice(0, 10) }
+      : null;
+
   return {
     proof,
-    // KEY VALUE is claims-driven and stays null until a confirmed extracted claim
-    // carries a measured value for a parameter the rule sets a limit on. The demo
-    // seed records evidence as metadata only, so nothing populates it there.
-    keyValue: null,
+    keyValue,
     ruleVerifiedBy,
-    evidenceConfirmedBy: null,
+    evidenceConfirmedBy,
     fullRuleText: corpus?.requirementText ?? card.requirementText,
     notApplicableReason: verdict === "not_applicable" ? (card.outcome?.detail ?? null) : null,
     appliesFrom: verdict === "upcoming" ? (card.outcome?.detail ?? null) : null,
@@ -265,6 +313,61 @@ async function loadCitationVerification(): Promise<Map<string, { name: string; v
   return out;
 }
 
+/**
+ * The corpus releases that actually contributed the rules in this screening.
+ *
+ * Not `assessment.corpusVersion`, which is the single label stamped at creation:
+ * a screening evaluated against batch-1 + batch-2-eu + batch-2-in was describing
+ * itself as one of them. checkpoint_approvals is what records which release
+ * approved each checkpoint, so the set is derived from the rules actually used.
+ */
+async function loadReleasesFor(cards: { checkpointId: string; version: number }[]): Promise<string[]> {
+  if (cards.length === 0) return [];
+  const rows = await db
+    .select({ label: corpusVersions.label, id: checkpointApprovals.checkpointId, version: checkpointApprovals.checkpointVersion })
+    .from(checkpointApprovals)
+    .innerJoin(corpusVersions, eq(corpusVersions.id, checkpointApprovals.corpusVersionId));
+  const used = new Set(cards.map((c) => `${c.checkpointId}@${c.version}`));
+  const labels = new Set(rows.filter((r) => used.has(`${r.id}@${r.version}`)).map((r) => r.label));
+  return [...labels].sort();
+}
+
+/** A confirmed extracted claim, reduced to what the key-value line needs. */
+interface ConfirmedClaim {
+  parameter: string | null;
+  value: string | null;
+  unit: string | null;
+  confirmedBy: string | null;
+  confirmedAt: Date | null;
+}
+
+/**
+ * Confirmed claims for this assessment. CONFIRMED ONLY — an unconfirmed claim is
+ * a proposal, and the rule that it must not reach a verdict applies equally to
+ * what a reader is shown.
+ */
+async function loadConfirmedClaims(assessmentId: number): Promise<ConfirmedClaim[]> {
+  return db
+    .select({
+      parameter: extractedClaims.parameter,
+      value: extractedClaims.value,
+      unit: extractedClaims.unit,
+      confirmedBy: extractedClaims.confirmedBy,
+      confirmedAt: extractedClaims.confirmedAt,
+    })
+    .from(extractedClaims)
+    .innerJoin(extractionRuns, eq(extractionRuns.id, extractedClaims.runId))
+    .innerJoin(evidenceDocuments, eq(evidenceDocuments.id, extractionRuns.documentId))
+    .where(and(eq(evidenceDocuments.assessmentId, assessmentId), eq(extractedClaims.status, "confirmed")));
+}
+
+/** Does a claim's parameter answer this threshold's parameter? Compared on a
+ *  normalised form so "Pb+Cd+Hg+Cr(VI) sum" matches however it is spaced. */
+function sameParameter(claim: string | null, threshold: string): boolean {
+  const norm = (v: string) => v.toLowerCase().replace(/[\s_]+/g, "");
+  return !!claim && norm(claim) === norm(threshold);
+}
+
 /** "Issued 2026-03-14 · expires 2027-04-16", or whichever half exists. */
 function validityText(issued: string | null, expiry: string | null): string | null {
   const parts = [issued ? `issued ${issued}` : null, expiry ? `expires ${expiry}` : null].filter(Boolean);
@@ -277,6 +380,7 @@ export async function buildPassportPayload(assessment: LoadedAssessment): Promis
   const factors = await pinnedFactorSet(assessment.id);
   const corpusByKey = new Map(corpus.map((c) => [`${c.id}@${c.version}`, c]));
   const verificationByKey = await loadCitationVerification();
+  const confirmedClaims = await loadConfirmedClaims(assessment.id);
   const report = evaluatePack({
     checkpoints: corpus,
     context: assessment.context,
@@ -324,6 +428,8 @@ export async function buildPassportPayload(assessment: LoadedAssessment): Promis
     // needs. They carry their own verdict and render under their own heading.
     ...report.upcoming,
   ];
+  const releases = await loadReleasesFor(allCards);
+
   for (const card of allCards) {
     const outcome = card.outcome;
     if (!outcome) continue;
@@ -358,7 +464,7 @@ export async function buildPassportPayload(assessment: LoadedAssessment): Promis
         citationUrl: url,
         confidence: g.confidence,
         subjectToExemptions: g.subjectToExemptions,
-        ...passportDetail(g.card, g.worst.verdict, packDocuments, recordByDocId, corpusByKey, verificationByKey),
+        ...passportDetail(g.card, g.worst.verdict, packDocuments, recordByDocId, corpusByKey, verificationByKey, confirmedClaims),
       };
     })
     .sort((a, b) => VERDICT_RANK[b.verdict] - VERDICT_RANK[a.verdict] || a.checkpointId.localeCompare(b.checkpointId));
@@ -396,7 +502,7 @@ export async function buildPassportPayload(assessment: LoadedAssessment): Promis
     counts: report.counts,
     // Shown once on the page rather than per rule: the provenance of the RULE
     // SET, not of any one rule.
-    corpus: { asOf: assessment.asOf, releases: [assessment.corpusVersion] },
+    corpus: { asOf: assessment.asOf, releases: releases.length > 0 ? releases : [assessment.corpusVersion] },
     components: assessment.components.map((c) => {
       const fp = footprint.components.find((f) => f.line === c.line);
       return {

@@ -253,6 +253,7 @@ Prepared (Commit "Deploy readiness"); execution needs a Vercel account + a manag
 
 ## Decision log
 
+- **2026-09-13 — Post-Tuesday queue, recorded and NOT started.** Six items, parked deliberately so they are not rediscovered as surprises: (1) `METADATA_CLAIM_TYPES` wired into the matcher — it is currently exported and referenced nowhere; (2) per-polymer factor granularity, so LDPE and PET stop sharing one `plastic` factor (the wider fix behind the 2026-09-13 granularity entry); (3) Organisation Commit 5; (4) a custom domain; (5) the varied-retry prompt-version bump (dropout recovery needs a varied retry, deferred from Sprint 6); (6) opus at the real-document acceptance run, which is where the provisional "default: sonnet" gets settled. Also open from the Sprint 11 hygiene audit: `assessment_evidence` has no entered-by column, so "Evidence confirmed by" is null for manual records — adding it is a schema decision, not a display one.
 - **2026-09-13 — The public/gated line MOVES: the passport now shows evidence, issuers and component traceability.** This supersedes the 2026-09-06 disclosure-model entry, which put "evidence document references, supplier/sourced-from identities, component weights and full BOM composition" firmly on the gated side. Sprint 10 deliberately reverses that for four classes of fact, on the owner's instruction:
   · **Proof** — evidence type, reference and validity for rules that are met;
   · **Issuer** — who issued that evidence, their type, and any accreditation;

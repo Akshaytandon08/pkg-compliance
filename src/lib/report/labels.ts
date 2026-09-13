@@ -338,6 +338,21 @@ export function preparedForLine(org: {
     .join(" · ");
 }
 
+// --- evidence issuers -------------------------------------------------------
+
+/** Who issued a piece of evidence, in words. The distinction a reader needs is
+ *  whether the issuer is independent of the party making the claim. */
+export const ISSUER_TYPE_LABEL: Record<string, string> = {
+  manufacturer_qa: "manufacturer's own quality function",
+  accredited_lab: "accredited laboratory",
+  treatment_provider: "treatment provider",
+  mill: "mill's own quality function",
+};
+
+export function issuerTypeLabel(type: string): string {
+  return ISSUER_TYPE_LABEL[type] ?? humanise(type);
+}
+
 // --- materials -------------------------------------------------------------
 
 const MATERIAL_LABEL: Record<string, string> = {

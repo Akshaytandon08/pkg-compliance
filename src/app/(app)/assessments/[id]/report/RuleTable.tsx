@@ -85,6 +85,22 @@ function Details({ row, id }: { row: RuleRow; id: string }) {
     <div id={id} className="space-y-2 bg-n50/60 px-3 py-3 text-sm">
       <p className="text-n700">{row.requirementText}</p>
       <dl className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
+        {/* The measured figure leads the thresholds it is judged against: a
+            reader wants the number first and the limit as context. Present only
+            where a CONFIRMED claim carries one. */}
+        {row.keyValue && (
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-n600">Key value</dt>
+            <dd className="text-n800">
+              <span className="font-medium">
+                {row.keyValue.measured}
+                {row.keyValue.measuredUnit ? ` ${row.keyValue.measuredUnit}` : ""}
+              </span>
+              <span className="text-n600"> against {row.keyValue.limitText}</span>
+              <span className="block text-xs text-n500">{row.keyValue.parameter}</span>
+            </dd>
+          </div>
+        )}
         {row.thresholds.length > 0 && (
           <div>
             <dt className="text-xs font-semibold uppercase tracking-wide text-n600">Thresholds</dt>

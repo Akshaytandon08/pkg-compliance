@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { issuerTypeLabel } from "@/lib/report/labels";
 import { FileText, Pencil, X } from "lucide-react";
 import type { EvidenceRelied } from "@/lib/report/ruleRows";
 
@@ -20,13 +21,6 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
     </div>
   );
 }
-
-const ISSUER_TYPE_LABEL: Record<string, string> = {
-  manufacturer_qa: "manufacturer's own quality function",
-  accredited_lab: "accredited laboratory",
-  treatment_provider: "treatment provider",
-  mill: "mill's own quality function",
-};
 
 export function EvidenceDrawer({ item, onClose }: { item: EvidenceRelied | null; onClose: () => void }) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -114,7 +108,7 @@ export function EvidenceDrawer({ item, onClose }: { item: EvidenceRelied | null;
               <Row label="Issued by">
                 {item.issuerName}
                 {item.issuerType && (
-                  <span className="text-n500"> — {ISSUER_TYPE_LABEL[item.issuerType] ?? item.issuerType}</span>
+                  <span className="text-n500"> — {issuerTypeLabel(item.issuerType)}</span>
                 )}
               </Row>
             )}
