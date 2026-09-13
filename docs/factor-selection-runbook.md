@@ -194,3 +194,29 @@ Then open each demo report and confirm the footprint card shows a real total wit
 `BEIS / Greenhouse gas reporting: conversion factors 2026 · GB · 2026 · Secondary
 database` per row, and **no "partial" flag on any of the three demo packs** — with `metal` selected,
 every demo component now resolves.
+
+
+---
+
+## Appendix — after the Passport v3-lite merge (Sprint 10)
+
+Passport v3-lite changes the passport PAYLOAD (proof, issuers, component
+traceability, rule-set provenance). Existing passports keep parsing and keep
+verifying against their stored hashes — the new fields are optional — but they do
+**not** show the new sections until they are regenerated.
+
+Two OWNER actions after the PR merges, both against production:
+
+```bash
+npm run seed:demo-suite -- --remote
+```
+
+Then open each demo report once and press **Generate passport**, which mints a new
+hash-chained version carrying the new payload.
+
+**This orphans any passport QR generated before the merge** — the token is stable,
+so an old QR still resolves, but a passport minted earlier renders without the new
+sections until regenerated. That was accepted when the sprint was scoped.
+
+Local is already done: `npm run seed:demo-suite` and regeneration were run as part
+of the sprint.
