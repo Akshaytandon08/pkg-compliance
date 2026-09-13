@@ -1,3 +1,5 @@
+import { DEMO_DATA_LABEL } from "@/lib/report/language";
+
 // The single status/verdict chip used everywhere (report, list, passport). One
 // component, one palette — verdict colours from the Fitsol green/semantic scales,
 // the demo tag deliberately in accent-blue so it never reads as a verdict.
@@ -29,7 +31,7 @@ const DEFAULT_LABEL: Record<ChipStatus, string> = {
   not_applicable: "Not applicable",
   pending: "Pending approval",
   upcoming: "Upcoming",
-  demo: "Demonstration data",
+  demo: DEMO_DATA_LABEL,
 };
 
 export function StatusChip({

@@ -213,7 +213,10 @@ export function aggregate(model: string, scores: DocScore[]): ModelReport {
   for (const s of scores) {
     const exp = new Set(s.expectedFlags);
     const got = new Set(s.derivedFlags);
-    for (const f of got) (exp.has(f) ? tp++ : fp++);
+    for (const f of got) {
+      if (exp.has(f)) tp++;
+      else fp++;
+    }
     for (const f of exp) if (!got.has(f)) fn++;
   }
   const silentErrors = scores.flatMap((s) => s.silentErrors);

@@ -17,8 +17,10 @@ import {
   LEGIBILITY_LABEL,
   RISK_LABEL,
   VALIDATION_LABEL,
+  ISSUER_TYPE_LABEL,
   VERDICT_LABEL,
   claimTypeLabel,
+  issuerTypeLabel,
   evidenceTypeLabel,
   humanise,
   reasonLabel,
@@ -26,7 +28,7 @@ import {
   verdictAriaLabel,
   verdictLabel,
 } from "../src/lib/report/labels.ts";
-import { EVIDENCE_TYPES } from "../src/lib/vocab.ts";
+import { EVIDENCE_TYPES, ISSUER_TYPES } from "../src/lib/vocab.ts";
 import { LEGIBILITY } from "../src/lib/extraction/types.ts";
 import { PROMPTS } from "../src/lib/extraction/prompts.ts";
 
@@ -153,17 +155,13 @@ test("passport headings and group labels read as English, not as enum values", (
   // itself before this was checked.
   const src = readFileSync(new URL("../src/app/passport/[token]/page.tsx", import.meta.url), "utf8");
 
-  // Visible labels only — `label:` fields, and the VALUES of the issuer-type map.
-  // Deliberately not every string in the file: `verdict: "not_applicable"` is a
-  // DATA value matched against the payload, and a test that cannot tell a datum
-  // from a label would have to be silenced rather than obeyed.
+  // Visible labels only — the `label:` fields of the group tables. Deliberately
+  // not every string in the file: `verdict: "not_applicable"` is a DATA value
+  // matched against the payload, and a test that cannot tell a datum from a label
+  // would have to be silenced rather than obeyed.
   const labels = [...src.matchAll(/\blabel:\s*"([^"]+)"/g)].map((m) => m[1]);
-  const issuerMap = src.slice(src.indexOf("ISSUER_TYPE_LABEL"));
-  const issuerLabels = [...issuerMap.slice(0, issuerMap.indexOf("};")).matchAll(/:\s*"([^"]+)"/g)].map((m) => m[1]);
-
   assert.ok(labels.length >= 5, `found only ${labels.length} labels — the scan is broken`);
-  assert.ok(issuerLabels.length >= 4, "issuer-type labels not found — the scan is broken");
-  for (const label of [...labels, ...issuerLabels]) {
+  for (const label of labels) {
     assert.doesNotMatch(label, LOWER_SNAKE, `passport renders "${label}" as a snake_case identifier`);
     assert.doesNotMatch(label, SCREAMING_SNAKE, `passport renders "${label}" as an enum constant`);
   }
@@ -173,6 +171,32 @@ test("passport headings and group labels read as English, not as enum values", (
     assert.ok(
       new RegExp(heading, "i").test(src),
       `passport is missing the "${heading}" heading the v3-lite layout depends on`,
+    );
+  }
+});
+
+test("every issuer type has a readable label, from ONE definition", () => {
+  // ISSUER_TYPE_LABEL lived in the passport page AND the evidence drawer as two
+  // identical copies — the exact drift labels.ts exists to prevent, and it would
+  // have let the public page and the gated report disagree about what
+  // `accredited_lab` is called. It is now defined once.
+  for (const t of ISSUER_TYPES) {
+    assert.ok(ISSUER_TYPE_LABEL[t], `issuer type "${t}" has no label`);
+    assertReadable(
+      issuerTypeLabel(t).replace(/^./, (c) => c.toUpperCase()),
+      `issuer type ${t}`,
+    );
+  }
+  // An unknown type degrades to English rather than leaking the identifier.
+  assert.equal(issuerTypeLabel("some_new_kind"), "Some new kind");
+
+  // And no render source defines its own copy.
+  for (const rel of RENDER_SOURCES) {
+    const src = readFileSync(new URL(rel, import.meta.url), "utf8");
+    assert.doesNotMatch(
+      src,
+      /const ISSUER_TYPE_LABEL/,
+      `${rel} defines its own issuer-type map instead of importing the one in labels.ts`,
     );
   }
 });

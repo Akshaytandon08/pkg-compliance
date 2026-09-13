@@ -276,6 +276,11 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
     ),
   );
   const evidenceContext = { sourceLinks, claimsByComponent, issuerByDocId };
+  // CONFIRMED claims only, for the key-value line. An unconfirmed claim is a
+  // proposal and must not read as a measurement.
+  const confirmedClaims = (await listClaimsForAssessment(assessment.id))
+    .filter((c) => c.status === "confirmed")
+    .map((c) => ({ parameter: c.parameter, value: c.value, unit: c.unit }));
 
   // Draft EU declaration of conformity — eligibility (button state) + existing drafts.
   const docEligibility = (await doCDraftEligibility(assessment.id)) ?? { eligible: false, blockers: ["Assessment not found."] };
@@ -456,7 +461,8 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
                 <RuleTable
                   caption={`Applicable rules for component ${s.component.line}, ${s.component.name}`}
                   rows={buildRuleRows({
-                    cards: s.cards,
+          confirmedClaims,
+          cards: s.cards,
                     documents: s.component.documents,
                     corpusByKey,
                     assessorFlag: s.component.riskRationale,
@@ -484,7 +490,9 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-500">Packaging unit</h2>
           <RuleTable
             caption="Applicable rules held at packaging-unit level"
-            rows={buildRuleRows({ cards: report.packagingUnit, documents: packDocuments, corpusByKey, guidance: guidanceMap, evidenceContext })}
+            rows={buildRuleRows({
+          confirmedClaims,
+          cards: report.packagingUnit, documents: packDocuments, corpusByKey, guidance: guidanceMap, evidenceContext })}
           />
         </section>
       )}
@@ -494,7 +502,9 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-500">Organisation</h2>
           <RuleTable
             caption="Applicable rules held at organisation level"
-            rows={buildRuleRows({ cards: report.organisation, documents: packDocuments, corpusByKey, guidance: guidanceMap, evidenceContext })}
+            rows={buildRuleRows({
+          confirmedClaims,
+          cards: report.organisation, documents: packDocuments, corpusByKey, guidance: guidanceMap, evidenceContext })}
           />
         </section>
       )}

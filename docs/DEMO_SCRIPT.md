@@ -118,8 +118,10 @@ top. Walk one row end to end:
   **Assessor flag** in the expanded row. (A component with no annotation shows
   nothing there — there is no default "risk low".)
 - **5a — who stands behind the evidence.** Expand the strap's heavy-metals row:
-  the proof is an **accredited laboratory** XRF report with an **NABL** reference
-  and a measured value against the limit (Pb 3.1 mg/kg, sum 4.1, limit 100). Then
+  the proof is an **accredited laboratory** report with an **NABL** reference, and
+  a **Key value** line: **17.0 mg/kg against ≤ 100 mg/kg**, with "Evidence
+  confirmed by" naming the assessor and the date. The figures are transcribed from
+  the owner's synthetic dossier (manifest entry **SYN-06**), not invented. Then
   expand any corrugated row: the proof there is the **mill's own quality
   function**. Same verdict word, very different strength of evidence — and the
   passport now says which, rather than leaving the reader to assume.

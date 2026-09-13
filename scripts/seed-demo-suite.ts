@@ -20,6 +20,7 @@ import { assessments, organisations } from "../src/db/schema.ts";
 import { createAssessment, type NewAssessment } from "../src/db/assessments.ts";
 import { createOrganisation, type NewOrganisation } from "../src/db/organisations.ts";
 import { requireIntendedTarget } from "../src/lib/factors/target.ts";
+import { seedConfirmedHeavyMetalsClaim } from "./seed-demo-claim.ts";
 import { parseArgs } from "./corpus-lib.ts";
 
 // This script DELETES and recreates the demo packs, so it says which database
@@ -251,9 +252,15 @@ const packs: NewAssessment[] = [
         evidence: [
           {
             evidenceType: "lab_test",
-            reference: `${SD} — XRF screening report SYN/2026/0417: Pb 3.1 mg/kg, Cd <0.5, Hg <0.5, Cr(VI) <0.5; sum 4.1 mg/kg against a 100 mg/kg limit`,
-            issuedDate: "2026-04-17",
-            expiryDate: "2027-04-16",
+            // Values taken VERBATIM from the synthetic dossier manifest, entry
+            // SYN-06 (06_lab_test_report_A.pdf, tier A, trap: none) — see
+            // reference/extraction-set-synthetic/synthetic_packaging_dossier/manifest.json.
+            // They were invented the first time this was seeded, which was wrong:
+            // the dossier is the owner's document set and a demo must not put
+            // numbers in a laboratory's mouth that the laboratory never reported.
+            reference: `${SD} — lab test report SYN/2026/0006 (manifest SYN-06): Pb 12.4, Cd 0.8, Hg 0.2, Cr(VI) 3.6 mg/kg; sum 17.0 mg/kg against a 100 mg/kg limit`,
+            issuedDate: "2026-08-24",
+            expiryDate: "2027-08-23",
             scopeComponents: ["Green polyester strap (PET)"],
             scopeMaterials: ["plastic"],
             scopeParameters: ["Pb", "Cd", "Hg", "Cr(VI)"],
@@ -408,6 +415,12 @@ for (const rawPack of packs) {
   console.log(
     `Seeded demo #${id} — "${pack.packName}" (demo=true), prepared for org #${organisationId}.`,
   );
+  // The one CONFIRMED extracted claim in the suite. It exists so the key-value
+  // line has something real to render; every other demo record is metadata only.
+  if (pack.packName === GOLDEN) {
+    const claimId = await seedConfirmedHeavyMetalsClaim(id);
+    if (claimId) console.log(`  … confirmed heavy-metals claim #${claimId} (manifest SYN-06) on the PET strap.`);
+  }
 }
 console.log("\nThree demo packs seeded. Open / to run the demo (see docs/DEMO_SCRIPT.md).");
 process.exit(0);

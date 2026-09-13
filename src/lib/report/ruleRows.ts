@@ -2,6 +2,7 @@ import type { CheckpointCard, ProductionCheckpoint } from "../engine/pack.ts";
 import { guidanceKey, type GuidanceRow } from "../../db/guidance.ts";
 import type { EvidenceDocument } from "../engine/evaluate.ts";
 import type { Verdict } from "../engine/verdict.ts";
+import type { Threshold } from "../../db/schema.ts";
 import { describeDeltaAction, describeRequirement } from "./deltaActions.ts";
 import {
   CONFIDENCE_LABEL,
@@ -104,6 +105,8 @@ export interface RuleRow {
   phaseIn: string | null;
   confidence: string | null;
   assessorFlag: string | null;
+  /** Measured value against the rule's limit, where a CONFIRMED claim carries one. */
+  keyValue: { parameter: string; measured: string; measuredUnit: string | null; limitText: string } | null;
   guidance: RuleGuidance[];
   /** Evidence types this rule accepts — the Add-evidence control offers these. */
   acceptedEvidenceTypes: string[];
@@ -122,6 +125,25 @@ export interface RuleRow {
  *
  * Keeps the first card for each `id@version` and preserves order.
  */
+/** A measured value against the rule's limit, where a confirmed claim carries one
+ *  for the parameter the rule sets a threshold on. Null otherwise — the row then
+ *  has no key-value line rather than an empty one. */
+function keyValueFor(
+  threshold: Threshold | null,
+  claims: { parameter: string | null; value: string | null; unit: string | null }[],
+): RuleRow["keyValue"] {
+  if (!threshold) return null;
+  const norm = (v: string) => v.toLowerCase().replace(/[\s_]+/g, "");
+  const match = claims.find((c) => c.parameter && c.value && norm(c.parameter) === norm(threshold.parameter));
+  if (!match) return null;
+  return {
+    parameter: threshold.parameter,
+    measured: match.value!,
+    measuredUnit: match.unit,
+    limitText: describeThreshold({ ...threshold, parameter: null }),
+  };
+}
+
 export function groupCardsByRule<T extends { checkpointId: string; version: number }>(cards: T[]): T[] {
   return [...new Map(cards.map((c) => [`${c.checkpointId}@${c.version}`, c])).values()];
 }
@@ -224,6 +246,9 @@ export interface BuildRowsInput {
   componentId?: number;
   /** Signed links + claims, so an evidence chip can open a populated drawer. */
   evidenceContext?: EvidenceContext;
+  /** CONFIRMED claims for this assessment, for the key-value line. Unconfirmed
+   *  claims are never used: a proposal must not read as a measurement. */
+  confirmedClaims?: { parameter: string | null; value: string | null; unit: string | null }[];
 }
 
 /** Request templates a rule can offer, as resolved URLs. */
@@ -245,7 +270,7 @@ function requestTemplatesFor(
   return out;
 }
 
-export function buildRuleRows({ cards, documents, corpusByKey, assessorFlag, guidance, assessmentId, componentId, evidenceContext }: BuildRowsInput): RuleRow[] {
+export function buildRuleRows({ cards, documents, corpusByKey, assessorFlag, guidance, assessmentId, componentId, evidenceContext, confirmedClaims = [] }: BuildRowsInput): RuleRow[] {
   const evCtx: EvidenceContext = { ...evidenceContext, componentId: componentId ?? evidenceContext?.componentId };
   return cards.map((card, i) => {
     const outcome = card.outcome;
@@ -287,6 +312,7 @@ export function buildRuleRows({ cards, documents, corpusByKey, assessorFlag, gui
       exemptions: (card.exemptions ?? []).map((e) => ({ scope: e.scope, basis: e.basis_pinpoint })),
       phaseIn: card.laterOfCondition ?? null,
       confidence: card.confidence ? (CONFIDENCE_LABEL[card.confidence] ?? card.confidence) : null,
+      keyValue: keyValueFor(corpus?.thresholds?.[0] ?? null, confirmedClaims),
       assessorFlag: assessorFlag ?? null,
       acceptedEvidenceTypes: accepted,
       // Only where evidence is actually outstanding. A qualified row does not
