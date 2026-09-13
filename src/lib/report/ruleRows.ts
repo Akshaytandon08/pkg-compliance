@@ -112,7 +112,43 @@ export interface RuleRow {
 }
 
 /** Split "pinpoint text. https://…" into display text + primary-source URL. */
-function splitCitation(citation: string): { text: string; url: string | null } {
+/**
+ * One entry per RULE from a list of cards that may carry one per COMPONENT.
+ *
+ * `PackReport.upcoming` (and the component sections) hold a card per component
+ * for component-scoped checkpoints, which is right for evaluation and wrong for
+ * a list a person reads: the production report rendered `recyclability-grade`
+ * three times, identically, each with its full legal text.
+ *
+ * Keeps the first card for each `id@version` and preserves order.
+ */
+export function groupCardsByRule<T extends { checkpointId: string; version: number }>(cards: T[]): T[] {
+  return [...new Map(cards.map((c) => [`${c.checkpointId}@${c.version}`, c])).values()];
+}
+
+/** The earliest ISO date mentioned across a set of upcoming cards — the one fact
+ *  worth showing on a collapsed summary line. Null when none states a date. */
+export function earliestTriggerDate(cards: { outcome?: { detail?: string | null } | null }[]): string | null {
+  const dates = cards
+    .map((c) => /\d{4}-\d{2}-\d{2}/.exec(c.outcome?.detail ?? "")?.[0])
+    .filter((d): d is string => !!d)
+    .sort();
+  return dates[0] ?? null;
+}
+
+/** The engine's upcoming detail already opens "Applies from …", which repeats the
+ *  field label beside it. Strip the prefix so the row reads "Applies from ·
+ *  2030-01-01 or later, pending …" rather than saying it twice. */
+export function upcomingWhen(detail: string | null | undefined): string {
+  const d = (detail ?? "").trim();
+  if (!d) return "a date the instrument has not fixed";
+  return d.replace(/^applies from\s+/i, "");
+}
+
+/** "pinpoint. https://…" → display text + primary-source URL. Exported because
+ *  the report's upcoming section needs the same split; a second implementation
+ *  would be a second thing to get wrong. */
+export function splitCitation(citation: string): { text: string; url: string | null } {
   const m = citation.match(/https?:\/\/\S+/);
   const url = m ? m[0].replace(/[.,;]$/, "") : null;
   const text = citation.replace(/https?:\/\/\S+/, "").replace(/\s*\.\s*$/, "").trim();

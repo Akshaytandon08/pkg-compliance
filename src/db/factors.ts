@@ -43,8 +43,14 @@ function toEngineFactor(r: typeof emissionFactors.$inferSelect): EmissionFactor 
  * looked and chose nothing"), and the engine treats them as no factor.
  */
 export async function currentFactorSet(database: typeof db = db): Promise<EmissionFactor[]> {
-  const rows = await database.select().from(emissionFactors);
-  const best = new Map<string, typeof rows[number]>();
+  return pickCurrent(await database.select().from(emissionFactors)).map(toEngineFactor);
+}
+
+/** One row per (material, process): primary outranks secondary, and within a
+ *  tier the highest version wins. Shared by the plain and transactional reads so
+ *  the two can never disagree about what "current" means. */
+function pickCurrent(rows: (typeof emissionFactors.$inferSelect)[]) {
+  const best = new Map<string, (typeof rows)[number]>();
   for (const r of rows) {
     const key = `${r.material}::${r.process}`;
     const held = best.get(key);
@@ -55,7 +61,14 @@ export async function currentFactorSet(database: typeof db = db): Promise<Emissi
     const tierDelta = (TIER_RANK[r.tier as FactorTier] ?? 0) - (TIER_RANK[held.tier as FactorTier] ?? 0);
     if (tierDelta > 0 || (tierDelta === 0 && r.version > held.version)) best.set(key, r);
   }
-  return [...best.values()].map(toEngineFactor);
+  return [...best.values()];
+}
+
+/** `currentFactorSet` inside a transaction, with the chosen rows locked FOR
+ *  SHARE so they cannot be deleted before the pins referencing them are written. */
+async function currentFactorSetTx(tx: Parameters<Parameters<typeof db.transaction>[0]>[0]): Promise<EmissionFactor[]> {
+  const rows = await tx.select().from(emissionFactors).for("share");
+  return pickCurrent(rows).map(toEngineFactor);
 }
 
 /**
@@ -91,7 +104,6 @@ export async function pinnedFactorSet(
 
   // First evaluation: pin what is current. Guarded so two concurrent renders
   // cannot both pin — the second sees pinnedAt set and reads the first's rows.
-  const current = await currentFactorSet(database);
   await database.transaction(async (tx) => {
     const [claimed] = await tx
       .update(assessments)
@@ -99,6 +111,18 @@ export async function pinnedFactorSet(
       .where(and(eq(assessments.id, assessmentId), isNull(assessments.factorsPinnedAt)))
       .returning({ id: assessments.id });
     if (!claimed) return; // another render pinned first; its set is authoritative
+
+    // The factor set is read INSIDE the transaction and the rows are locked FOR
+    // SHARE. Reading it outside was a real race: between the read and the insert
+    // a factor could be deleted, and the pin insert then died on the foreign key
+    // — which is exactly what the test suite hit, intermittently, when a
+    // concurrent test removed its own factors mid-render.
+    //
+    // FOR SHARE blocks a concurrent DELETE of these rows until this transaction
+    // commits, without blocking other readers. It is the cheapest correct fix:
+    // the alternative (catch the FK violation and retry) would paper over a
+    // torn read rather than prevent one.
+    const current = await currentFactorSetTx(tx);
     if (current.length > 0) {
       await tx
         .insert(assessmentFactorPins)

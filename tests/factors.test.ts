@@ -162,6 +162,12 @@ test("pinning is recorded even when NOTHING was selected — so it never re-pins
     undefined,
     "a later selection must not leak into an already-evaluated assessment",
   );
+  // Drop pins first, for the same reason cleanup() does: this factor is visible
+  // to currentFactorSet() the moment it exists, so a CONCURRENT test file's
+  // assessment can pin it between its creation and this delete. The FK is ON
+  // DELETE RESTRICT by design.
+  await sql!`delete from assessment_factor_pins where factor_id in
+             (select id from emission_factors where material = ${MAT_EMPTY})`;
   await sql!`delete from emission_factors where material = ${MAT_EMPTY}`;
 });
 

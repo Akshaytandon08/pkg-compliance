@@ -143,3 +143,71 @@ test("evaluatePack routes upcoming to its own bucket and its own count", () => {
   const grade = report.upcoming.find((c) => c.checkpointId === "EU-PPWR-recyclability-grade");
   assert.match(grade?.outcome?.detail ?? "", /Applies from 2030-01-01 or later, pending 24 months/);
 });
+
+// --- the "not yet applicable" LIST, as a reader sees it (Sprint 10) ---------
+
+import { groupCardsByRule, earliestTriggerDate, splitCitation, upcomingWhen } from "../src/lib/report/ruleRows.ts";
+
+test("an upcoming rule is listed ONCE, however many components it scopes to", () => {
+  // The production report showed `recyclability-grade` three times, identically,
+  // each with its full legal text: PackReport.upcoming carries a card per
+  // COMPONENT, which is right for evaluation and wrong for a list a person reads.
+  const cards = [
+    { checkpointId: "EU-PPWR-recyclability-grade", version: 1, componentName: "Outer carton" },
+    { checkpointId: "EU-PPWR-recyclability-grade", version: 1, componentName: "Inner fitting" },
+    { checkpointId: "EU-PPWR-recyclability-grade", version: 1, componentName: "Kraft label" },
+    { checkpointId: "EU-PPWR-recycled-content", version: 2, componentName: "Outer carton" },
+  ];
+  const grouped = groupCardsByRule(cards);
+  assert.equal(grouped.length, 2, "three cards for one rule collapse to one entry");
+  assert.deepEqual(
+    grouped.map((c) => `${c.checkpointId}@${c.version}`),
+    ["EU-PPWR-recyclability-grade@1", "EU-PPWR-recycled-content@2"],
+    "order is preserved and the version is part of identity",
+  );
+});
+
+test("a rule at two versions stays two entries — a version IS a different rule", () => {
+  const grouped = groupCardsByRule([
+    { checkpointId: "EU-PPWR-recyclability-grade", version: 1 },
+    { checkpointId: "EU-PPWR-recyclability-grade", version: 2 },
+  ]);
+  assert.equal(grouped.length, 2);
+});
+
+test("the collapsed summary names the earliest date anything starts to bite", () => {
+  const earliest = earliestTriggerDate([
+    { outcome: { detail: "Applies from 2030-01-01 or later, pending the Article 6(4) delegated acts" } },
+    { outcome: { detail: "Applies from 2026-09-27" } },
+    { outcome: { detail: "Applies from 2035-01-01 or later" } },
+  ]);
+  assert.equal(earliest, "2026-09-27", "the nearest date, not the first in the list");
+});
+
+test("no date anywhere yields null, so the summary omits the clause rather than inventing one", () => {
+  assert.equal(earliestTriggerDate([{ outcome: { detail: "pending an implementing act" } }]), null);
+  assert.equal(earliestTriggerDate([{ outcome: null }]), null);
+  assert.equal(earliestTriggerDate([]), null);
+});
+
+test("the citation splits into readable text and a primary-source link", () => {
+  const { text, url } = splitCitation(
+    "Regulation (EU) 2025/40, Article 6 (recyclability). https://eur-lex.europa.eu/eli/reg/2025/40/oj/eng",
+  );
+  assert.equal(url, "https://eur-lex.europa.eu/eli/reg/2025/40/oj/eng");
+  assert.match(text, /Article 6 \(recyclability\)/);
+  assert.doesNotMatch(text, /https?:/, "the URL is not repeated in the visible text");
+});
+
+test("the 'applies from' row does not repeat its own label", () => {
+  // The engine's detail opens "Applies from …", which sat beside a field labelled
+  // "Applies from" and read twice.
+  assert.equal(upcomingWhen("Applies from 2030-01-01 or later, pending the Article 6(4) acts"),
+    "2030-01-01 or later, pending the Article 6(4) acts");
+  assert.equal(upcomingWhen("applies from 2026-09-27"), "2026-09-27");
+  // A detail that does not start that way is left alone.
+  assert.equal(upcomingWhen("Pending an implementing act"), "Pending an implementing act");
+  // And an absent detail says so rather than rendering an empty row.
+  assert.equal(upcomingWhen(null), "a date the instrument has not fixed");
+  assert.equal(upcomingWhen("  "), "a date the instrument has not fixed");
+});
