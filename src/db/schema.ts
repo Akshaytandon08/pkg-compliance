@@ -607,6 +607,11 @@ export const emissionFactors = pgTable(
     year: integer("year").notNull(),
     // GWP set and system boundary, e.g. "AR6 GWP100, cradle-to-gate".
     methodology: text("methodology"),
+    // The provider's data release this value came from (Climatiq data_version,
+    // e.g. "^36"). Stored on every factor: `activity_id` identifies the row, but
+    // only the release says WHICH revision of that row was read, and a provider
+    // may change a value between releases without changing its id.
+    dataVersion: text("data_version"),
     // When the value was pulled from the provider — a factor is a snapshot, and
     // databases are revised.
     retrievedAt: timestamp("retrieved_at", { withTimezone: true }),

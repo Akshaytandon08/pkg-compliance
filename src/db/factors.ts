@@ -27,6 +27,7 @@ function toEngineFactor(r: typeof emissionFactors.$inferSelect): EmissionFactor 
     source: r.source,
     sourceDataset: r.sourceDataset,
     activityId: r.activityId,
+    dataVersion: r.dataVersion,
     region: r.region,
     year: r.year,
     methodology: r.methodology,
@@ -116,6 +117,8 @@ export interface FactorSelection {
   source: string;
   sourceDataset?: string | null;
   activityId?: string | null;
+  /** Provider data release (Climatiq data_version) this value came from. */
+  dataVersion?: string | null;
   region: string;
   year: number;
   methodology?: string | null;
@@ -156,6 +159,7 @@ export async function selectFactor(
         source: selection.source,
         sourceDataset: selection.sourceDataset ?? null,
         activityId: selection.activityId ?? null,
+        dataVersion: selection.dataVersion ?? null,
         region: selection.region,
         year: selection.year,
         methodology: selection.methodology ?? null,

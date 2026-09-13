@@ -27,8 +27,15 @@
 //   total — the same outcome as an absent row, but visible in the store.
 import { readFileSync } from "node:fs";
 import { selectFactor, type FactorSelection } from "../src/db/factors.ts";
-import { searchFactors, ClimatiqError } from "../src/lib/factors/climatiq.ts";
+import { searchFactors, ClimatiqError, DEFAULT_DATA_VERSION } from "../src/lib/factors/climatiq.ts";
 import { FACTOR_TIERS, type FactorTier } from "../src/lib/vocab.ts";
+import {
+  CANONICAL_MASS_UNIT,
+  UnitError,
+  isCarbonStorageVariant,
+  isProductionBoundary,
+  toPerKilogram,
+} from "../src/lib/factors/units.ts";
 import { parseArgs, requireString } from "./corpus-lib.ts";
 
 try {
@@ -79,21 +86,42 @@ if (primaryFile) {
     if (!line.trim()) continue;
     const cells = line.split(",");
     const rec = Object.fromEntries(header.map((h, i) => [h, (cells[i] ?? "").trim()]));
-    const factor = Number(rec.factor);
     const year = Number(rec.year);
-    if (!Number.isFinite(factor) || !Number.isInteger(year)) {
-      console.error(`Malformed factor/year in row: ${line}`);
+    if (!Number.isInteger(year)) {
+      console.error(`Malformed year in row: ${line}`);
+      process.exit(1);
+    }
+    // Transport rows are per kg·km and are left alone; production rows must be
+    // per kg, by the same rule the Climatiq path enforces.
+    const isTransport = rec.unit === "kgCO2e/kg.km";
+    let factor = Number(rec.factor);
+    let unit = rec.unit;
+    let unitNote: string | null = null;
+    if (!isTransport) {
+      try {
+        const c = toPerKilogram(factor, rec.unit);
+        factor = c.factor;
+        unit = c.unit;
+        unitNote = c.note;
+      } catch (err) {
+        console.error(`Row "${rec.material}/${rec.process}": ${err instanceof UnitError ? err.message : String(err)}`);
+        process.exit(1);
+      }
+    }
+    if (!Number.isFinite(factor)) {
+      console.error(`Malformed factor in row: ${line}`);
       process.exit(1);
     }
     const selection: FactorSelection = {
       material: rec.material,
       process: rec.process,
       factor,
-      unit: rec.unit,
+      unit,
       tier: "primary",
       source: rec.source || "Fitsol",
       sourceDataset: rec.source_dataset || null,
       activityId: null,
+      dataVersion: rec.data_version || null,
       region: rec.region,
       year,
       methodology: rec.methodology || null,
@@ -103,7 +131,7 @@ if (primaryFile) {
       // per row. Absent, it stays false like everything else.
       valueDisplayPermitted: (rec.value_display_permitted ?? "").toLowerCase() === "true" || permitValueDisplay,
       selectedBy,
-      notes: rec.notes || notes,
+      notes: [rec.notes || notes, unitNote].filter(Boolean).join(" ") || null,
     };
     report("primary", await selectFactor(selection), selection);
     n++;
@@ -139,6 +167,7 @@ if (args.none === true) {
 const activityId = requireString(args, "activity-id");
 const region = typeof args.region === "string" ? args.region : undefined;
 const year = typeof args.year === "string" ? Number(args.year) : undefined;
+const dataVersion = typeof args["data-version"] === "string" ? args["data-version"] : DEFAULT_DATA_VERSION;
 
 if (!process.env.CLIMATIQ_API_KEY) {
   console.error("CLIMATIQ_API_KEY is not set — cannot read the factor back from the provider.");
@@ -149,7 +178,11 @@ if (!process.env.CLIMATIQ_API_KEY) {
 
 let candidate;
 try {
-  const results = await searchFactors({ query: activityId, region, year, resultsPerPage: 25 });
+  // Public-only, matching the shortlist: a premium row cannot be read back
+  // without an entitled key, so it could not be stored truthfully anyway.
+  const results = await searchFactors({
+    query: activityId, region, year, dataVersion, accessType: "public", resultsPerPage: 25,
+  });
   candidate = results.find((r) => r.activityId === activityId);
 } catch (err) {
   console.error(err instanceof ClimatiqError ? err.message : String(err));
@@ -170,18 +203,49 @@ if (candidate.qualityFlags.length) {
   console.warn(`⚠ provider quality flags on this factor: ${candidate.qualityFlags.join(", ")}`);
 }
 
+// SYSTEM BOUNDARY. A search for a material returns more waste-disposal rows than
+// production rows, and they are indistinguishable at a glance. Refuse anything
+// that is not a production boundary unless the owner overrides deliberately.
+if (isCarbonStorageVariant(candidate.lcaActivity)) {
+  console.error(`"${activityId}" is a CARBON STORAGE variant (${candidate.lcaActivity}).`);
+  console.error("It reports sequestered carbon and is not comparable with a cradle-to-gate");
+  console.error("production factor — selecting it would flip the sign of this component.");
+  process.exit(1);
+}
+if (!isProductionBoundary(candidate.lcaActivity) && args["allow-boundary"] !== true) {
+  console.error(`"${activityId}" has system boundary "${candidate.lcaActivity ?? "(not stated)"}".`);
+  console.error("A cradle-to-gate screening needs a production factor (cradle_to_gate or");
+  console.error("cradle_to_shelf). End-of-life and gate-to-grave rows answer a different");
+  console.error("question and would quietly turn the footprint into something else.");
+  console.error("Pass --allow-boundary only if you mean it, and say why in --notes.");
+  process.exit(1);
+}
+
+// UNITS. The engine computes mass_in_kg × factor. BEIS publishes kg/tonne; storing
+// it verbatim would be a silent 1000× error that still looks like a plausible
+// number. Convert exactly, or refuse.
+let converted;
+try {
+  converted = toPerKilogram(candidate.factor, candidate.unit);
+} catch (err) {
+  console.error(err instanceof UnitError ? err.message : String(err));
+  process.exit(1);
+}
+if (converted.note) console.log(`  ${converted.note}`);
+
 const tier: FactorTier = "secondary_database";
 if (!FACTOR_TIERS.includes(tier)) throw new Error("unreachable");
 
 const selection: FactorSelection = {
   material,
   process: process_,
-  factor: candidate.factor,
-  unit: candidate.unit,
+  factor: converted.factor,
+  unit: CANONICAL_MASS_UNIT,
   tier,
   source: candidate.source,
   sourceDataset: candidate.sourceDataset,
   activityId: candidate.activityId,
+  dataVersion: candidate.dataVersion,
   region: candidate.region,
   year: candidate.year,
   methodology: candidate.lcaActivity,
@@ -189,7 +253,9 @@ const selection: FactorSelection = {
   licenceNote,
   valueDisplayPermitted: permitValueDisplay,
   selectedBy,
-  notes,
+  // The conversion is recorded on the row: an unexplained 1.19 where the provider
+  // publishes 1193.97 is exactly the discrepancy that destroys trust in a figure.
+  notes: [notes, converted.note].filter(Boolean).join(" ") || null,
 };
 report("secondary", await selectFactor(selection), selection);
 if (!permitValueDisplay) {

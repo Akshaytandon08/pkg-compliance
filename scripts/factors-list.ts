@@ -25,7 +25,8 @@ for (const r of rows) {
   const value = r.tier === "none" ? "NO FACTOR" : `${r.factor} ${r.unit}`;
   console.log(`${mark} ${r.material}/${r.process} v${r.version}  ${value}  [${r.tier}]`);
   console.log(`    ${r.source}${r.sourceDataset ? ` / ${r.sourceDataset}` : ""} · ${r.region} · ${r.year}`);
-  if (r.activityId) console.log(`    activity_id: ${r.activityId}`);
+  if (r.activityId) console.log(`    activity_id: ${r.activityId}${r.dataVersion ? ` @ data_version ${r.dataVersion}` : ""}`);
+  else if (r.dataVersion) console.log(`    release:     ${r.dataVersion}`);
   if (r.methodology) console.log(`    boundary:    ${r.methodology}`);
   console.log(`    selected by ${r.selectedBy} on ${r.selectedAt.toISOString().slice(0, 10)}`);
   console.log(`    value on public passport: ${r.valueDisplayPermitted ? "PERMITTED" : "withheld"}${r.licenceNote ? ` — ${r.licenceNote}` : ""}`);

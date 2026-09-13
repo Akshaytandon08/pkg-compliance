@@ -18,7 +18,7 @@ let nextId = 1;
 const ef = (material: string, over: Partial<EmissionFactor> = {}): EmissionFactor => ({
   id: nextId++, material, process: "production", version: 1, factor: 0.9, unit: "kgCO2e/kg",
   tier: "secondary_database", source: "ecoinvent", sourceDataset: "ecoinvent 3.10 cut-off",
-  activityId: `paper-${material}`, region: "GLOBAL", year: 2023,
+  activityId: `paper-${material}`, dataVersion: "^36", region: "GLOBAL", year: 2023,
   methodology: "AR6 GWP100, cradle-to-gate", licenceNote: null, valueDisplayPermitted: false, ...over,
 });
 
