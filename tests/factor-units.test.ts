@@ -114,3 +114,33 @@ test("an unread dataset returns null rather than a default permission", () => {
   assert.equal(licenceFor(null), null);
   assert.equal(licenceFor(""), null);
 });
+
+// --- write-target guard ------------------------------------------------------
+
+import { describeWriteTarget } from "../src/lib/factors/target.ts";
+
+test("a localhost target is recognised as local", () => {
+  for (const host of ["localhost", "127.0.0.1", "host.docker.internal"]) {
+    const t = describeWriteTarget(`postgres://u:p@${host}:5433/pkg_compliance`);
+    assert.equal(t.isLocal, true, host);
+    assert.match(t.label, /\(local\)/);
+  }
+});
+
+test("a Neon host is REMOTE — the case that nearly wrote five factors to production", () => {
+  const t = describeWriteTarget("postgres://neondb_owner:secret@ep-x-1.eu-central-1.aws.neon.tech/neondb");
+  assert.equal(t.isLocal, false);
+  assert.equal(t.host, "ep-x-1.eu-central-1.aws.neon.tech");
+  assert.equal(t.database, "neondb");
+  assert.match(t.label, /REMOTE/);
+});
+
+test("the printable label never contains the credential", () => {
+  const t = describeWriteTarget("postgres://neondb_owner:sup3rs3cret@ep-x-1.aws.neon.tech/neondb");
+  assert.doesNotMatch(t.label, /sup3rs3cret/);
+  assert.doesNotMatch(t.label, /neondb_owner/);
+});
+
+test("an absent DATABASE_URL is an error, not a silently local target", () => {
+  assert.throws(() => describeWriteTarget(undefined), /DATABASE_URL is not set/);
+});

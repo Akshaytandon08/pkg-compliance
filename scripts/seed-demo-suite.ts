@@ -19,6 +19,12 @@ import { db } from "../src/db/index.ts";
 import { assessments, organisations } from "../src/db/schema.ts";
 import { createAssessment, type NewAssessment } from "../src/db/assessments.ts";
 import { createOrganisation, type NewOrganisation } from "../src/db/organisations.ts";
+import { requireIntendedTarget } from "../src/lib/factors/target.ts";
+import { parseArgs } from "./corpus-lib.ts";
+
+// This script DELETES and recreates the demo packs, so it says which database
+// it is about to do that to, and refuses a remote one without --remote.
+requireIntendedTarget(parseArgs(process.argv.slice(2)).remote === true, "seed:demo-suite");
 
 const GOLDEN = "Client A — traction-cell (demo)";
 const CARTON = "Demo — corrugated export carton";

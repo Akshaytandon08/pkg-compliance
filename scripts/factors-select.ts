@@ -37,6 +37,7 @@ import {
   toPerKilogram,
 } from "../src/lib/factors/units.ts";
 import { parseArgs, requireString } from "./corpus-lib.ts";
+import { requireIntendedTarget } from "../src/lib/factors/target.ts";
 
 try {
   process.loadEnvFile(".env");
@@ -46,6 +47,9 @@ try {
 
 const args = parseArgs(process.argv.slice(2));
 const selectedBy = requireString(args, "selected-by");
+// Which database is about to be written to. Printed always; refused when remote
+// unless --remote was passed. See src/lib/factors/target.ts for the near miss.
+requireIntendedTarget(args.remote === true, "factors:select");
 const primaryFile = typeof args["primary-file"] === "string" ? args["primary-file"] : null;
 const licenceNote = typeof args["licence-note"] === "string" ? args["licence-note"] : null;
 const permitValueDisplay = args["permit-value-display"] === true;
