@@ -112,14 +112,26 @@ npm run factors:select -- --primary-file reference/fitsol_primary_factors.csv --
 
 Merging a branch ships **code**, never factors. The stores are separate.
 
+**An exported `DATABASE_URL` wins over `.env`.** Verified on Node 24.4.1: neither
+`--env-file` nor `process.loadEnvFile()` overwrites a variable already present in
+the environment, so `export DATABASE_URL=…` in a dedicated window is enough and
+every command below is the ordinary one. Confirm it before you write anything:
+
 ```bash
-# local
+# WINDOW 2, first command — prove which database you are pointed at
+export DATABASE_URL="<production>"
+node --env-file=.env -e 'const u=new URL(process.env.DATABASE_URL); console.log(u.hostname, u.pathname)'
+# expect: ep-….neon.tech  /neondb   — NOT localhost /pkg_compliance
+```
+
+```bash
+# window 1 — local
 npm run factors:list          # confirm the four rows
 npm run seed:demo-suite
 
-# production — same four commands with DATABASE_URL pointed at prod, then:
-DATABASE_URL="<production>" npm run factors:list
-DATABASE_URL="<production>" node --env-file=/dev/null scripts/seed-demo-suite.ts
+# window 2 — production, after the same four selections
+npm run factors:list
+npm run seed:demo-suite
 ```
 
 **The re-seed is required, not cosmetic.** `assessments.factors_pinned_at` is
