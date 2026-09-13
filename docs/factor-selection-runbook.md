@@ -43,6 +43,38 @@ packs only.
 
 ---
 
+## 0. Point each window at the right database — BOTH windows
+
+An **exported `DATABASE_URL` overrides `.env`**, so a shell that has one left over
+from an earlier session is pointed somewhere you did not choose. This happened on
+2026-09-13: the "local" window still held a production Neon URL from a September
+triage, and the first selection went to production. It failed only because the
+credential had gone stale. Had it worked, five factors would have been written to
+**production** from the local window — and the production window would then have
+appended five more as version 2, leaving prod double-versioned and local empty.
+
+Both writers now **print the target and refuse a remote one** unless `--remote` is
+passed, so this cannot happen silently again. Start each window anyway:
+
+```bash
+# WINDOW 1 — local
+unset DATABASE_URL
+node --env-file=.env -e 'const u=new URL(process.env.DATABASE_URL); console.log(u.hostname, u.pathname)'
+# expect: localhost /pkg_compliance
+```
+
+```bash
+# WINDOW 2 — production
+export DATABASE_URL="<production>"
+node --env-file=.env -e 'const u=new URL(process.env.DATABASE_URL); console.log(u.hostname, u.pathname)'
+# expect: ep-….neon.tech /neondb
+```
+
+**Window 2 commands take `--remote`.** Window 1 commands do not — and will refuse
+if that window turns out to be pointed at production after all.
+
+---
+
 ## 1. The five commands
 
 ```bash
@@ -88,6 +120,25 @@ Check with `npm run factors:list`.
 
 ---
 
+### Window 2 (production): the same five, each with `--remote`
+
+Identical commands, with `--remote` appended. The flag is the only difference —
+everything else, including the notes, must be verbatim so both stores agree.
+
+```bash
+npm run factors:select -- --material corrugated --activity-id paper_and_cardboard-type_board_primary_material_production ... --remote
+npm run factors:select -- --material plastic    --activity-id plastics_rubber-type_pet_including_forming_primary_material_production ... --remote
+npm run factors:select -- --material wood_solid --activity-id timber_forestry-type_wood_primary_material_production ... --remote
+npm run factors:select -- --material wood_processed --activity-id timber_forestry-type_wood_primary_material_production ... --remote
+npm run factors:select -- --material metal      --activity-id metals-type_primary_material_production ... --remote
+```
+
+(`...` stands for the `--selected-by` / `--licence-note` / `--permit-value-display`
+/ `--notes` arguments exactly as written above — copy each full command from §1 and
+append `--remote`.)
+
+---
+
 ## 2. The superseded alternatives — run only if you prefer them
 
 Each **replaces** the §1 selection for that BOM key (appends a higher version).
@@ -120,24 +171,16 @@ Merging a branch ships **code**, never factors. The stores are separate.
 
 **An exported `DATABASE_URL` wins over `.env`.** Verified on Node 24.4.1: neither
 `--env-file` nor `process.loadEnvFile()` overwrites a variable already present in
-the environment, so `export DATABASE_URL=…` in a dedicated window is enough and
-every command below is the ordinary one. Confirm it before you write anything:
-
-```bash
-# WINDOW 2, first command — prove which database you are pointed at
-export DATABASE_URL="<production>"
-node --env-file=.env -e 'const u=new URL(process.env.DATABASE_URL); console.log(u.hostname, u.pathname)'
-# expect: ep-….neon.tech  /neondb   — NOT localhost /pkg_compliance
-```
+the environment. That is what makes §0 necessary in *both* directions.
 
 ```bash
 # window 1 — local
 npm run factors:list          # confirm the five rows
 npm run seed:demo-suite
 
-# window 2 — production, after the same five selections
+# window 2 — production, after the same five selections (each with --remote)
 npm run factors:list
-npm run seed:demo-suite
+npm run seed:demo-suite -- --remote
 ```
 
 **The re-seed is required, not cosmetic.** `assessments.factors_pinned_at` is
