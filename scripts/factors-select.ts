@@ -177,13 +177,21 @@ if (!process.env.CLIMATIQ_API_KEY) {
 }
 
 let candidate;
+let alternateYears: number[] = [];
 try {
   // Public-only, matching the shortlist: a premium row cannot be read back
   // without an entitled key, so it could not be stored truthfully anyway.
   const results = await searchFactors({
     query: activityId, region, year, dataVersion, accessType: "public", resultsPerPage: 25,
   });
-  candidate = results.find((r) => r.activityId === activityId);
+  // BEIS republishes the SAME activity_id every year, so a search for one id can
+  // return half a dozen rows. Taking the first would store whichever year the
+  // provider happened to rank highest — a different value on a re-run, from a
+  // command that looks deterministic. Take the NEWEST year, and say so; pin an
+  // older one with --year.
+  const matches = results.filter((r) => r.activityId === activityId).sort((a, b) => b.year - a.year);
+  candidate = matches[0];
+  alternateYears = matches.slice(1).map((m) => m.year);
 } catch (err) {
   console.error(err instanceof ClimatiqError ? err.message : String(err));
   process.exit(1);
@@ -201,6 +209,10 @@ if (candidate.factor == null || !candidate.unit) {
 }
 if (candidate.qualityFlags.length) {
   console.warn(`⚠ provider quality flags on this factor: ${candidate.qualityFlags.join(", ")}`);
+}
+console.log(`  using ${candidate.source} ${candidate.year} (${candidate.region}).`);
+if (alternateYears.length) {
+  console.log(`  the provider also publishes this id for: ${alternateYears.join(", ")} — pin one with --year.`);
 }
 
 // SYSTEM BOUNDARY. A search for a material returns more waste-disposal rows than
