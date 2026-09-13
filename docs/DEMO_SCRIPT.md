@@ -117,6 +117,12 @@ top. Walk one row end to end:
   with **"Test required"** in the *Why* column, and the annotation shown as an
   **Assessor flag** in the expanded row. (A component with no annotation shows
   nothing there — there is no default "risk low".)
+- **5a — who stands behind the evidence.** Expand the strap's heavy-metals row:
+  the proof is an **accredited laboratory** XRF report with an **NABL** reference
+  and a measured value against the limit (Pb 3.1 mg/kg, sum 4.1, limit 100). Then
+  expand any corrugated row: the proof there is the **mill's own quality
+  function**. Same verdict word, very different strength of evidence — and the
+  passport now says which, rather than leaving the reader to assume.
 - **Expand the row** (click the rule name) for the full requirement text,
   thresholds, exemptions, phase-in and analyst confidence, plus the approved
   **"How to obtain this evidence"** guidance.
@@ -127,9 +133,14 @@ top. Walk one row end to end:
 - Use **"Request evidence"** in the Action column to download the lab-test request
   as a **.docx** (with a **PDF preview** alongside) — a Fitsol-branded drafting aid
   the user sends to their lab, never a system-issued document.
-- **"Add evidence"** sits in the same Action cell: add a lab test (or test report)
-  for the strap and save. The report re-evaluates in place and the strap flips
-  **Conditional → Qualified**, with no code change and no corpus change.
+- **"Add evidence"** sits in the same Action cell. Use it on the **Corrugated
+  sheet** (which has nothing on file): add a supplier declaration and save. The
+  report re-evaluates in place and that component flips **Conditional →
+  Qualified**, with no code change and no corpus change.
+  *(This moment used to use the strap. The strap now ships with an
+  accredited-lab XRF report so the passport can show the strongest issuer type
+  beside the weakest — see §5a — so the live flip moved to a component that still
+  has no evidence.)*
 - On a phone (≤768px) the same rows render as stacked cards in the same field
   order — nothing is hidden, the reading order just becomes vertical.
 - A rule that does not apply yet shows as **Upcoming — applies from <date>**,

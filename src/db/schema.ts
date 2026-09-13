@@ -388,6 +388,23 @@ export const assessmentComponents = pgTable("assessment_components", {
   riskAnnotation: text("risk_annotation"),
   riskRationale: text("risk_rationale"),
   riskAnnotatedBy: text("risk_annotated_by"),
+  // --- Minimal traceability (Sprint 10) ---------------------------------
+  // Where the component was actually made, finer than `sourcedFrom`. That column
+  // holds the country a component was SOURCED from (an ISO code, used by the
+  // report); this one holds the place of manufacture as a reader would say it
+  // ("Tamil Nadu, India"). They are different facts: a component can be sourced
+  // through a distributor in one country and made in another.
+  countryOfOrigin: text("country_of_origin"),
+  // The party that made it. A name only — no contact details, because this
+  // reaches the PUBLIC passport and the public tier discloses who, not how to
+  // reach them.
+  supplierName: text("supplier_name"),
+  // Recycled content as a FRACTION 0..1, nullable. Null means "not stated",
+  // which is different from 0 ("stated as none") — a passport must not imply the
+  // supplier declared virgin material when nobody asked. Stored as a fraction
+  // rather than a percentage so the post-Tuesday blend rule
+  // (primary × (1−r) + closed_loop × r) can use it directly.
+  recycledShare: doublePrecision("recycled_share"),
 });
 
 export const assessmentEvidence = pgTable("assessment_evidence", {
@@ -410,6 +427,20 @@ export const assessmentEvidence = pgTable("assessment_evidence", {
   source: text("source").notNull().default("manual"),
   documentId: integer("document_id").references(() => evidenceDocuments.id, { onDelete: "set null" }),
   extractedClaimId: integer("extracted_claim_id"),
+  // --- Who stands behind this evidence (Sprint 10) ------------------------
+  // A reader's first question about a test report is who ran it, and their
+  // second is whether that party is accredited. Both belong on the public tier:
+  // they are the difference between "a lab says so" and "the manufacturer's own
+  // QA says so", and a passport that hides it invites the reader to assume the
+  // stronger one.
+  issuerName: text("issuer_name"),
+  // ISSUER_TYPES in src/lib/vocab.ts. Text, not pgEnum, like every other
+  // vocabulary here — a new issuer kind must not require a migration.
+  issuerType: text("issuer_type"),
+  // The accreditation this issuer holds (e.g. an NABL certificate number).
+  // Meaningful for accredited_lab; null for everything else, and the display
+  // shows it only where it exists rather than printing an empty field.
+  accreditationRef: text("accreditation_ref"),
 });
 
 // --- Evidence documents (Sprint 4 / A1, stored files) ---------------------

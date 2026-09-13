@@ -301,3 +301,48 @@ there is no honest value to put in them for a row that was never chosen by anyon
 
 **Vocabulary as `text`, not `pgEnum`** (`FACTOR_TIERS` in `src/lib/vocab.ts`),
 consistent with the rest of the schema.
+
+## 15. A passport named the packaging but not where it came from — RESOLVED, implemented
+
+*(The Sprint 10 brief calls this "#14-lite"; #14 was already taken by emission-factor
+provenance, so it lands here as #15.)*
+
+**The gap.** The public passport could say a rule was met and not who met it. A
+reader scanning a QR code at a loading dock gets "Qualified — evidence complete"
+and has no way to tell whether that evidence is an accredited laboratory's test
+report or the supplier's own say-so. Those are different claims, and a page that
+renders them identically invites the reader to assume the stronger one.
+
+The same gap on the component side: the passport listed materials and masses but
+never where a part was made or by whom — the first two questions anyone asks of a
+supply chain.
+
+**The shape.** Six nullable columns, no new tables.
+
+| Table | Column | Why |
+|---|---|---|
+| `assessment_components` | `country_of_origin` | Place of manufacture as a reader says it ("Tamil Nadu, India"). Distinct from `sourced_from`, which is the ISO country a part was *sourced through* — a component can be sourced via a distributor in one country and made in another |
+| | `supplier_name` | Who made it. A name only: the public tier discloses **who**, never how to reach them |
+| | `recycled_share` | Recycled content as a **fraction 0..1** |
+| `assessment_evidence` | `issuer_name` | Who stands behind the record |
+| | `issuer_type` | `ISSUER_TYPES`: `manufacturer_qa` \| `accredited_lab` \| `treatment_provider` \| `mill` |
+| | `accreditation_ref` | The accreditation the issuer holds (e.g. an NABL certificate). Rendered only where it exists, never as an empty field |
+
+**`recycled_share` is null-vs-zero significant.** Null means *not stated*; `0`
+means *stated as none*. A passport must not imply a supplier declared virgin
+material when nobody asked them. The demo carries both cases deliberately — the
+LDPE bag is an explicit `0`, the wood pallet and the pouch components are null.
+
+Stored as a fraction rather than a percentage so the deferred blend rule
+(`primary × (1 − r) + closed_loop × r`, decision log 2026-09-13) can consume it
+without a unit conversion.
+
+**Display data is carried beside the engine's type, not through it.**
+`LoadedComponent` gains `evidenceRecords: EvidenceRecord[]` alongside the existing
+`documents: EvidenceDocument[]`. `EvidenceDocument` is the engine's input and this
+sprint changes no engine code, so the reader-facing fields travel in parallel and
+join on `docId`. The cost is one extra array; the benefit is that a display
+requirement never reshapes an evaluator input.
+
+**Vocabulary as `text`, not `pgEnum`**, consistent with the rest of the schema: a
+new issuer kind must not require a migration.
