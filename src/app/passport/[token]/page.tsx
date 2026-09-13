@@ -17,6 +17,18 @@ import {
 } from "@/lib/report/labels";
 import { Wordmark } from "@/app/_components/Wordmark";
 
+/** The tab title on a page reached by QR, so a reader with several open can tell
+ *  them apart. The pack name is public under the Sprint 10 disclosure line. */
+export async function generateMetadata({ params }: PageProps<"/passport/[token]">) {
+  const { token } = await params;
+  const passport = await getPassportByToken(token);
+  if (!passport) return { title: "Passport not found" };
+  return {
+    title: `${passport.payload.packName} — packaging passport`,
+    description: `Packaging compliance passport for ${passport.payload.packName}. Screening output, not a Declaration of Conformity.`,
+  };
+}
+
 // Public tier — reached without the access gate (see src/proxy.ts). Renders only
 // the passport payload, which by construction carries no evidence, no
 // per-checkpoint detail, and nothing from a draft/contested checkpoint.

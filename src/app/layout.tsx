@@ -15,7 +15,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "pkg-compliance",
+  // The repo name is not a product name, and this title reaches a browser tab on
+  // a public page opened from a QR code. `template` lets each page name itself
+  // and keeps one suffix.
+  title: {
+    default: "Packaging compliance screening — Fitsol",
+    template: "%s — Fitsol",
+  },
   description:
     "Packaging compliance qualification screening and evidence assembly",
 };

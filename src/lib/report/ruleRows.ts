@@ -49,6 +49,10 @@ export interface EvidenceRelied {
    *  evidence row — the loaded evidence does not carry extracted_claim_id, and
    *  adding it would be a schema change. Labelled as such in the drawer. */
   claims: ClaimSummary[];
+  // --- who stands behind it (Sprint 10) ---
+  issuerName: string | null;
+  issuerType: string | null;
+  accreditationRef: string | null;
 }
 
 export interface EvidenceContext {
@@ -57,6 +61,10 @@ export interface EvidenceContext {
   /** componentId → extracted claims. */
   claimsByComponent?: Map<number, ClaimSummary[]>;
   componentId?: number;
+  /** docId → who issued the evidence record (Sprint 10). Without this the GATED
+   *  report would show less about an issuer than the PUBLIC passport does, which
+   *  is backwards. */
+  issuerByDocId?: Map<string, { issuerName: string | null; issuerType: string | null; accreditationRef: string | null }>;
 }
 
 /** Approved "how to obtain this evidence" guidance, resolved to plain data so the
@@ -153,6 +161,9 @@ export function toEvidenceRelied(d: EvidenceDocument, ctx: EvidenceContext = {})
     },
     sourceUrl: d.sourceDocumentId != null ? (ctx.sourceLinks?.get(d.sourceDocumentId) ?? null) : null,
     claims: extracted && ctx.componentId != null ? (ctx.claimsByComponent?.get(ctx.componentId) ?? []) : [],
+    issuerName: ctx.issuerByDocId?.get(d.docId)?.issuerName ?? null,
+    issuerType: ctx.issuerByDocId?.get(d.docId)?.issuerType ?? null,
+    accreditationRef: ctx.issuerByDocId?.get(d.docId)?.accreditationRef ?? null,
   };
 }
 
