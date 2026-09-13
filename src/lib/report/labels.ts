@@ -338,6 +338,26 @@ export function preparedForLine(org: {
     .join(" · ");
 }
 
+// --- materials -------------------------------------------------------------
+
+const MATERIAL_LABEL: Record<string, string> = {
+  corrugated: "Corrugated board",
+  plastic: "Plastic",
+  wood: "Wood",
+  wood_solid: "Solid wood",
+  wood_processed: "Processed wood",
+  metal: "Metal",
+  transport: "Transport",
+  all: "All materials",
+};
+
+/** "wood_solid" → "Solid wood". The BOM vocabulary reaches the public passport
+ *  (material summary, component cards, factor attribution), so it needs a label
+ *  like every other vocabulary here. */
+export function materialLabel(material: string): string {
+  return MATERIAL_LABEL[material] ?? humanise(material);
+}
+
 // --- emission factors -------------------------------------------------------
 
 /** What a material with no selected factor reads as. Sprint 9 removed the seeded
