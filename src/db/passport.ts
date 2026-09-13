@@ -89,6 +89,32 @@ export type PassportPayload = {
   /** One line about the rule set's provenance, shown once (Sprint 10). Optional
    *  for hash-chain compatibility with passports minted before it existed. */
   corpus?: { asOf: string; releases: string[] } | null;
+  /** Per-component traceability (Sprint 10). Optional, as above.
+   *
+   *  What is here: what it is, what it is made of, how much it weighs, where it
+   *  was made, by whom, how much of it is recycled, what attests to it, and what
+   *  its footprint rests on. What is NOT: any contact route, any document body,
+   *  and no measured values beyond a rule's key-value line. */
+  components?: {
+    line: string;
+    name: string;
+    material: string;
+    massKg: number | null;
+    countryOfOrigin: string | null;
+    supplierName: string | null;
+    /** 0..1, or null for "not stated" — which is not the same as zero. */
+    recycledShare: number | null;
+    attestations: {
+      evidenceTypeLabel: string;
+      issuerName: string | null;
+      issuerType: string | null;
+      accreditationRef: string | null;
+      issuedDate: string | null;
+    }[];
+    footprint: { kgCo2e: number; datasetName: string } | null;
+    /** Why it has no footprint, when it has none. */
+    footprintExcludedReason: string | null;
+  }[];
   overallVerdict: string;
   checkpoints: PassportCheckpoint[];
   pcf: {
@@ -371,6 +397,40 @@ export async function buildPassportPayload(assessment: LoadedAssessment): Promis
     // Shown once on the page rather than per rule: the provenance of the RULE
     // SET, not of any one rule.
     corpus: { asOf: assessment.asOf, releases: [assessment.corpusVersion] },
+    components: assessment.components.map((c) => {
+      const fp = footprint.components.find((f) => f.line === c.line);
+      return {
+        line: c.line,
+        name: c.name,
+        material: c.material,
+        massKg: fp?.massKg ?? (c.weightGrams != null ? c.weightGrams / 1000 : null),
+        countryOfOrigin: c.countryOfOrigin,
+        supplierName: c.supplierName,
+        recycledShare: c.recycledShare,
+        attestations: c.evidenceRecords.map((r) => ({
+          evidenceTypeLabel: evidenceTypeLabel(r.evidenceType),
+          issuerName: r.issuerName,
+          issuerType: r.issuerType,
+          accreditationRef: r.accreditationRef,
+          issuedDate: r.issuedDate,
+        })),
+        footprint:
+          fp?.kgCo2e != null && fp.factor
+            ? {
+                kgCo2e: Number(fp.kgCo2e.toPrecision(3)),
+                datasetName: fp.factor.sourceDataset
+                  ? `${fp.factor.source} / ${fp.factor.sourceDataset}`
+                  : fp.factor.source,
+              }
+            : null,
+        footprintExcludedReason:
+          fp?.kgCo2e == null
+            ? fp?.unresolvedReason === "no_weight"
+              ? "no mass on file"
+              : "no emission factor selected for this material"
+            : null,
+      };
+    }),
     overallVerdict: report.overall.verdict,
     checkpoints,
     // Omitted entirely when there is no organisation on file, so a passport with

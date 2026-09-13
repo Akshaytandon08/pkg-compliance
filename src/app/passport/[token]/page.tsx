@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getPassportByToken, type PassportCheckpoint } from "@/db/passport";
+import { getPassportByToken, type PassportCheckpoint, type PassportPayload } from "@/db/passport";
 import { PCF_DISCLAIMER, SCREENING_DISCLAIMER } from "@/lib/report/language";
 import { StatusChip, toChipStatus } from "@/app/_components/StatusChip";
 import {
@@ -37,10 +37,13 @@ function Count({ n, label, href }: { n: number; label: string; href?: string }) 
   );
 }
 
-const ACTIVE_GROUPS: { verdict: string; label: string }[] = [
-  { verdict: "qualified", label: "Qualified" },
-  { verdict: "conditional", label: "Conditional" },
-  { verdict: "gap", label: "Gap" },
+// `anchor` is written out rather than derived from `verdict` so no verdict token
+// is ever interpolated into markup — the enum-leak tripwire bans that shape, and
+// it is right to: today's anchor is tomorrow's visible label.
+const ACTIVE_GROUPS: { verdict: string; label: string; anchor: string }[] = [
+  { verdict: "qualified", label: "Qualified", anchor: "cp-qualified" },
+  { verdict: "conditional", label: "Conditional", anchor: "cp-conditional" },
+  { verdict: "gap", label: "Gap", anchor: "cp-gap" },
 ];
 
 /**
@@ -52,11 +55,13 @@ const ACTIVE_GROUPS: { verdict: string; label: string }[] = [
 const QUIET_GROUPS: {
   verdict: string;
   label: string;
+  anchor: string;
   blurb: (rows: PassportCheckpoint[]) => string;
 }[] = [
   {
     verdict: "not_applicable",
     label: "Not applicable",
+    anchor: "cp-not_applicable",
     // The reasons are near-identical across rows in practice (destination and
     // food-contact), so the summary states them once rather than repeating.
     blurb: (rows) => {
@@ -67,6 +72,7 @@ const QUIET_GROUPS: {
   {
     verdict: "upcoming",
     label: "Not yet applicable",
+    anchor: "cp-upcoming",
     blurb: (rows) => {
       const dates = [...new Set(rows.map((r) => r.appliesFrom).filter(Boolean))] as string[];
       return dates.length ? `applies from ${dates.sort()[0]}` : "applies from a future date";
@@ -187,6 +193,35 @@ function RuleRow({ c }: { c: PassportCheckpoint }) {
   );
 }
 
+/** One field in a component card. */
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex gap-2">
+      <dt className="w-28 shrink-0 text-neutral-400">{label}</dt>
+      <dd className="min-w-0 flex-1 text-neutral-700">{children}</dd>
+    </div>
+  );
+}
+
+/** "3 components · corrugated board · 1.27 kg · origin Germany". Origins are
+ *  listed only when they are few; a pack sourced from six places says so rather
+ *  than printing all six in a summary line. */
+function materialsSummary(components: NonNullable<PassportPayload["components"]>): string {
+  const mass = components.reduce((a, c) => a + (c.massKg ?? 0), 0);
+  const materials = [...new Set(components.map((c) => materialLabel(c.material)))];
+  const origins = [...new Set(components.map((c) => c.countryOfOrigin).filter(Boolean))] as string[];
+  // Collapse "Tamil Nadu, India" + "Gujarat, India" to "India" for the summary —
+  // the card keeps the region.
+  const countries = [...new Set(origins.map((o) => o.split(",").pop()!.trim()))];
+  const parts = [
+    `${components.length} component${components.length === 1 ? "" : "s"}`,
+    materials.join(", "),
+    mass > 0 ? `${Number(mass.toPrecision(3))} kg` : null,
+    countries.length > 0 && countries.length <= 3 ? `origin ${countries.join(", ")}` : null,
+  ].filter(Boolean);
+  return parts.join(" · ");
+}
+
 /** A labelled line inside an expanded rule. The label is muted and the value
  *  leads — the reader is scanning for the value, not the label. */
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -275,10 +310,10 @@ export default async function PassportPage({ params }: PageProps<"/passport/[tok
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
         {[...ACTIVE_GROUPS, ...QUIET_GROUPS].map((g) => (
           <Count
-            key={g.verdict}
+            key={g.anchor}
             n={checkpoints.filter((c) => c.verdict === g.verdict).length}
             label={g.label}
-            href={`#cp-${g.verdict}`}
+            href={`#${g.anchor}`}
           />
         ))}
       </div>
@@ -307,11 +342,11 @@ export default async function PassportPage({ params }: PageProps<"/passport/[tok
         )}
 
         <div className="mt-4 space-y-5">
-          {ACTIVE_GROUPS.map(({ verdict, label }) => {
+          {ACTIVE_GROUPS.map(({ verdict, label, anchor }) => {
             const rows = checkpoints.filter((c) => c.verdict === verdict);
-            if (rows.length === 0) return <div key={verdict} id={`cp-${verdict}`} className="scroll-mt-4" />;
+            if (rows.length === 0) return <div key={anchor} id={anchor} className="scroll-mt-4" />;
             return (
-              <section key={verdict} id={`cp-${verdict}`} className="scroll-mt-4">
+              <section key={anchor} id={anchor} className="scroll-mt-4">
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
                   {label} ({rows.length})
                 </h3>
@@ -329,11 +364,11 @@ export default async function PassportPage({ params }: PageProps<"/passport/[tok
           {/* Not-applicable and Upcoming collapse to ONE line each. Neither is
               something the reader has to act on, and giving them the same weight
               as a gap is what made the old list unreadable on a phone. */}
-          {QUIET_GROUPS.map(({ verdict, label, blurb }) => {
+          {QUIET_GROUPS.map(({ verdict, label, anchor, blurb }) => {
             const rows = checkpoints.filter((c) => c.verdict === verdict);
-            if (rows.length === 0) return <div key={verdict} id={`cp-${verdict}`} className="scroll-mt-4" />;
+            if (rows.length === 0) return <div key={anchor} id={anchor} className="scroll-mt-4" />;
             return (
-              <details key={verdict} id={`cp-${verdict}`} className="scroll-mt-4 rounded-md border border-neutral-100 bg-neutral-50">
+              <details key={anchor} id={anchor} className="scroll-mt-4 rounded-md border border-neutral-100 bg-neutral-50">
                 <summary className="cursor-pointer list-none px-3 py-2.5 text-xs text-neutral-600 marker:content-none">
                   <span className="font-semibold uppercase tracking-wide text-neutral-400">
                     {label} ({rows.length})
@@ -353,6 +388,74 @@ export default async function PassportPage({ params }: PageProps<"/passport/[tok
           })}
         </div>
       </div>
+
+      {/* Materials — the traceability tier. One card per component, because at
+          375px a table of nine fields is unreadable and a phone user scrolls
+          happily. Public-tier rules hold: no contact routes, no document bodies,
+          no measured values beyond a rule's key-value line. */}
+      {(p.components?.length ?? 0) > 0 && (
+        <div className="rounded-lg border border-neutral-200 bg-white p-4 sm:p-5">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Materials</h2>
+          <p className="mt-1 text-xs text-neutral-600">{materialsSummary(p.components!)}</p>
+          <ul className="mt-3 space-y-3">
+            {p.components!.map((c) => (
+              <li key={c.line} className="rounded-md border border-neutral-100 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-medium leading-snug text-neutral-800">{c.name}</p>
+                  <span className="shrink-0 text-xs text-neutral-400">{c.line}</span>
+                </div>
+                <dl className="mt-2 space-y-1 text-xs">
+                  <Row label="Material">{materialLabel(c.material)}</Row>
+                  {c.massKg != null && <Row label="Mass">{Number(c.massKg.toPrecision(3))} kg</Row>}
+                  {c.countryOfOrigin && <Row label="Origin">{c.countryOfOrigin}</Row>}
+                  {c.supplierName && <Row label="Made by">{c.supplierName}</Row>}
+                  <Row label="Recycled share">
+                    {c.recycledShare == null ? (
+                      /* Not stated is NOT zero. Rendering a blank as 0% would put
+                         a claim in the supplier's mouth that nobody made. */
+                      <span className="text-neutral-400">not stated</span>
+                    ) : (
+                      `${Math.round(c.recycledShare * 100)}%`
+                    )}
+                  </Row>
+                  <Row label="Footprint">
+                    {c.footprint ? (
+                      <>
+                        {c.footprint.kgCo2e} kg CO<sub>2</sub>e
+                        <span className="block text-neutral-400">{c.footprint.datasetName}</span>
+                      </>
+                    ) : (
+                      <span className="text-neutral-400">excluded — {c.footprintExcludedReason}</span>
+                    )}
+                  </Row>
+                </dl>
+                {c.attestations.length > 0 && (
+                  <div className="mt-2 border-t border-neutral-100 pt-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
+                      Attestations
+                    </p>
+                    <ul className="mt-1 space-y-1 text-xs text-neutral-600">
+                      {c.attestations.map((a, i) => (
+                        <li key={i}>
+                          <span className="font-medium text-neutral-800">{a.evidenceTypeLabel}</span>
+                          {a.issuerName && <span> — {a.issuerName}</span>}
+                          {a.issuerType && (
+                            <span className="text-neutral-400"> ({ISSUER_TYPE_LABEL[a.issuerType] ?? a.issuerType})</span>
+                          )}
+                          {a.issuedDate && <span className="text-neutral-400"> · {a.issuedDate}</span>}
+                          {a.accreditationRef && (
+                            <span className="block text-neutral-500">Accreditation: {a.accreditationRef}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="rounded-lg border border-neutral-200 bg-white p-5">
         <div className="flex items-baseline justify-between gap-2">

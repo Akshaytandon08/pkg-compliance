@@ -76,7 +76,11 @@ const TRACE: Record<string, Trace> = {
 type Issuer = { issuerName: string; issuerType: string; accreditationRef?: string };
 const DEFAULT_ISSUER: Record<string, Issuer> = {
   supplier_declaration: { issuerName: `${SD} — supplier quality function`, issuerType: "mill" },
-  marking: { issuerName: `${SD} — Hosur Timber & Pallets Pvt Ltd (ISPM-15 registered treater)`, issuerType: "treatment_provider" },
+  // A marking's issuer depends on WHICH marking: an ISPM-15 heat-treatment mark
+  // is stamped by a registered treater, an operator-identification marking is
+  // applied by the manufacturer. Keying both to the treater put an Indian timber
+  // treater's name on a German carton's operator marking.
+  marking: { issuerName: `${SD} — manufacturer, on-pack marking`, issuerType: "manufacturer_qa" },
   technical_file: { issuerName: `${SD} — Rheinsolt Verpackungswerke GmbH, technical documentation`, issuerType: "manufacturer_qa" },
   registration: { issuerName: `${SD} — Zentrale Stelle Verpackungsregister (LUCID)`, issuerType: "manufacturer_qa" },
   lab_test: { issuerName: `${SD} — Orvantis Materials Laboratory`, issuerType: "accredited_lab", accreditationRef: `${SD} — NABL TC-9914 (ISO/IEC 17025)` },
@@ -98,10 +102,13 @@ function applyTraceability(pack: NewAssessment): NewAssessment {
       ...c,
       ...(TRACE[c.name] ?? {}),
       evidence: c.evidence.map((e) => {
+        const isHeatTreatmentMark = /IPPC|HT mark/i.test(e.reference ?? "");
         const issuer =
           e.evidenceType === "supplier_declaration"
             ? ISSUER_BY_COMPONENT[c.name] ?? DEFAULT_ISSUER.supplier_declaration
-            : DEFAULT_ISSUER[e.evidenceType];
+            : isHeatTreatmentMark
+              ? { issuerName: `${SD} — Hosur Timber & Pallets Pvt Ltd, ISPM-15 registered treater`, issuerType: "treatment_provider" }
+              : DEFAULT_ISSUER[e.evidenceType];
         return { ...e, ...(issuer ?? {}) };
       }),
     })),

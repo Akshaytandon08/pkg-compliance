@@ -119,16 +119,43 @@ test("generate → v1 (unguessable token), idempotent, new hash-chained version 
     assert.ok(c.checkpointId && c.requirement && c.verdict && c.reasonCategory, "checkpoint fields present");
     assert.ok(["qualified", "conditional", "gap", "not_applicable"].includes(c.verdict));
   }
-  // ...but NO gated field leaks. The seeded component is "Outer carton" and its
-  // evidence reference is "PASSPORT-TEST-sd"; neither may appear anywhere.
+  // ...and the public/gated line, AS IT NOW STANDS.
+  //
+  // Sprint 10 moved this line deliberately (DEVELOPMENT_PLAN decision log,
+  // 2026-09-13): component identity, evidence references and issuers ARE public
+  // now, because "Qualified" with no visible proof is the weakest useful thing a
+  // passport can say. This test was asserting the OLD line and had to change —
+  // so it is rewritten to assert the new one rather than deleted, which would
+  // have removed the only automated guard on public disclosure.
+  //
+  // The rule the new line encodes: IDENTITY AND OUTCOME are public; NARRATIVE,
+  // CONTACT ROUTES and RAW DOCUMENTS are not.
   const blob = JSON.stringify(payload);
-  for (const secret of ["Outer carton", "PASSPORT-TEST-sd", "weightGrams", "riskRationale", "sourcedFrom"]) {
+
+  // Still gated. Each of these is a thing a reader could act on to someone's
+  // detriment, or an internal judgement that is not the reader's business.
+  for (const secret of [
+    "riskRationale",       // the assessor's reasoning about a supplier's product
+    "riskAnnotatedBy",     // who inside the operator made that judgement
+    "sourcedFrom",         // the commercial sourcing route, distinct from origin
+    "deltaAction",         // what the operator must do next
+    "primaryContact",      // the operator's contact route
+    "registeredAddress",   // ditto
+  ]) {
     assert.ok(!blob.includes(secret), `payload must not leak "${secret}"`);
   }
-  const keys = Object.keys(payload);
-  for (const forbidden of ["components", "evidence", "cards", "documents", "delta"]) {
-    assert.ok(!keys.includes(forbidden), `payload must not expose "${forbidden}"`);
+  for (const forbidden of ["cards", "documents", "delta", "claims"]) {
+    assert.ok(!Object.keys(payload).includes(forbidden), `payload must not expose "${forbidden}"`);
   }
+
+  // Now public, and asserted positively so the widening cannot be silently
+  // reverted either: a regression that dropped these would make the passport
+  // unfalsifiable again.
+  assert.ok(Array.isArray(payload.components) && payload.components.length > 0, "components are disclosed");
+  const comp = payload.components![0];
+  assert.equal(comp.name, "Outer carton", "component identity is public");
+  assert.ok("countryOfOrigin" in comp && "supplierName" in comp && "recycledShare" in comp);
+  assert.ok(payload.corpus?.asOf, "rule-set provenance is disclosed once");
 });
 
 test("unknown token resolves to null", dbRequired, async () => {

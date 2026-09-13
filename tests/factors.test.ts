@@ -47,6 +47,15 @@ const CONTEXT: AssessmentContextRecord = {
 
 async function cleanup(s: ReturnType<typeof postgres>) {
   await s`delete from assessments where pack_name = ${PACK}`;
+  // Drop pins pointing at this file's factors BEFORE deleting them. The FK is ON
+  // DELETE RESTRICT by design (an assessment's pinned factor must not vanish
+  // under it), and these test factors are visible to currentFactorSet() like any
+  // other — so ANY assessment evaluated while they exist pins them, including the
+  // demo packs. Without this the cleanup fails with 23503 and leaves rows behind,
+  // which is exactly what it did: the leftovers then showed up in the owner's
+  // factors:list beside real selections.
+  await s`delete from assessment_factor_pins
+          where factor_id in (select id from emission_factors where material like ${PREFIX + "%"})`;
   await s`delete from emission_factors where material like ${PREFIX + "%"}`;
 }
 
