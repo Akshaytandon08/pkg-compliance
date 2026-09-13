@@ -20,7 +20,9 @@ import { getAllGuidance } from "@/db/guidance";
 import {
   NO_FACTOR_LABEL,
   RULE_REFERENCE_TOOLTIP,
+  factorBoundaryLabel,
   factorSourceLabel,
+  formatFactorValue,
   factorTierLabel,
   preparedForLine,
   ruleReference,
@@ -105,12 +107,12 @@ function FactorCells({ factor }: { factor: EmissionFactor | null }) {
   }
   return (
     <>
-      <td className="py-1 pr-3 whitespace-nowrap">{factor.factor} {factor.unit}</td>
+      <td className="py-1 pr-3 whitespace-nowrap">{formatFactorValue(factor.factor)} {factor.unit}</td>
       <td className="py-1 pr-3">
         {factorSourceLabel(factor)}
         <span className="block text-neutral-500">
           {factor.region} · {factor.year}
-          {factor.methodology ? ` · ${factor.methodology}` : ""}
+          {factorBoundaryLabel(factor.methodology) ? ` · ${factorBoundaryLabel(factor.methodology)}` : ""}
         </span>
       </td>
       <td className="py-1 pr-3 whitespace-nowrap">{factorTierLabel(factor.tier)}</td>

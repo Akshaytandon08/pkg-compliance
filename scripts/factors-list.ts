@@ -4,6 +4,7 @@
 // marks the one the engine would use today (primary outranks secondary; within a
 // tier, the highest version wins).
 import { listFactorHistory, currentFactorSet } from "../src/db/factors.ts";
+import { formatFactorValue } from "../src/lib/report/labels.ts";
 
 try {
   process.loadEnvFile(".env");
@@ -22,7 +23,7 @@ if (rows.length === 0) {
 const current = new Set((await currentFactorSet()).map((f) => f.id));
 for (const r of rows) {
   const mark = current.has(r.id) ? "→" : " ";
-  const value = r.tier === "none" ? "NO FACTOR" : `${r.factor} ${r.unit}`;
+  const value = r.tier === "none" ? "NO FACTOR" : `${formatFactorValue(r.factor)} ${r.unit}`;
   console.log(`${mark} ${r.material}/${r.process} v${r.version}  ${value}  [${r.tier}]`);
   console.log(`    ${r.source}${r.sourceDataset ? ` / ${r.sourceDataset}` : ""} · ${r.region} · ${r.year}`);
   if (r.activityId) console.log(`    activity_id: ${r.activityId}${r.dataVersion ? ` @ data_version ${r.dataVersion}` : ""}`);
