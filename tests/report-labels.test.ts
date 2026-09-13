@@ -146,6 +146,47 @@ test("the report and passport never render a raw enum expression", () => {
   }
 });
 
+test("passport headings and group labels read as English, not as enum values", () => {
+  // Sprint 10: the passport gained headings, group labels and issuer/material
+  // vocabularies that are rendered directly. The enum-leak rule applies to them
+  // like anything else a reader sees — `wood_solid` reached the public page as
+  // itself before this was checked.
+  const src = readFileSync(new URL("../src/app/passport/[token]/page.tsx", import.meta.url), "utf8");
+
+  // Visible labels only — `label:` fields, and the VALUES of the issuer-type map.
+  // Deliberately not every string in the file: `verdict: "not_applicable"` is a
+  // DATA value matched against the payload, and a test that cannot tell a datum
+  // from a label would have to be silenced rather than obeyed.
+  const labels = [...src.matchAll(/\blabel:\s*"([^"]+)"/g)].map((m) => m[1]);
+  const issuerMap = src.slice(src.indexOf("ISSUER_TYPE_LABEL"));
+  const issuerLabels = [...issuerMap.slice(0, issuerMap.indexOf("};")).matchAll(/:\s*"([^"]+)"/g)].map((m) => m[1]);
+
+  assert.ok(labels.length >= 5, `found only ${labels.length} labels — the scan is broken`);
+  assert.ok(issuerLabels.length >= 4, "issuer-type labels not found — the scan is broken");
+  for (const label of [...labels, ...issuerLabels]) {
+    assert.doesNotMatch(label, LOWER_SNAKE, `passport renders "${label}" as a snake_case identifier`);
+    assert.doesNotMatch(label, SCREAMING_SNAKE, `passport renders "${label}" as an enum constant`);
+  }
+
+  // And the headings a reader actually scans.
+  for (const heading of ["Rules", "Materials", "Producer registrations", "Attestations", "Proof", "Key value"]) {
+    assert.ok(
+      new RegExp(heading, "i").test(src),
+      `passport is missing the "${heading}" heading the v3-lite layout depends on`,
+    );
+  }
+});
+
+test("the passport never calls anyone an auditor", () => {
+  // House rule: this system does not audit, and must not borrow the word for a
+  // verifier, a lab or a confirming assessor. Checked on the rendered sources
+  // rather than on a vocabulary, because the word would arrive as prose.
+  for (const rel of RENDER_SOURCES) {
+    const src = readFileSync(new URL(rel, import.meta.url), "utf8");
+    assert.doesNotMatch(src, /\bauditor/i, `${rel} uses the word "auditor"`);
+  }
+});
+
 test("the rule reference is muted, tooltipped, and hides the version by default", () => {
   assert.equal(ruleReference("EU-PPWR-heavy-metals", 3), "EU-PPWR-heavy-metals");
   assert.equal(ruleReference("EU-PPWR-heavy-metals", 3, true), "EU-PPWR-heavy-metals@3");

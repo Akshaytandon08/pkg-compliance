@@ -32,6 +32,12 @@ import { RuleTable } from "./RuleTable";
 import { EvidenceList } from "./EvidenceList";
 import { GeneratePassport } from "./GeneratePassport";
 
+export async function generateMetadata({ params }: PageProps<"/assessments/[id]/report">) {
+  const { id } = await params;
+  const assessment = await getAssessment(Number(id));
+  return { title: assessment ? `${assessment.packName} — screening report` : "Screening report" };
+}
+
 function AnnotationLine({ component }: { component: ComponentInput }) {
   const by = component.riskAnnotatedBy ? ` (by ${component.riskAnnotatedBy})` : "";
   if (!component.designAssessment) {
@@ -250,7 +256,17 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
     });
     claimsByComponent.set(claim.componentId, list);
   }
-  const evidenceContext = { sourceLinks, claimsByComponent };
+  // Who issued each evidence record, so the gated report shows at least what the
+  // public passport does (Sprint 10).
+  const issuerByDocId = new Map(
+    assessment.components.flatMap((c) =>
+      c.evidenceRecords.map((r) => [
+        r.docId,
+        { issuerName: r.issuerName, issuerType: r.issuerType, accreditationRef: r.accreditationRef },
+      ] as const),
+    ),
+  );
+  const evidenceContext = { sourceLinks, claimsByComponent, issuerByDocId };
 
   // Draft EU declaration of conformity — eligibility (button state) + existing drafts.
   const docEligibility = (await doCDraftEligibility(assessment.id)) ?? { eligible: false, blockers: ["Assessment not found."] };

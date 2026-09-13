@@ -21,6 +21,13 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
+const ISSUER_TYPE_LABEL: Record<string, string> = {
+  manufacturer_qa: "manufacturer's own quality function",
+  accredited_lab: "accredited laboratory",
+  treatment_provider: "treatment provider",
+  mill: "mill's own quality function",
+};
+
 export function EvidenceDrawer({ item, onClose }: { item: EvidenceRelied | null; onClose: () => void }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -101,6 +108,17 @@ export function EvidenceDrawer({ item, onClose }: { item: EvidenceRelied | null;
             {item.reference && <Row label="Reference">{item.reference}</Row>}
             {item.issuedDate && <Row label="Issued">{item.issuedDate}</Row>}
             {item.expiryDate && <Row label="Valid to">{item.expiryDate}</Row>}
+            {/* Who stands behind this record (Sprint 10). The public passport
+                shows this; the gated report must not show less. */}
+            {item.issuerName && (
+              <Row label="Issued by">
+                {item.issuerName}
+                {item.issuerType && (
+                  <span className="text-n500"> — {ISSUER_TYPE_LABEL[item.issuerType] ?? item.issuerType}</span>
+                )}
+              </Row>
+            )}
+            {item.accreditationRef && <Row label="Accreditation">{item.accreditationRef}</Row>}
             {item.scope.components.length > 0 && <Row label="Covers components">{item.scope.components.join(", ")}</Row>}
             {item.scope.materials.length > 0 && <Row label="Covers materials">{item.scope.materials.join(", ")}</Row>}
             {item.scope.parameters.length > 0 && <Row label="Covers parameters">{item.scope.parameters.join(", ")}</Row>}

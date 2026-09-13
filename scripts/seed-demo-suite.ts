@@ -32,12 +32,88 @@ const POUCH = "Demo — food-contact laminate pouch";
 
 const SD = "SYNTHETIC-DEMO"; // prefix stamped on every fabricated evidence reference
 
+// A supplier declaration is issued by the supplier's own quality function — the
+// weakest issuer type, and the passport now says so rather than leaving a reader
+// to assume a lab was involved.
 const supplierDeclaration = (component: string, material: string) => ({
   evidenceType: "supplier_declaration",
   reference: `${SD} — supplier declaration (heavy metals, SoC, composition) for ${component}`,
   scopeComponents: [component],
   scopeMaterials: [material],
+  issuedDate: "2026-03-14",
 });
+
+// --- Minimal traceability (Sprint 10) --------------------------------------
+// Applied by component NAME after the packs are declared, rather than inlined
+// into each literal: twelve components across three packs, and threading three
+// more fields through every one of them by hand is how a seed drifts out of
+// step with itself.
+//
+// `recycledShare` is deliberately absent (not zero) on the wood pallet and the
+// two pouch components: "not stated" and "stated as none" are different facts,
+// and the passport renders them differently. The LDPE bag carries an explicit 0
+// so both cases appear in the demo.
+type Trace = { countryOfOrigin: string; supplierName: string; recycledShare?: number };
+const TRACE: Record<string, Trace> = {
+  "Pine wood pallet / crate (heat treated)": { countryOfOrigin: "Karnataka, India", supplierName: `${SD} — Hosur Timber & Pallets Pvt Ltd` },
+  'Nails (2")': { countryOfOrigin: "Maharashtra, India", supplierName: `${SD} — Sahyadri Fasteners`, recycledShare: 0.62 },
+  "Corrugated sheet": { countryOfOrigin: "Tamil Nadu, India", supplierName: `${SD} — Coimbatore Board Mills`, recycledShare: 0.71 },
+  "Honeycomb buffer": { countryOfOrigin: "Tamil Nadu, India", supplierName: `${SD} — Coimbatore Board Mills`, recycledShare: 0.68 },
+  "Edge board": { countryOfOrigin: "Gujarat, India", supplierName: `${SD} — Vapi Paper Converters`, recycledShare: 0.55 },
+  "Poly packet (LDPE bag)": { countryOfOrigin: "Gujarat, India", supplierName: `${SD} — Vapi Polyfilms`, recycledShare: 0 },
+  "Green polyester strap (PET)": { countryOfOrigin: "Maharashtra, India", supplierName: `${SD} — Nashik Strapping Industries`, recycledShare: 0.3 },
+  "Outer carton (B-flute corrugated)": { countryOfOrigin: "North Rhine-Westphalia, Germany", supplierName: `${SD} — Duisburg Wellpappe GmbH`, recycledShare: 0.74 },
+  "Inner fitting (corrugated)": { countryOfOrigin: "North Rhine-Westphalia, Germany", supplierName: `${SD} — Duisburg Wellpappe GmbH`, recycledShare: 0.74 },
+  "Kraft paper label": { countryOfOrigin: "Bavaria, Germany", supplierName: `${SD} — Augsburg Etiketten GmbH`, recycledShare: 0.4 },
+  "Laminate film (PET/AL/PE)": { countryOfOrigin: "North Brabant, Netherlands", supplierName: `${SD} — Eindhoven Flexibles B.V.` },
+  "Barrier coating": { countryOfOrigin: "North Brabant, Netherlands", supplierName: `${SD} — Eindhoven Flexibles B.V.` },
+};
+
+// Who issued each evidence record, by component name + evidence type. Every
+// record gets an issuer: "we do not know who stands behind this" is not a state
+// the demo should show, and a blank issuer reads as an oversight rather than a
+// fact.
+type Issuer = { issuerName: string; issuerType: string; accreditationRef?: string };
+const DEFAULT_ISSUER: Record<string, Issuer> = {
+  supplier_declaration: { issuerName: `${SD} — supplier quality function`, issuerType: "mill" },
+  // A marking's issuer depends on WHICH marking: an ISPM-15 heat-treatment mark
+  // is stamped by a registered treater, an operator-identification marking is
+  // applied by the manufacturer. Keying both to the treater put an Indian timber
+  // treater's name on a German carton's operator marking.
+  marking: { issuerName: `${SD} — manufacturer, on-pack marking`, issuerType: "manufacturer_qa" },
+  technical_file: { issuerName: `${SD} — Rheinsolt Verpackungswerke GmbH, technical documentation`, issuerType: "manufacturer_qa" },
+  registration: { issuerName: `${SD} — Zentrale Stelle Verpackungsregister (LUCID)`, issuerType: "manufacturer_qa" },
+  lab_test: { issuerName: `${SD} — Orvantis Materials Laboratory`, issuerType: "accredited_lab", accreditationRef: `${SD} — NABL TC-9914 (ISO/IEC 17025)` },
+  test_report: { issuerName: `${SD} — Orvantis Materials Laboratory`, issuerType: "accredited_lab", accreditationRef: `${SD} — NABL TC-9914 (ISO/IEC 17025)` },
+};
+// Per-component overrides, so a reader sees the ACTUAL maker named on the
+// declaration rather than a generic "supplier quality function".
+const ISSUER_BY_COMPONENT: Record<string, Issuer> = Object.fromEntries(
+  Object.entries(TRACE).map(([component, t]) => [
+    component,
+    { issuerName: `${t.supplierName}, quality function`, issuerType: "mill" },
+  ]),
+);
+
+function applyTraceability(pack: NewAssessment): NewAssessment {
+  return {
+    ...pack,
+    components: pack.components.map((c) => ({
+      ...c,
+      ...(TRACE[c.name] ?? {}),
+      evidence: c.evidence.map((e) => {
+        const isHeatTreatmentMark = /IPPC|HT mark/i.test(e.reference ?? "");
+        const issuer =
+          e.evidenceType === "supplier_declaration"
+            ? ISSUER_BY_COMPONENT[c.name] ?? DEFAULT_ISSUER.supplier_declaration
+            : isHeatTreatmentMark
+              ? { issuerName: `${SD} — Hosur Timber & Pallets Pvt Ltd, ISPM-15 registered treater`, issuerType: "treatment_provider" }
+              : DEFAULT_ISSUER[e.evidenceType];
+        return { ...e, ...(issuer ?? {}) };
+      }),
+    })),
+  };
+}
 
 // The obligated economic operator each pack is screened FOR. A screening is
 // always prepared for a named legal person — that is what a declaration of
@@ -163,7 +239,26 @@ const packs: NewAssessment[] = [
         riskRationale:
           "Green/yellow pigment families historically include lead chromate, which fails Pb and Cr(VI) simultaneously. Modern organic pigments comply but must be evidenced by a pigment specification or an XRF/lab test.",
         riskAnnotatedBy: "Demo seed",
-        evidence: [],
+        // The one ACCREDITED-LAB attestation in the demo suite. It exists so the
+        // passport can show the strongest issuer type next to the weakest
+        // (a mill's own declaration) — that contrast is the point of showing an
+        // issuer at all.
+        //
+        // NOTE: this component used to carry no evidence, and DEMO_SCRIPT used it
+        // for the live "add evidence → Conditional flips to Qualified" moment.
+        // That moment moved to the Corrugated sheet (see DEMO_SCRIPT §5), which
+        // still has no evidence on file.
+        evidence: [
+          {
+            evidenceType: "lab_test",
+            reference: `${SD} — XRF screening report SYN/2026/0417: Pb 3.1 mg/kg, Cd <0.5, Hg <0.5, Cr(VI) <0.5; sum 4.1 mg/kg against a 100 mg/kg limit`,
+            issuedDate: "2026-04-17",
+            expiryDate: "2027-04-16",
+            scopeComponents: ["Green polyester strap (PET)"],
+            scopeMaterials: ["plastic"],
+            scopeParameters: ["Pb", "Cd", "Hg", "Cr(VI)"],
+          },
+        ],
       },
     ],
   },
@@ -306,7 +401,8 @@ await db.delete(organisations).where(
   ),
 );
 
-for (const pack of packs) {
+for (const rawPack of packs) {
+  const pack = applyTraceability(rawPack);
   const organisationId = await createOrganisation(orgs[pack.packName]);
   const id = await createAssessment({ ...pack, organisationId });
   console.log(

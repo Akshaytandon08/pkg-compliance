@@ -45,6 +45,17 @@ export const LEGAL_ROLES = [
 // searched and chose nothing — not the absence of a row; either way the material
 // renders "No factor selected" and is excluded from the footprint total.
 // `primary` (Fitsol's own data) outranks `secondary_database` when both exist.
+// Who issued a piece of evidence. The distinction a reader actually needs is
+// whether the issuer is independent of the party making the claim, and whether
+// they hold an accreditation for it.
+export const ISSUER_TYPES = [
+  "manufacturer_qa",
+  "accredited_lab",
+  "treatment_provider",
+  "mill",
+] as const;
+export type IssuerType = (typeof ISSUER_TYPES)[number];
+
 export const FACTOR_TIERS = ["primary", "secondary_database", "none"] as const;
 export type FactorTier = (typeof FACTOR_TIERS)[number];
 

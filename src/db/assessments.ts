@@ -17,6 +17,10 @@ export type NewEvidence = {
   reference?: string | null;
   issuedDate?: string | null;
   expiryDate?: string | null;
+  /** Who issued it, and whether they are independent / accredited. */
+  issuerName?: string | null;
+  issuerType?: string | null;
+  accreditationRef?: string | null;
   scopeComponents?: string[];
   scopeMaterials?: string[];
   scopeParameters?: string[];
@@ -32,6 +36,11 @@ export type NewComponent = {
   riskAnnotation?: string | null;
   riskRationale?: string | null;
   riskAnnotatedBy?: string | null;
+  /** Place of manufacture, as a reader would say it ("Tamil Nadu, India"). */
+  countryOfOrigin?: string | null;
+  supplierName?: string | null;
+  /** Recycled content 0..1. Null = not stated, which is not the same as 0. */
+  recycledShare?: number | null;
   evidence: NewEvidence[];
 };
 
@@ -89,6 +98,9 @@ export async function createAssessment(input: NewAssessment): Promise<number> {
           riskAnnotation: c.riskAnnotation ?? null,
           riskRationale: c.riskRationale ?? null,
           riskAnnotatedBy: c.riskAnnotatedBy ?? null,
+          countryOfOrigin: c.countryOfOrigin ?? null,
+          supplierName: c.supplierName ?? null,
+          recycledShare: c.recycledShare ?? null,
         })
         .returning({ id: assessmentComponents.id });
 
@@ -102,12 +114,33 @@ export async function createAssessment(input: NewAssessment): Promise<number> {
           scopeComponents: e.scopeComponents ?? null,
           scopeMaterials: e.scopeMaterials ?? null,
           scopeParameters: e.scopeParameters ?? null,
+          issuerName: e.issuerName ?? null,
+          issuerType: e.issuerType ?? null,
+          accreditationRef: e.accreditationRef ?? null,
         });
       }
     }
     return row.id;
   });
 }
+
+/**
+ * An evidence row as a READER needs it — issuer, accreditation, validity.
+ *
+ * Deliberately separate from the engine's `EvidenceDocument`: that type is the
+ * engine's input and this sprint changes no engine code, so display fields are
+ * carried alongside it rather than threaded through it. `docId` joins the two.
+ */
+export type EvidenceRecord = {
+  docId: string;
+  evidenceType: string;
+  reference: string | null;
+  issuedDate: string | null;
+  expiryDate: string | null;
+  issuerName: string | null;
+  issuerType: string | null;
+  accreditationRef: string | null;
+};
 
 export type LoadedComponent = {
   id: number;
@@ -120,7 +153,12 @@ export type LoadedComponent = {
   riskAnnotation: string | null;
   riskRationale: string | null;
   riskAnnotatedBy: string | null;
+  countryOfOrigin: string | null;
+  supplierName: string | null;
+  recycledShare: number | null;
   documents: EvidenceDocument[];
+  /** Display-side view of the same evidence rows (see EvidenceRecord). */
+  evidenceRecords: EvidenceRecord[];
 };
 
 export type LoadedAssessment = {
@@ -164,6 +202,19 @@ export async function getAssessment(id: number): Promise<LoadedAssessment | null
       riskAnnotation: c.riskAnnotation,
       riskRationale: c.riskRationale,
       riskAnnotatedBy: c.riskAnnotatedBy,
+      countryOfOrigin: c.countryOfOrigin,
+      supplierName: c.supplierName,
+      recycledShare: c.recycledShare,
+      evidenceRecords: ev.map((e) => ({
+        docId: String(e.id),
+        evidenceType: e.evidenceType,
+        reference: e.reference,
+        issuedDate: e.issuedDate,
+        expiryDate: e.expiryDate,
+        issuerName: e.issuerName,
+        issuerType: e.issuerType,
+        accreditationRef: e.accreditationRef,
+      })),
       documents: ev.map((e) => ({
         docId: String(e.id),
         type: e.evidenceType,

@@ -1,11 +1,13 @@
 import { createHash, randomBytes } from "node:crypto";
 import { desc, eq } from "drizzle-orm";
 import { db } from "./index.ts";
-import { passports } from "./schema.ts";
-import { getAssessment, loadCorpusAsOf, type LoadedAssessment } from "./assessments.ts";
+import { checkpoints, passports } from "./schema.ts";
+import { getAssessment, loadCorpusAsOf, type EvidenceRecord, type LoadedAssessment } from "./assessments.ts";
 import { getOrganisation } from "./organisations.ts";
 import { pinnedFactorSet } from "./factors.ts";
-import { evaluatePack } from "../lib/engine/pack.ts";
+import { evaluatePack, type CheckpointCard, type ProductionCheckpoint } from "../lib/engine/pack.ts";
+import type { EvidenceDocument } from "../lib/engine/evaluate.ts";
+import { evidenceTypeLabel } from "../lib/report/labels.ts";
 import { computePackFootprint } from "../lib/engine/pcf.ts";
 
 // The PUBLIC tier of an assessment (disclosure model v2). The rule set is public
@@ -39,6 +41,38 @@ export type PassportCheckpoint = {
   // detailed (the carve-out detail stays on the gated report).
   confidence: "H" | "M" | "L" | null;
   subjectToExemptions: boolean;
+
+  // --- Passport v3-lite (Sprint 10). All OPTIONAL: passports are hash-chained,
+  // and a version minted before these existed must still parse and verify. ---
+
+  /** What actually satisfies the rule. Empty for a rule nothing satisfies yet. */
+  proof?: {
+    evidenceType: string;
+    evidenceTypeLabel: string;
+    reference: string | null;
+    validity: string | null;
+    issuerName: string | null;
+    issuerType: string | null;
+    accreditationRef: string | null;
+  }[];
+  /** Measured value against the rule's limit, where BOTH exist. */
+  keyValue?: {
+    parameter: string;
+    measured: string;
+    measuredUnit: string | null;
+    limitText: string;
+  } | null;
+  /** Who verified the RULE's encoding against primary law, and when. Always the
+   *  regulatory owner — this is not a statement about the packaging. */
+  ruleVerifiedBy?: { name: string; verifiedOn: string } | null;
+  /** Who confirmed the EVIDENCE, and when, where that was recorded. */
+  evidenceConfirmedBy?: { name: string; confirmedOn: string } | null;
+  /** The verbatim legal text, hidden behind a disclosure. */
+  fullRuleText?: string | null;
+  /** Why a not-applicable rule does not apply, in plain words. */
+  notApplicableReason?: string | null;
+  /** Date an upcoming rule starts to apply. */
+  appliesFrom?: string | null;
 };
 
 export type PassportPayload = {
@@ -52,6 +86,35 @@ export type PassportPayload = {
   // versions published before the temporal state existed have no such key and
   // must still parse and re-render. Absent reads as 0.
   counts: { qualified: number; conditional: number; gap: number; not_applicable: number; caveat: number; upcoming?: number };
+  /** One line about the rule set's provenance, shown once (Sprint 10). Optional
+   *  for hash-chain compatibility with passports minted before it existed. */
+  corpus?: { asOf: string; releases: string[] } | null;
+  /** Per-component traceability (Sprint 10). Optional, as above.
+   *
+   *  What is here: what it is, what it is made of, how much it weighs, where it
+   *  was made, by whom, how much of it is recycled, what attests to it, and what
+   *  its footprint rests on. What is NOT: any contact route, any document body,
+   *  and no measured values beyond a rule's key-value line. */
+  components?: {
+    line: string;
+    name: string;
+    material: string;
+    massKg: number | null;
+    countryOfOrigin: string | null;
+    supplierName: string | null;
+    /** 0..1, or null for "not stated" — which is not the same as zero. */
+    recycledShare: number | null;
+    attestations: {
+      evidenceTypeLabel: string;
+      issuerName: string | null;
+      issuerType: string | null;
+      accreditationRef: string | null;
+      issuedDate: string | null;
+    }[];
+    footprint: { kgCo2e: number; datasetName: string } | null;
+    /** Why it has no footprint, when it has none. */
+    footprintExcludedReason: string | null;
+  }[];
   overallVerdict: string;
   checkpoints: PassportCheckpoint[];
   pcf: {
@@ -120,10 +183,100 @@ function splitCitation(citation: string): { text: string; url: string | null } {
   return { text, url };
 }
 
+/**
+ * The per-rule detail the v3-lite passport shows when a row is expanded.
+ *
+ * Everything here is derived from data the gated report already had; none of it
+ * is new judgement. The decision this encodes is about DISCLOSURE, not about
+ * evaluation — see the 2026-09-13 decision-log entry that widens the public tier.
+ */
+function passportDetail(
+  card: CheckpointCard,
+  verdict: string,
+  packDocuments: EvidenceDocument[],
+  recordByDocId: Map<string, EvidenceRecord>,
+  corpusByKey: Map<string, ProductionCheckpoint>,
+  verificationByKey: Map<string, { name: string; verifiedOn: string }>,
+): Partial<PassportCheckpoint> {
+  const key = `${card.checkpointId}@${card.version}`;
+  const corpus = corpusByKey.get(key);
+
+  // PROOF — only for a rule the evidence actually satisfies. Listing documents
+  // beside a gap would suggest they count for something; they do not.
+  const accepted = new Set((card.evidenceRequirements.allOf ?? []).flatMap((c) => c.anyOf));
+  const proof =
+    verdict === "qualified"
+      ? packDocuments
+          .filter((d) => accepted.has(d.type))
+          .map((d) => {
+            const rec = recordByDocId.get(d.docId);
+            return {
+              evidenceType: d.type,
+              evidenceTypeLabel: evidenceTypeLabel(d.type),
+              reference: rec?.reference ?? null,
+              validity: validityText(rec?.issuedDate ?? null, rec?.expiryDate ?? null),
+              issuerName: rec?.issuerName ?? null,
+              issuerType: rec?.issuerType ?? null,
+              accreditationRef: rec?.accreditationRef ?? null,
+            };
+          })
+      : [];
+
+  // RULE VERIFIED BY — about the RULE's encoding against primary law, never
+  // about the packaging. The wording on the page has to keep that distinction.
+  // Read from the checkpoints table rather than the engine's ProductionCheckpoint,
+  // which does not carry verification fields — and this sprint changes no engine
+  // types.
+  const ruleVerifiedBy = verificationByKey.get(key) ?? null;
+
+  return {
+    proof,
+    // KEY VALUE is claims-driven and stays null until a confirmed extracted claim
+    // carries a measured value for a parameter the rule sets a limit on. The demo
+    // seed records evidence as metadata only, so nothing populates it there.
+    keyValue: null,
+    ruleVerifiedBy,
+    evidenceConfirmedBy: null,
+    fullRuleText: corpus?.requirementText ?? card.requirementText,
+    notApplicableReason: verdict === "not_applicable" ? (card.outcome?.detail ?? null) : null,
+    appliesFrom: verdict === "upcoming" ? (card.outcome?.detail ?? null) : null,
+  };
+}
+
+/**
+ * Who verified each checkpoint's citation against primary law, and when. Read
+ * straight from the corpus table: these columns exist there but are deliberately
+ * not carried into the engine's ProductionCheckpoint, and this sprint adds no
+ * engine fields.
+ */
+async function loadCitationVerification(): Promise<Map<string, { name: string; verifiedOn: string }>> {
+  const rows = await db
+    .select({
+      id: checkpoints.id,
+      version: checkpoints.version,
+      by: checkpoints.citationVerifiedBy,
+      on: checkpoints.citationVerifiedDate,
+    })
+    .from(checkpoints);
+  const out = new Map<string, { name: string; verifiedOn: string }>();
+  for (const r of rows) {
+    if (r.by && r.on) out.set(`${r.id}@${r.version}`, { name: r.by, verifiedOn: r.on });
+  }
+  return out;
+}
+
+/** "Issued 2026-03-14 · expires 2027-04-16", or whichever half exists. */
+function validityText(issued: string | null, expiry: string | null): string | null {
+  const parts = [issued ? `issued ${issued}` : null, expiry ? `expires ${expiry}` : null].filter(Boolean);
+  return parts.length ? parts.join(" · ") : null;
+}
+
 export async function buildPassportPayload(assessment: LoadedAssessment): Promise<PassportPayload> {
   const corpus = await loadCorpusAsOf(assessment.corpusVersion); // in_force only — no drafts
   const org = assessment.organisationId ? await getOrganisation(assessment.organisationId) : null;
   const factors = await pinnedFactorSet(assessment.id);
+  const corpusByKey = new Map(corpus.map((c) => [`${c.id}@${c.version}`, c]));
+  const verificationByKey = await loadCitationVerification();
   const report = evaluatePack({
     checkpoints: corpus,
     context: assessment.context,
@@ -154,7 +307,14 @@ export async function buildPassportPayload(assessment: LoadedAssessment): Promis
   // Per-checkpoint public detail. A component-subject checkpoint yields one card
   // per component; aggregate them into a single row (worst verdict) so no
   // component identity leaks. Caveat cards (no verdict) are omitted.
-  const grouped = new Map<string, { requirement: string; citation: string; version: number; worst: { verdict: string; reasonCode: string }; confidence: "H" | "M" | "L" | null; subjectToExemptions: boolean }>();
+  // Evidence records keyed by the engine's docId, so a card's relied-on
+  // documents can be enriched with WHO issued them (Sprint 10). The engine's
+  // EvidenceDocument is untouched; this joins to it on docId.
+  const recordByDocId = new Map<string, (typeof assessment.components)[number]["evidenceRecords"][number]>();
+  for (const c of assessment.components) for (const r of c.evidenceRecords) recordByDocId.set(r.docId, r);
+  const packDocuments = assessment.components.flatMap((c) => c.documents);
+
+  const grouped = new Map<string, { requirement: string; citation: string; version: number; worst: { verdict: string; reasonCode: string }; confidence: "H" | "M" | "L" | null; subjectToExemptions: boolean; card: (typeof allCards)[number] }>();
   const allCards = [
     ...report.componentSections.flatMap((s) => s.cards),
     ...report.packagingUnit,
@@ -179,6 +339,7 @@ export async function buildPassportPayload(assessment: LoadedAssessment): Promis
         worst: { verdict, reasonCode: outcome.reasonCode },
         confidence: card.confidence,
         subjectToExemptions: !!(card.exemptions && card.exemptions.length > 0),
+        card,
       });
     } else if (VERDICT_RANK[verdict] > VERDICT_RANK[existing.worst.verdict]) {
       existing.worst = { verdict, reasonCode: outcome.reasonCode };
@@ -197,6 +358,7 @@ export async function buildPassportPayload(assessment: LoadedAssessment): Promis
         citationUrl: url,
         confidence: g.confidence,
         subjectToExemptions: g.subjectToExemptions,
+        ...passportDetail(g.card, g.worst.verdict, packDocuments, recordByDocId, corpusByKey, verificationByKey),
       };
     })
     .sort((a, b) => VERDICT_RANK[b.verdict] - VERDICT_RANK[a.verdict] || a.checkpointId.localeCompare(b.checkpointId));
@@ -232,6 +394,43 @@ export async function buildPassportPayload(assessment: LoadedAssessment): Promis
     demo: assessment.demo,
     materialComposition,
     counts: report.counts,
+    // Shown once on the page rather than per rule: the provenance of the RULE
+    // SET, not of any one rule.
+    corpus: { asOf: assessment.asOf, releases: [assessment.corpusVersion] },
+    components: assessment.components.map((c) => {
+      const fp = footprint.components.find((f) => f.line === c.line);
+      return {
+        line: c.line,
+        name: c.name,
+        material: c.material,
+        massKg: fp?.massKg ?? (c.weightGrams != null ? c.weightGrams / 1000 : null),
+        countryOfOrigin: c.countryOfOrigin,
+        supplierName: c.supplierName,
+        recycledShare: c.recycledShare,
+        attestations: c.evidenceRecords.map((r) => ({
+          evidenceTypeLabel: evidenceTypeLabel(r.evidenceType),
+          issuerName: r.issuerName,
+          issuerType: r.issuerType,
+          accreditationRef: r.accreditationRef,
+          issuedDate: r.issuedDate,
+        })),
+        footprint:
+          fp?.kgCo2e != null && fp.factor
+            ? {
+                kgCo2e: Number(fp.kgCo2e.toPrecision(3)),
+                datasetName: fp.factor.sourceDataset
+                  ? `${fp.factor.source} / ${fp.factor.sourceDataset}`
+                  : fp.factor.source,
+              }
+            : null,
+        footprintExcludedReason:
+          fp?.kgCo2e == null
+            ? fp?.unresolvedReason === "no_weight"
+              ? "no mass on file"
+              : "no emission factor selected for this material"
+            : null,
+      };
+    }),
     overallVerdict: report.overall.verdict,
     checkpoints,
     // Omitted entirely when there is no organisation on file, so a passport with
