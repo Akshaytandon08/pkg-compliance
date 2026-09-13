@@ -12,7 +12,7 @@ const ef = (
 ): EmissionFactor => ({
   id: nextId++, material, process, version: 1, factor, unit,
   tier: "secondary_database", source: "Fixture DB", sourceDataset: "fixture 1.0",
-  activityId: `fixture-${material}-${process}`, region: "GLOBAL", year: 2024,
+  activityId: `fixture-${material}-${process}`, dataVersion: "^36", region: "GLOBAL", year: 2024,
   methodology: "cradle-to-gate", licenceNote: null, valueDisplayPermitted: false, ...over,
 });
 

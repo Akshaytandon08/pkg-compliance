@@ -24,6 +24,8 @@ export type EmissionFactor = {
   source: string;
   sourceDataset: string | null;
   activityId: string | null;
+  /** Provider data release (Climatiq data_version) this value came from. */
+  dataVersion: string | null;
   region: string;
   year: number;
   methodology: string | null;

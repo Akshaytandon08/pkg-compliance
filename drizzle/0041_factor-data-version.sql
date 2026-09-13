@@ -1,0 +1,1 @@
+ALTER TABLE "emission_factors" ADD COLUMN "data_version" text;
