@@ -22,12 +22,21 @@ import {
   RULE_REFERENCE_TOOLTIP,
   factorBoundaryLabel,
   factorSourceLabel,
+  ruleName,
   formatFactorValue,
   factorTierLabel,
   preparedForLine,
   ruleReference,
 } from "@/lib/report/labels";
-import { buildRuleRows, toEvidenceRelied, type ClaimSummary } from "@/lib/report/ruleRows";
+import {
+  buildRuleRows,
+  earliestTriggerDate,
+  groupCardsByRule,
+  splitCitation,
+  toEvidenceRelied,
+  upcomingWhen,
+  type ClaimSummary,
+} from "@/lib/report/ruleRows";
 import { RuleTable } from "./RuleTable";
 import { EvidenceList } from "./EvidenceList";
 import { GeneratePassport } from "./GeneratePassport";
@@ -298,15 +307,20 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
     assessment.context.inbound_transport,
   );
 
+  // One entry per RULE, not per card: report.upcoming carries a card per
+  // component, so a component-scoped rule repeated once per component.
+  const upcomingRules = groupCardsByRule(report.upcoming);
+  const earliestUpcoming = earliestTriggerDate(upcomingRules);
+
   const sections = [
     { id: "summary", label: "Summary" },
     ...(report.caveats.length > 0 ? [{ id: "caveats", label: "Pending & caveats" }] : []),
-    ...(report.upcoming.length > 0 ? [{ id: "upcoming", label: "Not yet applicable" }] : []),
     { id: "components", label: "Components" },
     ...(report.packagingUnit.length > 0 ? [{ id: "packaging-unit", label: "Packaging unit" }] : []),
     ...(report.organisation.length > 0 ? [{ id: "organisation", label: "Organisation" }] : []),
     { id: "footprint", label: "Footprint" },
     { id: "passport", label: "Passport" },
+    ...(upcomingRules.length > 0 ? [{ id: "upcoming", label: "Not yet applicable" }] : []),
     ...(obligations.length > 0 ? [{ id: "calendar", label: "Calendar" }] : []),
   ];
 
@@ -377,7 +391,9 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
         <Count n={report.counts.conditional} label="Conditional" href="#components" />
         <Count n={report.counts.gap} label="Gap" href="#components" />
         <Count n={report.counts.not_applicable} label="N/A" href="#components" />
-        <Count n={report.counts.upcoming} label="Upcoming" href={report.upcoming.length > 0 ? "#upcoming" : "#components"} />
+        {/* Counted per RULE so the chip matches the list it links to;
+            report.counts.upcoming is per card. */}
+        <Count n={upcomingRules.length} label="Upcoming" href={upcomingRules.length > 0 ? "#upcoming" : "#components"} />
         <Count n={report.counts.caveat} label="Caveats" href={report.caveats.length > 0 ? "#caveats" : "#components"} />
       </div>
 
@@ -416,38 +432,6 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
               <CaveatCard key={`${c.checkpointId}-${i}`} card={c} />
             ))}
           </div>
-        </section>
-      )}
-
-      {/* Not yet applicable — informational. These requirements exist but their
-          trigger date is after this assessment's as-of date, so they cannot be
-          satisfied today and are excluded from the qualified/conditional/gap
-          counts. They never block anything. */}
-      {report.upcoming.length > 0 && (
-        <section id="upcoming" className="scroll-mt-14">
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-500">
-            Not yet applicable ({report.upcoming.length})
-          </h2>
-          <p className="mb-3 text-xs text-neutral-500">
-            These requirements are in the corpus but do not apply as of {report.asOf}. They are shown so the
-            date is visible in advance; they are not gaps and do not affect the verdict counts or the
-            declaration-of-conformity gate.
-          </p>
-          <ul className="space-y-2">
-            {report.upcoming.map((c, i) => (
-              <li key={`${c.checkpointId}-${i}`} className="rounded-md border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900/40">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <p className="font-mono text-xs text-n600 dark:text-neutral-400" title={RULE_REFERENCE_TOOLTIP}>
-                    {ruleReference(c.checkpointId, c.version)}
-                  </p>
-                  <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
-                    {c.outcome?.detail}
-                  </span>
-                </div>
-                <p className="mt-1 text-sm text-neutral-700 dark:text-neutral-200">{c.requirementText}</p>
-              </li>
-            ))}
-          </ul>
         </section>
       )}
 
@@ -520,6 +504,99 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
           No verdicts have been produced: every applicable checkpoint in the corpus is still a draft pending
           regulatory approval. Once approved, this report renders verdicts with no change to the assessment.
         </p>
+      )}
+
+      {/* Not yet applicable — informational, and moved down here beside the
+          calendar because both answer "what happens later", not "what is wrong
+          today". It was sitting above Components, where seven repeated cards of
+          verbatim legal text pushed the actual verdicts below the fold.
+
+          GROUPED BY RULE. report.upcoming carries one card PER COMPONENT, so a
+          component-scoped rule appeared once per component — recyclability grade
+          rendered three identical times on the production report. The passport
+          already grouped; this did not. */}
+      {upcomingRules.length > 0 && (
+        <section id="upcoming" className="scroll-mt-14">
+          <details className="rounded-lg border border-n50 bg-card">
+            <summary className="cursor-pointer list-none px-4 py-3 marker:content-none">
+              <span className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+                Not yet applicable ({upcomingRules.length})
+              </span>
+              <span className="ml-2 text-xs text-neutral-500">
+                not gaps — none affects the verdict counts or the declaration gate
+                {earliestUpcoming ? `; earliest applies ${earliestUpcoming}` : ""}
+              </span>
+              <span className="ml-2 text-xs text-sky-700 underline">show</span>
+            </summary>
+            <div className="border-t border-n50 px-4 pb-4 pt-3">
+              <p className="mb-3 text-xs text-neutral-500">
+                These requirements are in the corpus but do not apply as of {report.asOf}. They are shown
+                so the date is visible in advance.
+              </p>
+              <ul className="space-y-2">
+                {upcomingRules.map((c) => (
+                  <li
+                    key={`${c.checkpointId}-${c.version}`}
+                    className="rounded-md border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900/40"
+                  >
+                    <p className="text-sm font-medium text-neutral-800 dark:text-neutral-100">
+                      {ruleName(c.checkpointId)}
+                    </p>
+                    <dl className="mt-1.5 space-y-1 text-xs">
+                      <div className="flex gap-2">
+                        <dt className="w-28 shrink-0 text-neutral-400">Why not yet</dt>
+                        <dd className="min-w-0 flex-1 text-neutral-600 dark:text-neutral-300">
+                          Not in force as of {report.asOf}
+                        </dd>
+                      </div>
+                      <div className="flex gap-2">
+                        <dt className="w-28 shrink-0 text-neutral-400">Applies from</dt>
+                        <dd className="min-w-0 flex-1 text-neutral-700 dark:text-neutral-200">
+                          {upcomingWhen(c.outcome?.detail)}
+                        </dd>
+                      </div>
+                    </dl>
+                    <p className="mt-1.5 text-xs text-neutral-500">
+                      {splitCitation(c.citation).text}
+                      {splitCitation(c.citation).url && (
+                        <>
+                          {" "}
+                          <a
+                            href={splitCitation(c.citation).url!}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-sky-700 underline"
+                          >
+                            primary source ↗
+                          </a>
+                        </>
+                      )}
+                    </p>
+                    {/* The verbatim legal text is the thing that made this section
+                        unreadable. It stays available, one more tap down. */}
+                    <details className="mt-2 rounded border border-neutral-100 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
+                      <summary className="cursor-pointer list-none px-2.5 py-1.5 text-xs marker:content-none">
+                        <span className="text-sky-700 underline">Read the full rule</span>
+                      </summary>
+                      <div className="px-2.5 pb-2.5 text-xs leading-relaxed text-neutral-600 dark:text-neutral-300">
+                        <p>{c.requirementText}</p>
+                        {c.laterOfCondition && (
+                          <p className="mt-1.5 text-neutral-500">Later-of clause: {c.laterOfCondition}</p>
+                        )}
+                      </div>
+                    </details>
+                    <p
+                      className="mt-1.5 font-mono text-[11px] text-neutral-300 dark:text-neutral-600"
+                      title={RULE_REFERENCE_TOOLTIP}
+                    >
+                      {ruleReference(c.checkpointId, c.version)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </details>
+        </section>
       )}
 
       {obligations.length > 0 && (
