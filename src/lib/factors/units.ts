@@ -63,7 +63,12 @@ export function toPerKilogram(value: number, unit: string | null | undefined): U
   if (!Number.isFinite(value)) throw new UnitError(`Factor value "${value}" is not a finite number.`);
   if (divisor === 1) return { factor: value, unit: CANONICAL_MASS_UNIT, note: null };
   return {
-    factor: value / divisor,
+    // Rounded to 12 significant figures. Dividing by 1000 in binary floating
+    // point turns BEIS's 3821.94858 into 3.8219485800000004, and that artefact
+    // was reaching the customer-facing footprint card verbatim. Providers publish
+    // at most ~9 significant figures, so 12 discards the noise without touching
+    // the value: 3.8219485800000004 → 3.82194858, and 269.50416/1000 → 0.26950416.
+    factor: Number((value / divisor).toPrecision(12)),
     unit: CANONICAL_MASS_UNIT,
     note: `Converted from ${value} ${unit} (÷ ${divisor}) to ${CANONICAL_MASS_UNIT}.`,
   };

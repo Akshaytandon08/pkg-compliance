@@ -351,6 +351,41 @@ const TIER_LABEL: Record<string, string> = {
   none: NO_FACTOR_LABEL,
 };
 
+/**
+ * A factor value as it should be printed. Rounds to 12 significant figures,
+ * which strips binary floating-point noise without touching any published
+ * precision — 3.8219485800000004 → "3.82194858".
+ *
+ * Selection rounds too (src/lib/factors/units.ts), so new rows are stored clean.
+ * This exists because rows selected BEFORE that fix are still in the database,
+ * and a stored artefact must not reach a customer's report just because it was
+ * written yesterday.
+ */
+export function formatFactorValue(value: number): string {
+  return String(Number(value.toPrecision(12)));
+}
+
+const BOUNDARY_LABEL: Record<string, string> = {
+  cradle_to_gate: "cradle-to-gate",
+  cradle_to_shelf: "cradle-to-shelf",
+  cradle_to_consumer: "cradle-to-consumer",
+  gate_to_grave: "gate-to-grave",
+  end_of_life: "end-of-life",
+  source_specific: "source-specific",
+};
+
+/**
+ * A factor's system boundary, as a reader would say it: "cradle_to_gate" →
+ * "cradle-to-gate". The value comes straight from the provider
+ * (Climatiq `source_lca_activity`), so it arrives as a raw identifier and would
+ * otherwise reach the report as one — which the rest of this module exists to
+ * prevent. Lower case: it reads mid-sentence after the region and year.
+ */
+export function factorBoundaryLabel(boundary: string | null | undefined): string | null {
+  if (!boundary) return null;
+  return BOUNDARY_LABEL[boundary] ?? boundary.replace(/_/g, "-");
+}
+
 /** "secondary_database" → "Secondary database". */
 export function factorTierLabel(tier: string): string {
   return TIER_LABEL[tier] ?? humanise(tier);

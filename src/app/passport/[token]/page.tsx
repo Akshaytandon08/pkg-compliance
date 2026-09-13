@@ -7,6 +7,7 @@ import {
   countryLabel,
   factorSourceLabel,
   factorTierLabel,
+  formatFactorValue,
   legalRoleLabel,
   ruleReference,
   verdictAriaLabel,
@@ -210,7 +211,7 @@ export default async function PassportPage({ params }: PageProps<"/passport/[tok
                   {" — "}
                   {factorSourceLabel(f)} · {f.region} · {f.year} · {factorTierLabel(f.tier)}
                   {f.value != null && f.unit ? (
-                    <span className="font-mono"> · {f.value} {f.unit}</span>
+                    <span className="font-mono"> · {formatFactorValue(f.value)} {f.unit}</span>
                   ) : (
                     <span className="italic"> · value not republished under the dataset licence</span>
                   )}
