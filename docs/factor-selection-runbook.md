@@ -220,3 +220,66 @@ sections until regenerated. That was accepted when the sprint was scoped.
 
 Local is already done: `npm run seed:demo-suite` and regeneration were run as part
 of the sprint.
+
+---
+
+## Appendix B — closed-loop rows for the recycled-content blend (Sprint 12)
+
+The blend is `factor = primary × (1 − r) + closed_loop × r`, with `r` the
+component's recycled share. It needs a SECOND row per material, stored under
+`--process production_closed_loop` so it sits alongside the primary row rather
+than superseding it. **Both rows are pinned**, so a screening reproduces its blend
+from pinned values even after either factor is re-selected.
+
+Until these are selected, every component renders `… BEIS primary only — no
+closed-loop factor selected for this material`, and **no figure changes**.
+
+All four rows are BEIS 2026 GB, `cradle_to_gate`, under OGL v3.0 — same licence,
+same year-pinning as the primary rows.
+
+### Local (window 1)
+
+```bash
+npm run factors:select -- --material corrugated --process production_closed_loop --activity-id paper_and_cardboard-type_board_closed_loop_source --selected-by "Akshay Tandon" --licence-note "OGL v3.0 — copy/publish/distribute/adapt with Crown copyright attribution" --permit-value-display --notes "Closed-loop (recycled-source) counterpart to the corrugated primary row, for the recycled-content blend. BEIS material use, cradle-to-gate GB 2026, 1096.62766 kg/tonne."
+```
+
+```bash
+npm run factors:select -- --material plastic --process production_closed_loop --activity-id plastics_rubber-type_pet_including_forming_closed_loop_source --selected-by "Akshay Tandon" --licence-note "OGL v3.0 — copy/publish/distribute/adapt with Crown copyright attribution" --permit-value-display --notes "Closed-loop counterpart to the PET primary row, for the recycled-content blend. BEIS material use, cradle-to-gate GB 2026, 2211.58251 kg/tonne."
+```
+
+### Production (window 2) — same two, each with `--remote`
+
+Append `--remote` to each command above. Nothing else changes.
+
+### Expected values after conversion
+
+| BOM material | activity_id | kgCO2e/kg |
+|---|---|---|
+| `corrugated` | `paper_and_cardboard-type_board_closed_loop_source` | 1.09662766 |
+| `plastic` | `plastics_rubber-type_pet_including_forming_closed_loop_source` | 2.21158251 |
+
+`factors:list` should then show **four** rows for these two materials — a
+`production` and a `production_closed_loop` each.
+
+### Wood and metals — asked for, and here is what BEIS actually publishes
+
+**Metals: a usable row exists.** `metals-type_closed_loop_source`, 1636.68994
+kg/tonne → **1.63668994 kgCO2e/kg**, GB 2026. This one matters for the demo: the
+golden pack's nails state **62% recycled**, so selecting it changes that
+component from 0.764 to about 0.497 kg CO2e and moves the pack total. Not printed
+above because it was not in the brief — decide deliberately, then:
+
+```bash
+npm run factors:select -- --material metal --process production_closed_loop --activity-id metals-type_closed_loop_source --selected-by "Akshay Tandon" --licence-note "OGL v3.0 — copy/publish/distribute/adapt with Crown copyright attribution" --permit-value-display --notes "Closed-loop counterpart to the generic metals primary row. BEIS 2026 GB, 1636.68994 kg/tonne. Also available and NOT chosen: metal_products-type_steel_cans_closed_loop_source (1821.58251) and metals-type_scrap_metal_closed_loop_source (1704.27272)."
+```
+
+**⚠️ Wood: a row exists and it is ZERO.**
+`timber_forestry-type_wood_closed_loop_source` is published at **0 kg/tonne**, GB
+2026 — BEIS attributes no production burden to a closed-loop wood source. Selecting
+it would mean a wood component at `r = 1` costs **0 kg CO2e**, and at `r = 0.5`
+costs half the primary. That is faithful to BEIS and reads on a customer's report
+like a bug.
+
+**Recommendation: do not select it** without deciding what you want a 100%-recycled
+wood component to say. No demo component is affected — the pine pallet states no
+recycled share — so nothing is lost by leaving it.

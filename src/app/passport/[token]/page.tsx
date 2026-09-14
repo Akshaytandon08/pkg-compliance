@@ -425,6 +425,7 @@ export default async function PassportPage({ params }: PageProps<"/passport/[tok
                       `${Math.round(c.recycledShare * 100)}%`
                     )}
                   </Row>
+                  {c.blend && <Row label="Factor">{c.blend}</Row>}
                   <Row label="Footprint">
                     {c.footprint ? (
                       <>

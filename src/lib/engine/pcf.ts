@@ -47,6 +47,10 @@ export type PcfComponentInput = {
   name: string;
   material: string;
   weightGrams: number | null;
+  /** Recycled content 0..1. NULL means NOT STATED, which is not the same as 0:
+   *  a component nobody asked is costed at the primary (virgin) factor and says
+   *  so, rather than being credited with a recycled share it never claimed. */
+  recycledShare?: number | null;
 };
 
 export type ComponentFootprint = {
@@ -54,9 +58,35 @@ export type ComponentFootprint = {
   name: string;
   material: string;
   massKg: number | null;
+  /** The PRIMARY factor. Kept as `factor` so every existing reader still works. */
   factor: EmissionFactor | null;
   kgCo2e: number | null; // null when unresolved (no weight or no factor)
   unresolvedReason?: "no_weight" | "no_factor";
+  /** How this component's factor was arrived at (Sprint 12). */
+  blend: FactorBlend | null;
+};
+
+/**
+ * Recycled-content blend: `primary × (1 − r) + closed_loop × r`.
+ *
+ * Every case is represented explicitly rather than collapsing to "primary" with
+ * no explanation, because the REASON a component was costed at the virgin factor
+ * is the part a reader needs — "nobody stated a share" and "the supplier stated
+ * none" are different facts, and "we have no closed-loop factor for this
+ * material" is a third.
+ */
+export type FactorBlend = {
+  /** The factor actually used, per kg. */
+  effective: number;
+  primary: EmissionFactor;
+  closedLoop: EmissionFactor | null;
+  /** 0..1, or null when the component does not state one. */
+  recycledShare: number | null;
+  reason:
+    | "blended"                  // r stated and a closed-loop factor exists
+    | "share_not_stated"         // r is null
+    | "share_zero"               // r === 0, stated
+    | "no_closed_loop_factor";   // r stated, but the material has no closed-loop row
 };
 
 export type TransportLeg = {
@@ -74,6 +104,53 @@ export type PackFootprint = {
   resolvedMassKg: number;
   unresolved: string[]; // component names lacking a weight or a factor
 };
+
+/** The process key a closed-loop (recycled-source) factor is stored under. Kept
+ *  distinct from "production" so the two live as separate rows on the same
+ *  material and BOTH can be pinned. */
+export const CLOSED_LOOP_PROCESS = "production_closed_loop";
+
+/**
+ * The factor a component is actually costed at, and why.
+ *
+ * `r` is never invented: a component that does not state a recycled share is
+ * costed at the primary factor and labelled as unstated. Blending an assumed
+ * share would understate a footprint on the strength of nothing.
+ */
+export function blendFor(
+  primary: EmissionFactor,
+  closedLoop: EmissionFactor | null,
+  recycledShare: number | null | undefined,
+): FactorBlend {
+  const r = recycledShare ?? null;
+  if (r === null) {
+    return { effective: primary.factor, primary, closedLoop, recycledShare: null, reason: "share_not_stated" };
+  }
+  if (!closedLoop) {
+    return { effective: primary.factor, primary, closedLoop: null, recycledShare: r, reason: "no_closed_loop_factor" };
+  }
+  if (r === 0) {
+    return { effective: primary.factor, primary, closedLoop, recycledShare: 0, reason: "share_zero" };
+  }
+  // Rounded to 12 significant figures for the same reason the unit conversion is
+  // (src/lib/factors/units.ts): binary floating point otherwise puts an artefact
+  // tail on a number that reaches a customer's report.
+  const effective = Number((primary.factor * (1 - r) + closedLoop.factor * r).toPrecision(12));
+  return { effective, primary, closedLoop, recycledShare: r, reason: "blended" };
+}
+
+/** The closed-loop (recycled-source) factor for a material, if one is selected.
+ *  Absent is the normal case and is NOT an error — it means the blend cannot be
+ *  computed and the component is costed at the primary factor, with a note. */
+function closedLoopFactor(factors: EmissionFactor[], material: string): EmissionFactor | null {
+  const exact = factors.find((f) => f.material === material && f.process === CLOSED_LOOP_PROCESS);
+  if (isUsableFactor(exact)) return exact;
+  if (exact) return null; // an explicit `none` is a decision, not a gap to fill
+  const parent = MATERIAL_PARENT[material];
+  if (!parent) return null;
+  const inherited = factors.find((f) => f.material === parent && f.process === CLOSED_LOOP_PROCESS);
+  return isUsableFactor(inherited) ? inherited : null;
+}
 
 /** Production factor for a material, if the owner has selected a usable one. */
 function productionFactor(factors: EmissionFactor[], material: string): EmissionFactor | null {
@@ -104,17 +181,21 @@ export function computePackFootprint(
     const massKg = c.weightGrams != null && c.weightGrams > 0 ? c.weightGrams / 1000 : null;
     const factor = productionFactor(factors, c.material);
     if (massKg == null) {
-      out.push({ line: c.line, name: c.name, material: c.material, massKg: null, factor, kgCo2e: null, unresolvedReason: "no_weight" });
+      out.push({ line: c.line, name: c.name, material: c.material, massKg: null, factor, kgCo2e: null, unresolvedReason: "no_weight", blend: null });
       unresolved.push(c.name);
       continue;
     }
     if (!factor) {
-      out.push({ line: c.line, name: c.name, material: c.material, massKg, factor: null, kgCo2e: null, unresolvedReason: "no_factor" });
+      out.push({ line: c.line, name: c.name, material: c.material, massKg, factor: null, kgCo2e: null, unresolvedReason: "no_factor", blend: null });
       unresolved.push(c.name);
       continue;
     }
-    const kgCo2e = massKg * factor.factor;
-    out.push({ line: c.line, name: c.name, material: c.material, massKg, factor, kgCo2e });
+    // The RECYCLED-CONTENT BLEND. A component's factor is the primary one only
+    // when it states no recycled share, states zero, or the material has no
+    // closed-loop factor selected — each of which the blend records as its reason.
+    const blend = blendFor(factor, closedLoopFactor(factors, c.material), c.recycledShare);
+    const kgCo2e = massKg * blend.effective;
+    out.push({ line: c.line, name: c.name, material: c.material, massKg, factor, kgCo2e, blend });
     total += kgCo2e;
     resolvedMassKg += massKg;
   }
