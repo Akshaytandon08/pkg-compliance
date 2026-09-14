@@ -22,6 +22,7 @@ import {
   riskAnnotationLabel,
   specDefinedByLabel,
 } from "@/lib/report/labels";
+import { massPlausibilityWarning } from "@/lib/intake/mass";
 import { OrganisationPicker } from "./OrganisationPicker";
 
 const input =
@@ -504,17 +505,38 @@ export default function NewAssessmentPage() {
                   </select>
                 </div>
                 <div>
-                  <label className={label}>Mass (kg)</label>
-                  <input
-                    type="number"
-                    className={input}
-                    inputMode="decimal"
-                    placeholder="e.g. 0.9"
-                    value={c.weight}
-                    onChange={(e) => updateComponent(ci, { weight: e.target.value })}
-                  />
+                  <label className={label} htmlFor={`mass-${ci}`}>Mass (kg)</label>
+                  {/* The unit is stated three times — label, placeholder and a
+                      persistent adornment — because it changed from grams, and
+                      the number a person types is the one thing no check can
+                      second-guess. The adornment is the one that stays visible
+                      once the field has a value in it. */}
+                  <div className="relative">
+                    <input
+                      id={`mass-${ci}`}
+                      type="number"
+                      className={`${input} pr-9`}
+                      inputMode="decimal"
+                      placeholder="e.g. 0.9 kg"
+                      value={c.weight}
+                      onChange={(e) => updateComponent(ci, { weight: e.target.value })}
+                    />
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-neutral-500"
+                    >
+                      kg
+                    </span>
+                  </div>
                   {massError(c.weight) && (
                     <p className="mt-1 text-xs text-red-600">{massError(c.weight)}</p>
+                  )}
+                  {/* A warning, never a block: a 900 kg component is possible,
+                      and only the person who knows the pack can say. */}
+                  {!massError(c.weight) && massPlausibilityWarning(c.weight, c.material) && (
+                    <p className="mt-1 text-xs text-amber-700">
+                      {massPlausibilityWarning(c.weight, c.material)}
+                    </p>
                   )}
                 </div>
                 <div className="lg:col-span-2">
