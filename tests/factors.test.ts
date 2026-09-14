@@ -45,18 +45,40 @@ const CONTEXT: AssessmentContextRecord = {
   persona: "2b", declared_reusable: false, legal_role_facts: {},
 };
 
+/**
+ * Remove this file's factors and anything pinning them.
+ *
+ * Drop the pins BEFORE the factors: the FK is ON DELETE RESTRICT by design (an
+ * assessment's pinned factor must not vanish under it), and these test factors
+ * are visible to currentFactorSet() like any other — so ANY assessment evaluated
+ * while they exist pins them, including the demo packs. Without that ordering the
+ * cleanup fails with 23503 and leaves rows behind, which is exactly what it did:
+ * the leftovers then showed up in the owner's factors:list beside real selections.
+ *
+ * Ordering alone is not enough, though, and that cost a flaky run: as two
+ * separate statements there is a window between them in which a concurrent
+ * render's pinnedFactorSet() commits a NEW pin on a factor whose pins were just
+ * deleted — and the factor delete then dies on the same FK. So both deletes run
+ * in ONE transaction that first takes FOR UPDATE on the factor rows. That lock
+ * conflicts with the FOR SHARE pinnedFactorSet() holds: a pin already in flight
+ * commits before we proceed (and its pin is then deleted with the rest), and one
+ * that arrives later blocks until we commit, re-reads, and finds the factor gone.
+ */
 async function cleanup(s: ReturnType<typeof postgres>) {
   await s`delete from assessments where pack_name = ${PACK}`;
-  // Drop pins pointing at this file's factors BEFORE deleting them. The FK is ON
-  // DELETE RESTRICT by design (an assessment's pinned factor must not vanish
-  // under it), and these test factors are visible to currentFactorSet() like any
-  // other — so ANY assessment evaluated while they exist pins them, including the
-  // demo packs. Without this the cleanup fails with 23503 and leaves rows behind,
-  // which is exactly what it did: the leftovers then showed up in the owner's
-  // factors:list beside real selections.
-  await s`delete from assessment_factor_pins
-          where factor_id in (select id from emission_factors where material like ${PREFIX + "%"})`;
-  await s`delete from emission_factors where material like ${PREFIX + "%"}`;
+  await deleteFactors(s, s`material like ${PREFIX + "%"}`);
+}
+
+async function deleteFactors(
+  s: ReturnType<typeof postgres>,
+  predicate: ReturnType<ReturnType<typeof postgres>>,
+) {
+  await s.begin(async (tx) => {
+    await tx`select id from emission_factors where ${predicate} for update`;
+    await tx`delete from assessment_factor_pins
+             where factor_id in (select id from emission_factors where ${predicate})`;
+    await tx`delete from emission_factors where ${predicate}`;
+  });
 }
 
 if (url) {
@@ -162,13 +184,10 @@ test("pinning is recorded even when NOTHING was selected — so it never re-pins
     undefined,
     "a later selection must not leak into an already-evaluated assessment",
   );
-  // Drop pins first, for the same reason cleanup() does: this factor is visible
-  // to currentFactorSet() the moment it exists, so a CONCURRENT test file's
-  // assessment can pin it between its creation and this delete. The FK is ON
-  // DELETE RESTRICT by design.
-  await sql!`delete from assessment_factor_pins where factor_id in
-             (select id from emission_factors where material = ${MAT_EMPTY})`;
-  await sql!`delete from emission_factors where material = ${MAT_EMPTY}`;
+  // Drop pins first and under one lock, for the same reason cleanup() does: this
+  // factor is visible to currentFactorSet() the moment it exists, so a CONCURRENT
+  // test file's assessment can pin it between its creation and this delete.
+  await deleteFactors(sql!, sql!`material = ${MAT_EMPTY}`);
 });
 
 test("tier `none` is a recorded decision, not a factor", dbRequired, async () => {
