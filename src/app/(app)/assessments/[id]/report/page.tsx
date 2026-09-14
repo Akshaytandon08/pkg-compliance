@@ -20,8 +20,10 @@ import { getAllGuidance } from "@/db/guidance";
 import {
   NO_FACTOR_LABEL,
   RULE_REFERENCE_TOOLTIP,
+  blendSummary,
   factorBoundaryLabel,
   factorSourceLabel,
+  materialLabel,
   ruleName,
   formatFactorValue,
   factorTierLabel,
@@ -109,7 +111,13 @@ function kg(n: number): string {
   return `${Number(n.toPrecision(3))} kg CO₂e`;
 }
 
-function FactorCells({ factor }: { factor: EmissionFactor | null }) {
+function FactorCells({
+  factor,
+  blend,
+}: {
+  factor: EmissionFactor | null;
+  blend?: ReturnType<typeof computePackFootprint>["components"][number]["blend"];
+}) {
   if (!factor) {
     return (
       <>
@@ -122,7 +130,15 @@ function FactorCells({ factor }: { factor: EmissionFactor | null }) {
   }
   return (
     <>
-      <td className="py-1 pr-3 whitespace-nowrap">{formatFactorValue(factor.factor)} {factor.unit}</td>
+      <td className="py-1 pr-3">
+        {/* The EFFECTIVE factor leads — it is the number multiplied by the mass.
+            The blend line beneath shows how it was reached, including both
+            inputs, so a reader can decompose it rather than trust it. */}
+        <span className="whitespace-nowrap">
+          {formatFactorValue(blend ? blend.effective : factor.factor)} {factor.unit}
+        </span>
+        {blend && <span className="block text-neutral-500">{blendSummary(blend)}</span>}
+      </td>
       <td className="py-1 pr-3">
         {factorSourceLabel(factor)}
         <span className="block text-neutral-500">
@@ -166,7 +182,7 @@ function FootprintCard({ footprint }: { footprint: ReturnType<typeof computePack
               <tr key={c.line} className="border-t border-neutral-100 align-top dark:border-neutral-800/60">
                 <td className="py-1 pr-3">{c.line}. {c.name}</td>
                 <td className="py-1 pr-3 whitespace-nowrap">{c.massKg != null ? `${Number((c.massKg).toPrecision(3))} kg` : "—"}</td>
-                <FactorCells factor={c.factor} />
+                <FactorCells factor={c.factor} blend={c.blend} />
                 <td className="py-1 pr-3 text-right whitespace-nowrap">
                   {c.kgCo2e != null
                     ? Number(c.kgCo2e.toPrecision(3))
@@ -307,7 +323,7 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
   // better factor must not silently move the number that was reported.
   const factors = await pinnedFactorSet(assessment.id);
   const footprint = computePackFootprint(
-    assessment.components.map((c) => ({ line: c.line, name: c.name, material: c.material, weightGrams: c.weightGrams })),
+    assessment.components.map((c) => ({ line: c.line, name: c.name, material: c.material, weightGrams: c.weightGrams, recycledShare: c.recycledShare })),
     factors,
     assessment.context.inbound_transport,
   );
@@ -448,7 +464,7 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
             <div key={s.component.line}>
               <h3 className="mb-1 text-sm font-medium">
                 {s.component.line}. {s.component.name}{" "}
-                <span className="text-neutral-400">· {s.component.material}</span>
+                <span className="text-neutral-400">· {materialLabel(s.component.material)}</span>
               </h3>
               <AnnotationLine component={s.component} />
               <EvidenceList

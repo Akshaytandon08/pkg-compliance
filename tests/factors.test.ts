@@ -38,6 +38,7 @@ const MAT_PRECEDENCE = `${PREFIX}precedence`;
 const MAT_PIN = `${PREFIX}pin`;
 const MAT_EMPTY = `${PREFIX}empty`;
 const MAT_NONE = `${PREFIX}none`;
+const MAT_BLEND = `${PREFIX}blend`;
 const PACK = "FACTOR-TEST-pack";
 
 const CONTEXT: AssessmentContextRecord = {
@@ -188,6 +189,43 @@ test("pinning is recorded even when NOTHING was selected — so it never re-pins
   // factor is visible to currentFactorSet() the moment it exists, so a CONCURRENT
   // test file's assessment can pin it between its creation and this delete.
   await deleteFactors(sql!, sql!`material = ${MAT_EMPTY}`);
+});
+
+test("both the primary AND the closed-loop row are pinned, and the blend reproduces from pins alone", dbRequired, async () => {
+  // The blend rests on two rows. If only the primary were pinned, re-rendering a
+  // screening after the owner changed the closed-loop factor would silently
+  // re-cost it — the exact reproducibility guarantee pinning exists to give.
+  const { CLOSED_LOOP_PROCESS, blendFor } = await import("../src/lib/engine/pcf.ts");
+  await F!.selectFactor({ ...base, material: MAT_BLEND, factor: 1.19823866, tier: "secondary_database", source: "BEIS" });
+  await F!.selectFactor({
+    ...base, material: MAT_BLEND, process: CLOSED_LOOP_PROCESS,
+    factor: 1.09662766, tier: "secondary_database", source: "BEIS",
+  });
+
+  const id = await A!.createAssessment({
+    packName: PACK, asOf: "2026-09-14", context: CONTEXT,
+    components: [{ line: "1", name: "part", material: MAT_BLEND, weightGrams: 900, evidence: [] }],
+  });
+  const pinned = await F!.pinnedFactorSet(id);
+  const primary = pinned.find((f) => f.material === MAT_BLEND && f.process === "production")!;
+  const closed = pinned.find((f) => f.material === MAT_BLEND && f.process === CLOSED_LOOP_PROCESS)!;
+  assert.ok(primary && closed, "both rows must be pinned, not just the primary");
+
+  // 0.9 kg at 74% recycled = 0.9 × 1.12304652 = 1.010741868
+  const blend = blendFor(primary, closed, 0.74);
+  assert.ok(Math.abs(blend.effective - 1.12304652) < 1e-9, `blend from pins: ${blend.effective}`);
+
+  // The owner now changes the closed-loop factor. The pinned screening must not move.
+  await F!.selectFactor({
+    ...base, material: MAT_BLEND, process: CLOSED_LOOP_PROCESS,
+    factor: 0.5, tier: "primary", source: "Fitsol",
+  });
+  const again = await F!.pinnedFactorSet(id);
+  assert.equal(
+    again.find((f) => f.material === MAT_BLEND && f.process === CLOSED_LOOP_PROCESS)!.factor,
+    1.09662766,
+    "the pinned closed-loop value must survive a later selection",
+  );
 });
 
 test("tier `none` is a recorded decision, not a factor", dbRequired, async () => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { issuerTypeLabel } from "@/lib/report/labels";
+import { issuerTypeLabel, materialLabel } from "@/lib/report/labels";
 import { FileText, Pencil, X } from "lucide-react";
 import type { EvidenceRelied } from "@/lib/report/ruleRows";
 
@@ -114,7 +114,9 @@ export function EvidenceDrawer({ item, onClose }: { item: EvidenceRelied | null;
             )}
             {item.accreditationRef && <Row label="Accreditation">{item.accreditationRef}</Row>}
             {item.scope.components.length > 0 && <Row label="Covers components">{item.scope.components.join(", ")}</Row>}
-            {item.scope.materials.length > 0 && <Row label="Covers materials">{item.scope.materials.join(", ")}</Row>}
+            {item.scope.materials.length > 0 && (
+              <Row label="Covers materials">{item.scope.materials.map(materialLabel).join(", ")}</Row>
+            )}
             {item.scope.parameters.length > 0 && <Row label="Covers parameters">{item.scope.parameters.join(", ")}</Row>}
           </dl>
 
