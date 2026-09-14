@@ -13,6 +13,13 @@ import {
   SPEC_DEFINED_BY,
 } from "@/lib/vocab";
 import { Breadcrumbs } from "@/app/_components/Breadcrumbs";
+import {
+  customVsStandardisedLabel,
+  evidenceTypeLabel,
+  materialLabel,
+  riskAnnotationLabel,
+  specDefinedByLabel,
+} from "@/lib/report/labels";
 import { OrganisationPicker } from "./OrganisationPicker";
 
 const input =
@@ -325,7 +332,7 @@ export default function NewAssessmentPage() {
             <select className={input} value={customVsStd} onChange={(e) => setCustomVsStd(e.target.value)}>
               {CUSTOM_VS_STANDARDISED.map((v) => (
                 <option key={v} value={v}>
-                  {v}
+                  {customVsStandardisedLabel(v)}
                 </option>
               ))}
             </select>
@@ -335,7 +342,7 @@ export default function NewAssessmentPage() {
             <select className={input} value={specDefinedBy} onChange={(e) => setSpecDefinedBy(e.target.value)}>
               {SPEC_DEFINED_BY.map((v) => (
                 <option key={v} value={v}>
-                  {v}
+                  {specDefinedByLabel(v)}
                 </option>
               ))}
             </select>
@@ -386,7 +393,7 @@ export default function NewAssessmentPage() {
                   >
                     {BOM_MATERIALS.map((m) => (
                       <option key={m} value={m}>
-                        {m}
+                        {materialLabel(m)}
                       </option>
                     ))}
                   </select>
@@ -430,7 +437,7 @@ export default function NewAssessmentPage() {
                     <option value="">Not annotated (defaults to no inherent risk)</option>
                     {RISK_ANNOTATIONS.map((r) => (
                       <option key={r} value={r}>
-                        {r.replace(/_/g, " ")}
+                        {riskAnnotationLabel(r)}
                       </option>
                     ))}
                   </select>
@@ -470,7 +477,7 @@ export default function NewAssessmentPage() {
                       >
                         {EVIDENCE_TYPES.map((t) => (
                           <option key={t} value={t}>
-                            {t}
+                            {evidenceTypeLabel(t)}
                           </option>
                         ))}
                       </select>

@@ -1,5 +1,7 @@
 "use client";
 
+import { CLAIM_STATUS_LABEL, claimTypeLabel, materialLabel } from "@/lib/report/labels";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -100,8 +102,8 @@ function ClaimRow({
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-neutral-800">{claim.claimType}</span>
-            <span className={`rounded-full border px-2 py-0.5 text-xs ${badge}`}>{claim.status}</span>
+            <span className="text-sm font-medium text-neutral-800">{claimTypeLabel(claim.claimType)}</span>
+            <span className={`rounded-full border px-2 py-0.5 text-xs ${badge}`}>{CLAIM_STATUS_LABEL[claim.status] ?? claim.status}</span>
             {lowConfidence && pending && (
               <span className="rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
                 low confidence — verify
@@ -153,7 +155,7 @@ function ClaimRow({
             <option value="">Attach to component…</option>
             {components.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.name} ({c.material})
+                {c.name} ({materialLabel(c.material)})
               </option>
             ))}
           </select>
