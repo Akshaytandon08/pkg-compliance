@@ -15,7 +15,7 @@ import { getOrganisation } from "./organisations.ts";
 import { pinnedFactorSet } from "./factors.ts";
 import { evaluatePack, type CheckpointCard, type ProductionCheckpoint } from "../lib/engine/pack.ts";
 import type { EvidenceDocument } from "../lib/engine/evaluate.ts";
-import { describeThreshold, evidenceTypeLabel } from "../lib/report/labels.ts";
+import { blendSummary, describeThreshold, evidenceTypeLabel } from "../lib/report/labels.ts";
 import { computePackFootprint } from "../lib/engine/pcf.ts";
 
 // The PUBLIC tier of an assessment (disclosure model v2). The rule set is public
@@ -122,6 +122,10 @@ export type PassportPayload = {
       issuedDate: string | null;
     }[];
     footprint: { kgCo2e: number; datasetName: string } | null;
+    /** How the factor was reached. Present only when BOTH contributing rows
+     *  permit their value to be republished — a blend line names two numbers,
+     *  and one licensed row is enough to withhold it. */
+    blend?: string | null;
     /** Why it has no footprint, when it has none. */
     footprintExcludedReason: string | null;
   }[];
@@ -397,7 +401,7 @@ export async function buildPassportPayload(assessment: LoadedAssessment): Promis
     corpusVersion: assessment.corpusVersion,
   });
   const footprint = computePackFootprint(
-    assessment.components.map((c) => ({ line: c.line, name: c.name, material: c.material, weightGrams: c.weightGrams })),
+    assessment.components.map((c) => ({ line: c.line, name: c.name, material: c.material, weightGrams: c.weightGrams, recycledShare: c.recycledShare })),
     factors,
     assessment.context.inbound_transport,
   );
@@ -476,7 +480,13 @@ export async function buildPassportPayload(assessment: LoadedAssessment): Promis
   // the licensed VALUE only where the owner recorded that the terms allow it.
   const usedFactors = new Map<number, { material: string; f: NonNullable<(typeof footprint.components)[number]["factor"]> }>();
   for (const c of footprint.components) {
-    if (c.kgCo2e != null && c.factor) usedFactors.set(c.factor.id, { material: c.material, f: c.factor });
+    if (c.kgCo2e == null || !c.factor) continue;
+    usedFactors.set(c.factor.id, { material: c.material, f: c.factor });
+    // A blended component rests on BOTH rows, so both are attributed. Omitting
+    // the closed-loop row would credit a reduction to a source never named.
+    if (c.blend?.reason === "blended" && c.blend.closedLoop) {
+      usedFactors.set(c.blend.closedLoop.id, { material: c.material, f: c.blend.closedLoop });
+    }
   }
   if (footprint.transport) {
     usedFactors.set(footprint.transport.factor.id, { material: "transport", f: footprint.transport.factor });
@@ -528,6 +538,11 @@ export async function buildPassportPayload(assessment: LoadedAssessment): Promis
                   ? `${fp.factor.source} / ${fp.factor.sourceDataset}`
                   : fp.factor.source,
               }
+            : null,
+        blend:
+          fp?.blend && fp.blend.primary.valueDisplayPermitted &&
+          (fp.blend.closedLoop ? fp.blend.closedLoop.valueDisplayPermitted : true)
+            ? blendSummary(fp.blend)
             : null,
         footprintExcludedReason:
           fp?.kgCo2e == null

@@ -373,6 +373,45 @@ export function materialLabel(material: string): string {
   return MATERIAL_LABEL[material] ?? humanise(material);
 }
 
+// --- recycled-content blend -------------------------------------------------
+
+/**
+ * How a component's factor was arrived at, in one line.
+ *
+ * "45% recycled · blended 1.15251371 · BEIS primary 1.19823866 + closed-loop
+ * 1.09662766" — the blend and BOTH inputs, because a number a reader cannot
+ * decompose is a number they have to take on trust.
+ *
+ * The three non-blended cases each say WHY, and they are different facts:
+ * nobody stated a share, the supplier stated none, or we hold no closed-loop
+ * factor for the material.
+ */
+export function blendSummary(blend: {
+  effective: number;
+  recycledShare: number | null;
+  reason: "blended" | "share_not_stated" | "share_zero" | "no_closed_loop_factor";
+  primary: { factor: number; source: string };
+  closedLoop: { factor: number } | null;
+}): string {
+  const v = (n: number) => formatFactorValue(n);
+  switch (blend.reason) {
+    case "blended":
+      return (
+        `${Math.round(blend.recycledShare! * 100)}% recycled · blended ${v(blend.effective)} kgCO2e/kg · ` +
+        `${blend.primary.source} primary ${v(blend.primary.factor)} + closed-loop ${v(blend.closedLoop!.factor)}`
+      );
+    case "share_zero":
+      return `0% recycled (stated) · ${v(blend.effective)} kgCO2e/kg · ${blend.primary.source} primary`;
+    case "no_closed_loop_factor":
+      return (
+        `${Math.round(blend.recycledShare! * 100)}% recycled · ${v(blend.effective)} kgCO2e/kg · ` +
+        `${blend.primary.source} primary only — no closed-loop factor selected for this material`
+      );
+    case "share_not_stated":
+      return `recycled share not stated · ${v(blend.effective)} kgCO2e/kg · ${blend.primary.source} primary`;
+  }
+}
+
 // --- emission factors -------------------------------------------------------
 
 /** What a material with no selected factor reads as. Sprint 9 removed the seeded
