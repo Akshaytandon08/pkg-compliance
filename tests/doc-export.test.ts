@@ -82,6 +82,22 @@ test("a gap and a missing tech-doc each block with their own reason", () => {
   assert.ok(noTechDoc.blockers.some((b) => /technical-documentation/i.test(b)));
 });
 
+test("the blocker names the requirement, not its database id", () => {
+  const e = assessDoCEligibility(
+    euCtx,
+    report([
+      card("EU-PPWR-technical-documentation", "qualified"),
+      card("EU-PPWR-heavy-metals", "conditional"),
+      // The same rule on a second component must not repeat its own name.
+      card("EU-PPWR-heavy-metals", "conditional"),
+    ]),
+  );
+  const line = e.blockers.find((b) => /not every applicable requirement/i.test(b))!;
+  assert.ok(line.includes("Heavy metals limit (conditional)"), line);
+  assert.equal(line.match(/Heavy metals limit/g)!.length, 1, "deduplicated on the name");
+  assert.doesNotMatch(line, /EU-PPWR-/, "no checkpoint id reaches the screen");
+});
+
 test("empty destination Member States block", () => {
   const e = assessDoCEligibility({ ...euCtx, destination_member_states: [] }, report([card("EU-PPWR-technical-documentation", "qualified")]));
   assert.ok(e.blockers.some((b) => /Member States are not set/i.test(b)));

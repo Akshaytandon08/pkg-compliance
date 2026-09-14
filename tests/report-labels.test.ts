@@ -130,6 +130,13 @@ const RENDER_SOURCES = [
   // The inline add-evidence form renders evidence types too — it leaked
   // `supplier declaration` (underscore-stripped) until the live scan found it.
   "../src/app/(app)/assessments/[id]/report/AddEvidenceForm.tsx",
+  // INTAKE (Sprint 13). Absent from this list until today, which is exactly why
+  // the new-assessment form shipped rendering `wood_solid`, `supplier_declaration`
+  // and an underscore-stripped "no inherent risk" for months: the report and the
+  // passport were guarded and the screen that CREATES their data was not.
+  "../src/app/(app)/assessments/new/page.tsx",
+  "../src/app/(app)/assessments/new/OrganisationPicker.tsx",
+  "../src/app/(app)/assessments/[id]/evidence/ClaimReview.tsx",
 ];
 
 test("the report and passport never render a raw enum expression", () => {
@@ -253,9 +260,14 @@ test("the passport never calls anyone an auditor", () => {
 test("the rule reference is muted, tooltipped, and hides the version by default", () => {
   assert.equal(ruleReference("EU-PPWR-heavy-metals", 3), "EU-PPWR-heavy-metals");
   assert.equal(ruleReference("EU-PPWR-heavy-metals", 3, true), "EU-PPWR-heavy-metals@3");
-  // Only the surfaces that actually SHOW a rule reference — the add-evidence
-  // form renders none, so requiring one there would be meaningless.
-  const surfacesShowingTheReference = RENDER_SOURCES.filter((r) => r.endsWith("page.tsx"));
+  // Only the surfaces that actually SHOW a rule reference, named explicitly.
+  // This used to be inferred from the filename ending in "page.tsx", which broke
+  // the moment the intake page joined RENDER_SOURCES: the new-assessment form
+  // shows no rule references, so demanding a tooltip there was meaningless.
+  const surfacesShowingTheReference = [
+    "../src/app/(app)/assessments/[id]/report/page.tsx",
+    "../src/app/passport/[token]/page.tsx",
+  ];
   for (const rel of surfacesShowingTheReference) {
     const src = readFileSync(new URL(rel, import.meta.url), "utf8");
     assert.match(src, /RULE_REFERENCE_TOOLTIP/, `${rel}: the identifier must carry the tooltip`);

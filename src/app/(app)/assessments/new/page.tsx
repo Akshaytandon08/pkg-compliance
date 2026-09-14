@@ -8,11 +8,21 @@ import {
   DESTINATION_MARKETS,
   EU_MEMBER_STATES,
   EVIDENCE_TYPES,
+  ISSUER_TYPES,
   PERSONAS,
   RISK_ANNOTATIONS,
   SPEC_DEFINED_BY,
 } from "@/lib/vocab";
 import { Breadcrumbs } from "@/app/_components/Breadcrumbs";
+import {
+  customVsStandardisedLabel,
+  issuerTypeLabel,
+  evidenceTypeLabel,
+  materialLabel,
+  riskAnnotationLabel,
+  specDefinedByLabel,
+} from "@/lib/report/labels";
+import { massPlausibilityWarning } from "@/lib/intake/mass";
 import { OrganisationPicker } from "./OrganisationPicker";
 
 const input =
@@ -30,6 +40,9 @@ type EvidenceRow = {
   reference: string;
   issuedDate: string;
   expiryDate: string;
+  issuerName: string;
+  issuerType: string;
+  accreditationRef: string;
   scopeComponents: string;
   scopeMaterials: string;
   scopeParameters: string;
@@ -41,6 +54,11 @@ type ComponentRow = {
   composition: string;
   weight: string;
   sourcedFrom: string;
+  countryOfOrigin: string;
+  supplierName: string;
+  /** Percent as typed (0-100). Empty string = NOT STATED, which is stored as
+   *  null and is a different fact from a stated 0. */
+  recycledPercent: string;
   riskAnnotation: string; // "" = none | "no_inherent_risk" | "at_risk"
   riskRationale: string;
   evidence: EvidenceRow[];
@@ -51,6 +69,9 @@ const emptyEvidence = (): EvidenceRow => ({
   reference: "",
   issuedDate: "",
   expiryDate: "",
+  issuerName: "",
+  issuerType: "",
+  accreditationRef: "",
   scopeComponents: "",
   scopeMaterials: "",
   scopeParameters: "",
@@ -62,6 +83,9 @@ const emptyComponent = (): ComponentRow => ({
   composition: "",
   weight: "",
   sourcedFrom: "",
+  countryOfOrigin: "",
+  supplierName: "",
+  recycledPercent: "",
   riskAnnotation: "",
   riskRationale: "",
   evidence: [],
@@ -75,7 +99,10 @@ const csv = (s: string): string[] | undefined => {
 export default function NewAssessmentPage() {
   const [packName, setPackName] = useState("");
   const [description, setDescription] = useState("");
-  const [asOf, setAsOf] = useState("2026-08-12");
+  // Today, not a hardcoded date. The as-of date decides which rules are in force
+  // and which are not yet applicable, so a stale default silently mis-dates the
+  // screening — this was pinned to 2026-08-12 and was a month out.
+  const [asOf, setAsOf] = useState(() => new Date().toISOString().slice(0, 10));
 
   const [markets, setMarkets] = useState<string[]>(["EU"]);
   const [destinations, setDestinations] = useState<string[]>([]);
@@ -86,6 +113,8 @@ export default function NewAssessmentPage() {
   const [packagingBranded, setPackagingBranded] = useState(false);
   const [customVsStd, setCustomVsStd] = useState<string>(CUSTOM_VS_STANDARDISED[0]);
   const [specDefinedBy, setSpecDefinedBy] = useState<string>(SPEC_DEFINED_BY[0]);
+  const [actsForManufacturer, setActsForManufacturer] = useState(false);
+  const [manufacturerIsNonEu, setManufacturerIsNonEu] = useState(false);
   const [assessorName, setAssessorName] = useState("");
   const [organisationId, setOrganisationId] = useState<number | null>(null);
 
@@ -94,6 +123,30 @@ export default function NewAssessmentPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdId, setCreatedId] = useState<number | null>(null);
+
+  // --- inline validation and guidance ---------------------------------------
+  // Everything here is shown BESIDE the field it concerns. The audit found these
+  // failures were only discoverable on the report, after the screening existed.
+  const massError = (w: string): string | null => {
+    if (w.trim() === "") return null; // optional — the component is simply excluded
+    const n = Number(w);
+    if (!Number.isFinite(n)) return "Mass must be a number, in kilograms.";
+    if (n <= 0) return "Mass must be greater than zero.";
+    return null;
+  };
+  const recycledError = (v: string): string | null => {
+    if (v.trim() === "") return null;
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "Recycled content must be a number, or blank if not stated.";
+    if (n < 0 || n > 100) return "Recycled content is a percentage between 0 and 100.";
+    return null;
+  };
+  const namedComponents = components.filter((c) => c.name.trim() !== "");
+  const invalid =
+    packName.trim() === "" ||
+    namedComponents.length === 0 ||
+    components.some((c) => c.name.trim() === "") ||
+    components.some((c) => massError(c.weight) !== null || recycledError(c.recycledPercent) !== null);
 
   const toggleDestination = (ms: string) =>
     setDestinations((d) => (d.includes(ms) ? d.filter((x) => x !== ms) : [...d, ms]));
@@ -133,6 +186,8 @@ export default function NewAssessmentPage() {
           packaging_branded: packagingBranded,
           custom_vs_standardised: customVsStd,
           spec_defined_by: specDefinedBy,
+          acts_for_manufacturer: actsForManufacturer,
+          manufacturer_is_non_eu: manufacturerIsNonEu,
         },
       },
       components: components.map((c, i) => ({
@@ -140,8 +195,17 @@ export default function NewAssessmentPage() {
         name: c.name,
         material: c.material,
         composition: c.composition || null,
-        weightGrams: c.weight ? Number(c.weight) : null,
+        // Typed in KILOGRAMS, stored in grams. Validation above guarantees a
+        // positive finite number here, so this can never produce NaN — which
+        // JSON.stringify would have turned into a silent null, dropping the
+        // component out of the footprint with "no weight".
+        weightGrams: c.weight.trim() === "" ? null : Math.round(Number(c.weight) * 1000),
         sourcedFrom: c.sourcedFrom || null,
+        countryOfOrigin: c.countryOfOrigin || null,
+        supplierName: c.supplierName || null,
+        // Blank stays NULL ("not stated"); a typed 0 becomes 0 ("stated as none").
+        // Percent in, fraction out — the engine and the blend rule both want 0..1.
+        recycledShare: c.recycledPercent.trim() === "" ? null : Number(c.recycledPercent) / 100,
         riskAnnotation: c.riskAnnotation || null,
         riskRationale: c.riskAnnotation ? c.riskRationale || null : null,
         riskAnnotatedBy: c.riskAnnotation ? assessorName || "unattributed" : null,
@@ -150,6 +214,9 @@ export default function NewAssessmentPage() {
           reference: e.reference || null,
           issuedDate: e.issuedDate || null,
           expiryDate: e.expiryDate || null,
+          issuerName: e.issuerName || null,
+          issuerType: e.issuerType || null,
+          accreditationRef: e.accreditationRef || null,
           scopeComponents: csv(e.scopeComponents),
           scopeMaterials: csv(e.scopeMaterials),
           scopeParameters: csv(e.scopeParameters),
@@ -299,6 +366,11 @@ export default function NewAssessmentPage() {
                 </button>
               ))}
             </div>
+            {markets.includes("EU") && destinations.length === 0 && csv(extraDestinations) === undefined && (
+              <p className="mt-2 text-xs text-amber-700">
+                Registration rules cannot be evaluated until a Member State is selected.
+              </p>
+            )}
             <input
               className={`${input} mt-2`}
               placeholder="Additional Member States (comma-separated, e.g. FI, DK)"
@@ -325,7 +397,7 @@ export default function NewAssessmentPage() {
             <select className={input} value={customVsStd} onChange={(e) => setCustomVsStd(e.target.value)}>
               {CUSTOM_VS_STANDARDISED.map((v) => (
                 <option key={v} value={v}>
-                  {v}
+                  {customVsStandardisedLabel(v)}
                 </option>
               ))}
             </select>
@@ -335,10 +407,48 @@ export default function NewAssessmentPage() {
             <select className={input} value={specDefinedBy} onChange={(e) => setSpecDefinedBy(e.target.value)}>
               {SPEC_DEFINED_BY.map((v) => (
                 <option key={v} value={v}>
-                  {v}
+                  {specDefinedByLabel(v)}
                 </option>
               ))}
             </select>
+          </div>
+          {specDefinedBy === "customer" && (
+            <p className="sm:col-span-2 rounded border border-amber-300 bg-amber-50 px-2.5 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+              Your customer is the manufacturer under the Commission&rsquo;s interpretation — the
+              Declaration draft will be blocked unless you act for them.
+            </p>
+          )}
+          <div className="sm:col-span-2 flex flex-col gap-2">
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={actsForManufacturer}
+                onChange={(e) => setActsForManufacturer(e.target.checked)}
+              />
+              <span>
+                We act for the manufacturer
+                <span className="block text-xs text-neutral-500">
+                  Tick if you draw up the Declaration on the manufacturer&rsquo;s behalf. Without this,
+                  a specification defined by your customer blocks the Declaration draft.
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={manufacturerIsNonEu}
+                onChange={(e) => setManufacturerIsNonEu(e.target.checked)}
+              />
+              <span>
+                The manufacturer is established outside the EU
+                <span className="block text-xs text-neutral-500">
+                  Affects importer verification and any authorised-representative note on the
+                  Declaration draft. It is not an eligibility gate.
+                </span>
+              </span>
+            </label>
           </div>
           <div className="sm:col-span-3">
             <label className={label}>Assessor name (attribution for any risk annotations)</label>
@@ -374,8 +484,11 @@ export default function NewAssessmentPage() {
               </div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <div>
-                  <label className={label}>Name</label>
+                  <label className={label}>Name *</label>
                   <input className={input} value={c.name} onChange={(e) => updateComponent(ci, { name: e.target.value })} />
+                  {c.name.trim() === "" && (
+                    <p className="mt-1 text-xs text-red-600">A component needs a name before it can be screened.</p>
+                  )}
                 </div>
                 <div>
                   <label className={label}>Material</label>
@@ -386,19 +499,45 @@ export default function NewAssessmentPage() {
                   >
                     {BOM_MATERIALS.map((m) => (
                       <option key={m} value={m}>
-                        {m}
+                        {materialLabel(m)}
                       </option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className={label}>Weight (g)</label>
-                  <input
-                    type="number"
-                    className={input}
-                    value={c.weight}
-                    onChange={(e) => updateComponent(ci, { weight: e.target.value })}
-                  />
+                  <label className={label} htmlFor={`mass-${ci}`}>Mass (kg)</label>
+                  {/* The unit is stated three times — label, placeholder and a
+                      persistent adornment — because it changed from grams, and
+                      the number a person types is the one thing no check can
+                      second-guess. The adornment is the one that stays visible
+                      once the field has a value in it. */}
+                  <div className="relative">
+                    <input
+                      id={`mass-${ci}`}
+                      type="number"
+                      className={`${input} pr-9`}
+                      inputMode="decimal"
+                      placeholder="e.g. 0.9 kg"
+                      value={c.weight}
+                      onChange={(e) => updateComponent(ci, { weight: e.target.value })}
+                    />
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-neutral-500"
+                    >
+                      kg
+                    </span>
+                  </div>
+                  {massError(c.weight) && (
+                    <p className="mt-1 text-xs text-red-600">{massError(c.weight)}</p>
+                  )}
+                  {/* A warning, never a block: a 900 kg component is possible,
+                      and only the person who knows the pack can say. */}
+                  {!massError(c.weight) && massPlausibilityWarning(c.weight, c.material) && (
+                    <p className="mt-1 text-xs text-amber-700">
+                      {massPlausibilityWarning(c.weight, c.material)}
+                    </p>
+                  )}
                 </div>
                 <div className="lg:col-span-2">
                   <label className={label}>Composition</label>
@@ -416,6 +555,44 @@ export default function NewAssessmentPage() {
                     onChange={(e) => updateComponent(ci, { sourcedFrom: e.target.value })}
                   />
                 </div>
+                <div>
+                  <label className={label}>Country or region of origin</label>
+                  <input
+                    className={input}
+                    placeholder="e.g. Tamil Nadu, India"
+                    value={c.countryOfOrigin}
+                    onChange={(e) => updateComponent(ci, { countryOfOrigin: e.target.value })}
+                  />
+                  <p className="mt-1 text-xs text-neutral-500">Where it was made. Shown on the public passport.</p>
+                </div>
+                <div>
+                  <label className={label}>Made by (producer)</label>
+                  <input
+                    className={input}
+                    value={c.supplierName}
+                    onChange={(e) => updateComponent(ci, { supplierName: e.target.value })}
+                  />
+                  <p className="mt-1 text-xs text-neutral-500">A name only — no contact details reach the passport.</p>
+                </div>
+                <div>
+                  <label className={label}>Recycled content (%)</label>
+                  <input
+                    className={input}
+                    inputMode="decimal"
+                    placeholder="leave blank if not stated"
+                    value={c.recycledPercent}
+                    onChange={(e) => updateComponent(ci, { recycledPercent: e.target.value })}
+                  />
+                  {recycledError(c.recycledPercent) && (
+                    <p className="mt-1 text-xs text-red-600">{recycledError(c.recycledPercent)}</p>
+                  )}
+                  {/* Blank and 0 are DIFFERENT claims: blank means nobody stated a
+                      share, 0 means the supplier stated none. The passport renders
+                      them differently, so the form must not collapse them. */}
+                  <p className="mt-1 text-xs text-neutral-500">
+                    Leave blank for &ldquo;not stated&rdquo;. Enter 0 only if the supplier stated none.
+                  </p>
+                </div>
               </div>
 
               {/* Assessor risk annotation (optional) */}
@@ -430,7 +607,7 @@ export default function NewAssessmentPage() {
                     <option value="">Not annotated (defaults to no inherent risk)</option>
                     {RISK_ANNOTATIONS.map((r) => (
                       <option key={r} value={r}>
-                        {r.replace(/_/g, " ")}
+                        {riskAnnotationLabel(r)}
                       </option>
                     ))}
                   </select>
@@ -470,7 +647,7 @@ export default function NewAssessmentPage() {
                       >
                         {EVIDENCE_TYPES.map((t) => (
                           <option key={t} value={t}>
-                            {t}
+                            {evidenceTypeLabel(t)}
                           </option>
                         ))}
                       </select>
@@ -486,6 +663,42 @@ export default function NewAssessmentPage() {
                     <div>
                       <label className={label}>Expires</label>
                       <input type="date" className={input} value={e.expiryDate} onChange={(ev) => updateEvidence(ci, ei, { expiryDate: ev.target.value })} />
+                    </div>
+                    <div>
+                      <label className={label}>Issued by</label>
+                      <input
+                        className={input}
+                        placeholder="e.g. Orvantis Materials Laboratory"
+                        value={e.issuerName}
+                        onChange={(ev) => updateEvidence(ci, ei, { issuerName: ev.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className={label}>Issuer type</label>
+                      <select
+                        className={input}
+                        value={e.issuerType}
+                        onChange={(ev) => updateEvidence(ci, ei, { issuerType: ev.target.value })}
+                      >
+                        <option value="">— not stated —</option>
+                        {ISSUER_TYPES.map((t) => (
+                          <option key={t} value={t}>
+                            {issuerTypeLabel(t)}
+                          </option>
+                        ))}
+                      </select>
+                      {/* An accredited laboratory and a mill's own quality function
+                          are different strengths of evidence, and the passport says
+                          which. Left unstated it says nothing rather than guessing. */}
+                    </div>
+                    <div>
+                      <label className={label}>Accreditation reference</label>
+                      <input
+                        className={input}
+                        placeholder="e.g. NABL TC-9914 (ISO/IEC 17025)"
+                        value={e.accreditationRef}
+                        onChange={(ev) => updateEvidence(ci, ei, { accreditationRef: ev.target.value })}
+                      />
                     </div>
                     <div>
                       <label className={label}>Scope — components</label>
@@ -523,7 +736,7 @@ export default function NewAssessmentPage() {
       )}
 
       <div className="flex items-center gap-3">
-        <button type="button" className={btn} disabled={submitting} onClick={submit}>
+        <button type="button" className={btn} disabled={submitting || invalid} onClick={submit}>
           {submitting ? "Saving…" : "Create assessment"}
         </button>
         <Link href="/" className={btnGhost}>

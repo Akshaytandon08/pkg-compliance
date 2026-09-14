@@ -338,6 +338,39 @@ export function preparedForLine(org: {
     .join(" · ");
 }
 
+// --- intake vocabularies ----------------------------------------------------
+
+const CUSTOM_VS_STANDARDISED_LABEL: Record<string, string> = {
+  custom: "Custom — made to a specification",
+  standardised: "Standardised — an off-the-shelf item",
+};
+
+export function customVsStandardisedLabel(v: string): string {
+  return CUSTOM_VS_STANDARDISED_LABEL[v] ?? humanise(v);
+}
+
+/**
+ * Who defined the packaging specification. "user" is database language for the
+ * party filling the form, which on screen has to read as a person: "Us".
+ * The distinction decides who the manufacturer is under the Commission's
+ * interpretation, so the wording has to be unambiguous about which party is meant.
+ */
+const SPEC_DEFINED_BY_LABEL: Record<string, string> = {
+  user: "Us",
+  customer: "Our customer",
+  supplier: "Our supplier",
+};
+
+export function specDefinedByLabel(v: string): string {
+  return SPEC_DEFINED_BY_LABEL[v] ?? humanise(v);
+}
+
+/** The assessor's optional risk annotation, for the intake dropdown. Reuses
+ *  DESIGN_ASSESSMENT_LABEL so the intake and the report cannot disagree. */
+export function riskAnnotationLabel(v: string): string {
+  return DESIGN_ASSESSMENT_LABEL[v] ?? humanise(v);
+}
+
 // --- evidence issuers -------------------------------------------------------
 
 /** Who issued a piece of evidence, in words. The distinction a reader needs is

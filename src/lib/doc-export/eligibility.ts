@@ -1,6 +1,7 @@
 import type { PackReport, CheckpointCard } from "../engine/pack.ts";
 import type { AssessmentContextRecord } from "../../db/schema.ts";
 import { userMayDrawUp } from "./manufacturer.ts";
+import { ruleName, verdictLabel } from "../report/labels.ts";
 
 // Eligibility for a DRAFT EU declaration of conformity. The draft is only offered
 // when the screening actually supports it: every applicable in_force checkpoint is
@@ -57,8 +58,18 @@ export function assessDoCEligibility(context: AssessmentContextRecord, report: P
     (c) => c.checkpointId !== DOC_ITSELF_CHECKPOINT && c.outcome?.verdict && c.outcome.verdict !== "qualified",
   );
   if (notQualified.length > 0) {
-    const ids = [...new Set(notQualified.map((c) => `${c.checkpointId} (${c.outcome?.verdict})`))];
-    blockers.push(`Not every applicable requirement is qualified yet: ${ids.join(", ")}.`);
+    // The blocker is read by the person who has to clear it, so it names the
+    // requirement the way the rest of the report does. The id is a database key;
+    // "EU-PPWR-heavy-metals (conditional)" tells a packaging manager nothing they
+    // can act on, and it is the same rule the checkpoint list above calls
+    // "Heavy metals". Deduplicated on the NAME, not the id: one rule evaluated
+    // per component would otherwise repeat its own name three times.
+    const names = [
+      ...new Set(
+        notQualified.map((c) => `${ruleName(c.checkpointId)} (${verdictLabel(c.outcome!.verdict!).toLowerCase()})`),
+      ),
+    ];
+    blockers.push(`Not every applicable requirement is qualified yet: ${names.join(", ")}.`);
   }
 
   const techDoc = cards.find((c) => c.checkpointId === TECH_DOC_CHECKPOINT);
