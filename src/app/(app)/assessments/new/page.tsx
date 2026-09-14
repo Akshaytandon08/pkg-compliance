@@ -98,7 +98,10 @@ const csv = (s: string): string[] | undefined => {
 export default function NewAssessmentPage() {
   const [packName, setPackName] = useState("");
   const [description, setDescription] = useState("");
-  const [asOf, setAsOf] = useState("2026-08-12");
+  // Today, not a hardcoded date. The as-of date decides which rules are in force
+  // and which are not yet applicable, so a stale default silently mis-dates the
+  // screening — this was pinned to 2026-08-12 and was a month out.
+  const [asOf, setAsOf] = useState(() => new Date().toISOString().slice(0, 10));
 
   const [markets, setMarkets] = useState<string[]>(["EU"]);
   const [destinations, setDestinations] = useState<string[]>([]);
@@ -119,6 +122,30 @@ export default function NewAssessmentPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdId, setCreatedId] = useState<number | null>(null);
+
+  // --- inline validation and guidance ---------------------------------------
+  // Everything here is shown BESIDE the field it concerns. The audit found these
+  // failures were only discoverable on the report, after the screening existed.
+  const massError = (w: string): string | null => {
+    if (w.trim() === "") return null; // optional — the component is simply excluded
+    const n = Number(w);
+    if (!Number.isFinite(n)) return "Mass must be a number, in kilograms.";
+    if (n <= 0) return "Mass must be greater than zero.";
+    return null;
+  };
+  const recycledError = (v: string): string | null => {
+    if (v.trim() === "") return null;
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "Recycled content must be a number, or blank if not stated.";
+    if (n < 0 || n > 100) return "Recycled content is a percentage between 0 and 100.";
+    return null;
+  };
+  const namedComponents = components.filter((c) => c.name.trim() !== "");
+  const invalid =
+    packName.trim() === "" ||
+    namedComponents.length === 0 ||
+    components.some((c) => c.name.trim() === "") ||
+    components.some((c) => massError(c.weight) !== null || recycledError(c.recycledPercent) !== null);
 
   const toggleDestination = (ms: string) =>
     setDestinations((d) => (d.includes(ms) ? d.filter((x) => x !== ms) : [...d, ms]));
@@ -167,7 +194,11 @@ export default function NewAssessmentPage() {
         name: c.name,
         material: c.material,
         composition: c.composition || null,
-        weightGrams: c.weight ? Number(c.weight) : null,
+        // Typed in KILOGRAMS, stored in grams. Validation above guarantees a
+        // positive finite number here, so this can never produce NaN — which
+        // JSON.stringify would have turned into a silent null, dropping the
+        // component out of the footprint with "no weight".
+        weightGrams: c.weight.trim() === "" ? null : Math.round(Number(c.weight) * 1000),
         sourcedFrom: c.sourcedFrom || null,
         countryOfOrigin: c.countryOfOrigin || null,
         supplierName: c.supplierName || null,
@@ -334,6 +365,11 @@ export default function NewAssessmentPage() {
                 </button>
               ))}
             </div>
+            {markets.includes("EU") && destinations.length === 0 && csv(extraDestinations) === undefined && (
+              <p className="mt-2 text-xs text-amber-700">
+                Registration rules cannot be evaluated until a Member State is selected.
+              </p>
+            )}
             <input
               className={`${input} mt-2`}
               placeholder="Additional Member States (comma-separated, e.g. FI, DK)"
@@ -375,6 +411,12 @@ export default function NewAssessmentPage() {
               ))}
             </select>
           </div>
+          {specDefinedBy === "customer" && (
+            <p className="sm:col-span-2 rounded border border-amber-300 bg-amber-50 px-2.5 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+              Your customer is the manufacturer under the Commission&rsquo;s interpretation — the
+              Declaration draft will be blocked unless you act for them.
+            </p>
+          )}
           <div className="sm:col-span-2 flex flex-col gap-2">
             <label className="flex items-start gap-2 text-sm">
               <input
@@ -441,8 +483,11 @@ export default function NewAssessmentPage() {
               </div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <div>
-                  <label className={label}>Name</label>
+                  <label className={label}>Name *</label>
                   <input className={input} value={c.name} onChange={(e) => updateComponent(ci, { name: e.target.value })} />
+                  {c.name.trim() === "" && (
+                    <p className="mt-1 text-xs text-red-600">A component needs a name before it can be screened.</p>
+                  )}
                 </div>
                 <div>
                   <label className={label}>Material</label>
@@ -459,13 +504,18 @@ export default function NewAssessmentPage() {
                   </select>
                 </div>
                 <div>
-                  <label className={label}>Weight (g)</label>
+                  <label className={label}>Mass (kg)</label>
                   <input
                     type="number"
                     className={input}
+                    inputMode="decimal"
+                    placeholder="e.g. 0.9"
                     value={c.weight}
                     onChange={(e) => updateComponent(ci, { weight: e.target.value })}
                   />
+                  {massError(c.weight) && (
+                    <p className="mt-1 text-xs text-red-600">{massError(c.weight)}</p>
+                  )}
                 </div>
                 <div className="lg:col-span-2">
                   <label className={label}>Composition</label>
@@ -511,6 +561,9 @@ export default function NewAssessmentPage() {
                     value={c.recycledPercent}
                     onChange={(e) => updateComponent(ci, { recycledPercent: e.target.value })}
                   />
+                  {recycledError(c.recycledPercent) && (
+                    <p className="mt-1 text-xs text-red-600">{recycledError(c.recycledPercent)}</p>
+                  )}
                   {/* Blank and 0 are DIFFERENT claims: blank means nobody stated a
                       share, 0 means the supplier stated none. The passport renders
                       them differently, so the form must not collapse them. */}
@@ -661,7 +714,7 @@ export default function NewAssessmentPage() {
       )}
 
       <div className="flex items-center gap-3">
-        <button type="button" className={btn} disabled={submitting} onClick={submit}>
+        <button type="button" className={btn} disabled={submitting || invalid} onClick={submit}>
           {submitting ? "Saving…" : "Create assessment"}
         </button>
         <Link href="/" className={btnGhost}>
