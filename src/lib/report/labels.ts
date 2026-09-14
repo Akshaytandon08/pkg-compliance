@@ -355,7 +355,7 @@ export function issuerTypeLabel(type: string): string {
 
 // --- materials -------------------------------------------------------------
 
-const MATERIAL_LABEL: Record<string, string> = {
+export const MATERIAL_LABEL: Record<string, string> = {
   corrugated: "Corrugated board",
   plastic: "Plastic",
   wood: "Wood",

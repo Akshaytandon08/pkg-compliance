@@ -18,9 +18,11 @@ import {
   RISK_LABEL,
   VALIDATION_LABEL,
   ISSUER_TYPE_LABEL,
+  MATERIAL_LABEL,
   VERDICT_LABEL,
   claimTypeLabel,
   issuerTypeLabel,
+  materialLabel,
   evidenceTypeLabel,
   humanise,
   reasonLabel,
@@ -28,7 +30,7 @@ import {
   verdictAriaLabel,
   verdictLabel,
 } from "../src/lib/report/labels.ts";
-import { EVIDENCE_TYPES, ISSUER_TYPES } from "../src/lib/vocab.ts";
+import { EVIDENCE_TYPES, ISSUER_TYPES, MATERIALS } from "../src/lib/vocab.ts";
 import { LEGIBILITY } from "../src/lib/extraction/types.ts";
 import { PROMPTS } from "../src/lib/extraction/prompts.ts";
 
@@ -198,6 +200,43 @@ test("every issuer type has a readable label, from ONE definition", () => {
       /const ISSUER_TYPE_LABEL/,
       `${rel} defines its own issuer-type map instead of importing the one in labels.ts`,
     );
+  }
+});
+
+test("every BOM material has a readable label, and no render source prints one raw", () => {
+  // `wood_solid` reached the REPORT verbatim — twice: the component heading and
+  // the evidence drawer's "Covers materials". The passport had been fixed in
+  // Sprint 10 and the report had not, which is exactly the drift a per-file fix
+  // invites. This asserts the CLASS, not the two instances.
+  for (const m of MATERIALS) {
+    assert.ok(MATERIAL_LABEL[m], `material "${m}" has no label`);
+    assertReadable(materialLabel(m), `material ${m}`);
+  }
+  assert.equal(materialLabel("some_new_material"), "Some new material");
+
+  // No rendered source may interpolate a material straight into markup. The
+  // shapes below are the ones that actually occurred; a material reaching a
+  // reader must go through materialLabel().
+  const RAW_MATERIAL = [
+    /\{\s*[a-z]\w*(?:\.\w+)*\.material\s*\}/,           // {c.material}, {s.component.material}
+    /\{\s*[a-z]\w*(?:\.\w+)*\.materials\.join\(/,        // {x.materials.join(", ")}
+    /\{\s*[a-z]\w*(?:\.\w+)*\.materials\s*\}/,           // {x.materials}
+  ];
+  // Scoped to the REPORT surface, which is where the leak was. The passport is
+  // clean — every material it shows goes through materialLabel() — but it builds
+  // a React key as `${f.material}-…`, which is not rendered text and which this
+  // deliberately blunt pattern cannot tell apart from an interpolation.
+  const REPORT_SOURCES = [
+    "../src/app/(app)/assessments/[id]/report/page.tsx",
+    "../src/app/(app)/assessments/[id]/report/EvidenceDrawer.tsx",
+    "../src/app/(app)/assessments/[id]/report/RuleTable.tsx",
+    "../src/app/(app)/assessments/[id]/report/EvidenceList.tsx",
+  ];
+  for (const rel of REPORT_SOURCES) {
+    const src = readFileSync(new URL(rel, import.meta.url), "utf8");
+    for (const pattern of RAW_MATERIAL) {
+      assert.doesNotMatch(src, pattern, `${rel}: renders a material without materialLabel()`);
+    }
   }
 });
 

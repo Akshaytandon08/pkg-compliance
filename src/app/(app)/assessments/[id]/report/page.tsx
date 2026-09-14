@@ -23,6 +23,7 @@ import {
   blendSummary,
   factorBoundaryLabel,
   factorSourceLabel,
+  materialLabel,
   ruleName,
   formatFactorValue,
   factorTierLabel,
@@ -463,7 +464,7 @@ export default async function ReportPage({ params }: PageProps<"/assessments/[id
             <div key={s.component.line}>
               <h3 className="mb-1 text-sm font-medium">
                 {s.component.line}. {s.component.name}{" "}
-                <span className="text-neutral-400">· {s.component.material}</span>
+                <span className="text-neutral-400">· {materialLabel(s.component.material)}</span>
               </h3>
               <AnnotationLine component={s.component} />
               <EvidenceList
